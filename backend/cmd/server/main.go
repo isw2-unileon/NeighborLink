@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/isw2-unileon/proyect-scaffolding/backend/internal/config"
+	"github.com/isw2-unileon/neighborlink/backend/internal/config"
+	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
+	"github.com/isw2-unileon/neighborlink/backend/internal/usuario"
 )
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -22,6 +24,17 @@ func main() {
 	cfg := config.Load()
 
 	gin.SetMode(cfg.GinMode)
+
+	pool, err := database.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	logger.Info("database connection established")
+
+	usuarioRepo := usuario.NewPostgresRepository(pool)
+	usuarioHandler := usuario.NewHandler(usuarioRepo)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -34,6 +47,7 @@ func main() {
 	api.GET("/hello", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Hello from the API"})
 	})
+	usuarioHandler.RegisterRoutes(api)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
