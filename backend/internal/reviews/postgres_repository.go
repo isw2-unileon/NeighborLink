@@ -19,17 +19,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{pool: pool}
 }
 
-func (r *postgresRepository) FindByTransaction(ctx context.Context, transactionID string) ([]Review, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, transaction_id, reviewer_id, reviewed_id, rating, comment, created_at
-		FROM reviews
-		WHERE transaction_id = $1
-	`, transactionID)
-	if err != nil {
-		return nil, fmt.Errorf("reviews: query failed: %w", err)
-	}
-	defer rows.Close()
-
+func (r *postgresRepository) scanRows(rows pgx.Rows) ([]Review, error) {
 	reviews := make([]Review, 0)
 	for rows.Next() {
 		var rv Review
@@ -41,35 +31,32 @@ func (r *postgresRepository) FindByTransaction(ctx context.Context, transactionI
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("reviews: iteration failed: %w", err)
 	}
-
 	return reviews, nil
+}
+
+func (r *postgresRepository) FindByTransaction(ctx context.Context, transactionID string) ([]Review, error) {
+	rows, err := r.pool.Query(ctx, `
+        SELECT id, transaction_id, reviewer_id, reviewed_id, rating, comment, created_at
+        FROM reviews WHERE transaction_id = $1
+    `, transactionID)
+	if err != nil {
+		return nil, fmt.Errorf("reviews: query failed: %w", err)
+	}
+	defer rows.Close()
+	return r.scanRows(rows)
 }
 
 func (r *postgresRepository) FindByReviewed(ctx context.Context, reviewedID string) ([]Review, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, transaction_id, reviewer_id, reviewed_id, rating, comment, created_at
-		FROM reviews
-		WHERE reviewed_id = $1
-		ORDER BY created_at DESC
-	`, reviewedID)
+        SELECT id, transaction_id, reviewer_id, reviewed_id, rating, comment, created_at
+        FROM reviews WHERE reviewed_id = $1
+        ORDER BY created_at DESC
+    `, reviewedID)
 	if err != nil {
 		return nil, fmt.Errorf("reviews: query failed: %w", err)
 	}
 	defer rows.Close()
-
-	reviews := make([]Review, 0)
-	for rows.Next() {
-		var rv Review
-		if err := rows.Scan(&rv.ID, &rv.TransactionID, &rv.ReviewerID, &rv.ReviewedID, &rv.Rating, &rv.Comment, &rv.CreatedAt); err != nil {
-			return nil, fmt.Errorf("reviews: scan failed: %w", err)
-		}
-		reviews = append(reviews, rv)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("reviews: iteration failed: %w", err)
-	}
-
-	return reviews, nil
+	return r.scanRows(rows)
 }
 
 func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Review, error) {
