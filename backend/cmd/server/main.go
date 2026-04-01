@@ -12,8 +12,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/isw2-unileon/neighborlink/backend/internal/config"
+	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
+	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
-	"github.com/isw2-unileon/neighborlink/backend/internal/usuario"
+	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
+	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
+	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
 )
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -33,8 +37,8 @@ func main() {
 	defer pool.Close()
 	logger.Info("database connection established")
 
-	usuarioRepo := usuario.NewPostgresRepository(pool)
-	usuarioHandler := usuario.NewHandler(usuarioRepo)
+	userRepo := usersModule.NewPostgresRepository(pool)
+	userHandler := usersModule.NewHandler(userRepo)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -47,7 +51,23 @@ func main() {
 	api.GET("/hello", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Hello from the API"})
 	})
-	usuarioHandler.RegisterRoutes(api)
+	userHandler.RegisterRoutes(api)
+
+	listingRepo := listingsModule.NewPostgresRepository(pool)
+	listingHandler := listingsModule.NewHandler(listingRepo)
+	listingHandler.RegisterRoutes(api)
+
+	transactionRepo := transactionsModule.NewPostgresRepository(pool)
+	transactionHandler := transactionsModule.NewHandler(transactionRepo)
+	transactionHandler.RegisterRoutes(api)
+
+	messageRepo := messagesModule.NewPostgresRepository(pool)
+	messageHandler := messagesModule.NewHandler(messageRepo)
+	messageHandler.RegisterRoutes(api)
+
+	reviewRepo := reviewsModule.NewPostgresRepository(pool)
+	reviewHandler := reviewsModule.NewHandler(reviewRepo)
+	reviewHandler.RegisterRoutes(api)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
