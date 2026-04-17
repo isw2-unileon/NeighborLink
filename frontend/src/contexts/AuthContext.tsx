@@ -1,11 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-// Tipos que representa el usuario actual
-interface User {
-    id: string;
-    email: string;
-    name: string;
-}
+import type { User } from '../types';
+
 
 // Forma del contexto — lo que exponemos globalmente
 interface AuthContextValue {
