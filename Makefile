@@ -1,3 +1,8 @@
+# Carga .env automáticamente si existe
+ifneq (,$(wildcard .env))
+  include .env
+  export
+endif
 .PHONY: install run-backend run-frontend build-backend build-frontend test lint e2e
 
 ## Install all dependencies
