@@ -18,7 +18,8 @@ describe('api', () => {
         const { api } = await import('../lib/api')
         await api.get('/test')
 
-        const headers = mockFetch.mock.calls[0][1].headers
+        const call = mockFetch.mock.calls[0] as [string, RequestInit]
+        const headers = call[1].headers as Record<string, string>
         expect(headers['Content-Type']).toBe('application/json')
     })
 
@@ -32,7 +33,8 @@ describe('api', () => {
         const { api } = await import('../lib/api')
         await api.get('/test')
 
-        const headers = mockFetch.mock.calls[0][1].headers
+        const call = mockFetch.mock.calls[0] as [string, RequestInit]
+        const headers = call[1].headers as Record<string, string>
         expect(headers['Authorization']).toBe('Bearer test-token-123')
     })
 
@@ -45,7 +47,8 @@ describe('api', () => {
         const { api } = await import('../lib/api')
         await api.get('/test')
 
-        const headers = mockFetch.mock.calls[0][1].headers
+        const call = mockFetch.mock.calls[0] as [string, RequestInit]
+        const headers = call[1].headers as Record<string, string>
         expect(headers['Authorization']).toBeUndefined()
     })
 
