@@ -15,6 +15,7 @@ import (
 	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
+	stripeClient "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
 	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
@@ -58,7 +59,9 @@ func main() {
 	listingHandler.RegisterRoutes(api)
 
 	transactionRepo := transactionsModule.NewPostgresRepository(pool)
-	transactionHandler := transactionsModule.NewHandler(transactionRepo)
+	stripe := stripeClient.NewClient(cfg.StripeSecretKey)
+	transactionService := transactionsModule.NewService(transactionRepo, stripe)
+	transactionHandler := transactionsModule.NewHandler(transactionRepo, transactionService)
 	transactionHandler.RegisterRoutes(api)
 
 	messageRepo := messagesModule.NewPostgresRepository(pool)

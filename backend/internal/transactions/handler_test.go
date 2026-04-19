@@ -113,7 +113,7 @@ func (f *fakeRepository) UpdateStatus(ctx context.Context, id string, status str
 func setupRouter(repo transactions.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := transactions.NewHandler(repo)
+	h := transactions.NewHandler(repo, nil)
 	api := r.Group("/api")
 	h.RegisterRoutes(api)
 	return r
