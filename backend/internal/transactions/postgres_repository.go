@@ -101,3 +101,60 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 	defer rows.Close()
 	return r.scanRows(rows)
 }
+
+func (r *postgresRepository) Create(ctx context.Context, t Transaction) (*Transaction, error) {
+	var created Transaction
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO transactions (listing_id, borrower_id, status)
+		VALUES ($1, $2, 'pending')
+		RETURNING id, listing_id, borrower_id, status, agreed_at, handover_at, return_at
+	`, t.ListingID, t.BorrowerID).Scan(
+		&created.ID, &created.ListingID, &created.BorrowerID, &created.Status,
+		&created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("transactions: insert failed: %w", err)
+	}
+	return &created, nil
+}
+
+func (r *postgresRepository) UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions
+		SET stripe_payment_intent_id = $1,
+		    payment_method_id        = $2,
+		    status                   = 'agreed',
+		    agreed_at                = NOW()
+		WHERE id = $3
+	`, paymentIntentID, paymentMethodID, id)
+	if err != nil {
+		return fmt.Errorf("transactions: update payment intent failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status string) error {
+	var err error
+	switch status {
+	case "handed_over":
+		_, err = r.pool.Exec(ctx, `
+			UPDATE transactions
+			SET status = 'handed_over', handover_at = NOW()
+			WHERE id = $1
+		`, id)
+	case "returned":
+		_, err = r.pool.Exec(ctx, `
+			UPDATE transactions
+			SET status = 'returned', return_at = NOW()
+			WHERE id = $1
+		`, id)
+	default:
+		_, err = r.pool.Exec(ctx, `
+			UPDATE transactions SET status = $1 WHERE id = $2
+		`, status, id)
+	}
+	if err != nil {
+		return fmt.Errorf("transactions: update status failed: %w", err)
+	}
+	return nil
+}
