@@ -15,3 +15,11 @@ type Listing struct {
 	Status        string    `json:"status"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+// ListingInput is used for both create and update operations.
+type ListingInput struct {
+	Title         string   `json:"title"          binding:"required,max=120"`
+	Description   string   `json:"description"    binding:"required"`
+	Photos        []string `json:"photos"`
+	DepositAmount float64  `json:"deposit_amount" binding:"required,gt=0"`
+}
