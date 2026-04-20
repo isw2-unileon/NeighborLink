@@ -13,6 +13,7 @@ type Config struct {
 	JWTSecret       string
 }
 
+// Load reads configuration from environment variables and returns a Config.
 func Load() Config {
 	return Config{
 		Port:            getEnv("PORT", "8080"),

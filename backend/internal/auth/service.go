@@ -16,12 +16,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 )
 
-// Service define el contrato — DIP: el handler depende de esta interfaz
-type Service interface {
-	Register(ctx context.Context, req RegisterRequest) (*AuthResponse, error)
-	Login(ctx context.Context, req LoginRequest) (*AuthResponse, error)
-}
-
 type service struct {
 	pool      *pgxpool.Pool
 	jwtSecret []byte
@@ -32,44 +26,39 @@ func NewService(pool *pgxpool.Pool, jwtSecret string) Service {
 	return &service{pool: pool, jwtSecret: []byte(jwtSecret)}
 }
 
-func (s *service) Register(ctx context.Context, req RegisterRequest) (*AuthResponse, error) {
-	// 1. Verificar que el email no esté registrado
+func (s *service) Register(ctx context.Context, req RegisterRequest) (Response, error) {
 	var count int
 	err := s.pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", req.Email).Scan(&count)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	if count > 0 {
-		return nil, ErrEmailTaken
+		return Response{}, ErrEmailTaken
 	}
 
-	// 2. Hash de la contraseña con bcrypt (coste 12 = balance seguridad/velocidad)
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 
-	// 3. Insertar usuario y recuperar el registro creado
 	var user UserDTO
 	err = s.pool.QueryRow(ctx,
 		"INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id, email, name",
 		req.Email, req.Name, string(hash),
 	).Scan(&user.ID, &user.Email, &user.Name)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 
-	// 4. Generar JWT
 	token, err := s.generateToken(user.ID)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 
-	return &AuthResponse{Token: token, User: user}, nil
+	return Response{Token: token, User: user}, nil
 }
 
-func (s *service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
-	// 1. Buscar usuario por email
+func (s *service) Login(ctx context.Context, req LoginRequest) (Response, error) {
 	var user UserDTO
 	var hash string
 	err := s.pool.QueryRow(ctx,
@@ -77,29 +66,26 @@ func (s *service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, e
 		req.Email,
 	).Scan(&user.ID, &user.Email, &user.Name, &hash)
 	if err != nil {
-		// No revelar si el email existe o no — siempre mismo error
-		return nil, ErrInvalidCredentials
+		return Response{}, ErrInvalidCredentials
 	}
 
-	// 2. Comparar contraseña
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		return nil, ErrInvalidCredentials
+		return Response{}, ErrInvalidCredentials
 	}
 
-	// 3. Generar JWT
 	token, err := s.generateToken(user.ID)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 
-	return &AuthResponse{Token: token, User: user}, nil
+	return Response{Token: token, User: user}, nil
 }
 
 // generateToken es un método privado — Extract Method, DRY
 func (s *service) generateToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": userID,
-		"exp": time.Now().Add(24 * time.Hour).Unix(), // 24h
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
 		"iat": time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

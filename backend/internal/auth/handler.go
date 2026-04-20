@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -9,10 +10,13 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// Handler exposes HTTP handlers for the auth domain.
 type Handler struct{ svc Service }
 
+// NewHandler creates a new auth Handler with the given Service.
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 
+// RegisterRoutes mounts the auth routes onto the given router group.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	auth := rg.Group("/auth")
 	auth.POST("/register", h.register)
@@ -20,7 +24,6 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 // validationMessage traduce los errores técnicos de Gin/validator a mensajes legibles.
-// Extract Method + tabla de mensajes — DRY, fácil de extender con nuevas reglas.
 func validationMessage(fe validator.FieldError) string {
 	messages := map[string]map[string]string{
 		"Name": {
@@ -36,7 +39,6 @@ func validationMessage(fe validator.FieldError) string {
 			"min":      "La contraseña debe tener al menos 6 caracteres",
 		},
 	}
-
 	if fieldMessages, ok := messages[fe.Field()]; ok {
 		if msg, ok := fieldMessages[fe.Tag()]; ok {
 			return msg
@@ -46,7 +48,6 @@ func validationMessage(fe validator.FieldError) string {
 }
 
 // parseValidationErrors extrae el primer error de validación legible.
-// Devolvemos solo el primero para no abrumar al usuario — UX progresiva.
 func parseValidationErrors(err error) string {
 	var ve validator.ValidationErrors
 	if errors.As(err, &ve) && len(ve) > 0 {
@@ -55,40 +56,40 @@ func parseValidationErrors(err error) string {
 	return "Datos inválidos"
 }
 
-func (h *Handler) register(c *gin.Context) {
-	var req RegisterRequest
+// handleAuth encapsulates the common pattern: bind JSON → call service → respond.
+// Uses generics to avoid duplicating the same flow for register and login.
+func handleAuth[Req any, Resp any](
+	c *gin.Context,
+	svcFn func(context.Context, Req) (Resp, error),
+	domainErr error,
+	domainStatus int,
+	domainMsg string,
+	successStatus int,
+) {
+	var req Req
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": parseValidationErrors(err)})
 		return
 	}
-	resp, err := h.svc.Register(c.Request.Context(), req)
-	if errors.Is(err, ErrEmailTaken) {
-		c.JSON(http.StatusConflict, gin.H{"error": "Este email ya está registrado"})
+	resp, err := svcFn(c.Request.Context(), req)
+	if errors.Is(err, domainErr) {
+		c.JSON(domainStatus, gin.H{"error": domainMsg})
 		return
 	}
 	if err != nil {
-		slog.Error("register failed", "error", err)
+		slog.Error("auth request failed", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor"})
 		return
 	}
-	c.JSON(http.StatusCreated, resp)
+	c.JSON(successStatus, resp)
+}
+
+func (h *Handler) register(c *gin.Context) {
+	handleAuth(c, h.svc.Register, ErrEmailTaken,
+		http.StatusConflict, "Este email ya está registrado", http.StatusCreated)
 }
 
 func (h *Handler) login(c *gin.Context) {
-	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": parseValidationErrors(err)})
-		return
-	}
-	resp, err := h.svc.Login(c.Request.Context(), req)
-	if errors.Is(err, ErrInvalidCredentials) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email o contraseña incorrectos"})
-		return
-	}
-	if err != nil {
-		slog.Error("login failed", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor"})
-		return
-	}
-	c.JSON(http.StatusOK, resp)
+	handleAuth(c, h.svc.Login, ErrInvalidCredentials,
+		http.StatusUnauthorized, "Email o contraseña incorrectos", http.StatusOK)
 }

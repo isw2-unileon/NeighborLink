@@ -1,5 +1,5 @@
 // El middleware sirve cuando creemos rutas que requieran estar logueado — por ejemplo, crear un listing,
-// iniciar una transacción, etc. En ese momento sí tocaremos main.go para decirle a esas rutas que pasen por el middleware.
+// start a transaction, etc. At that point we will update main.go to route requests through the middleware.
 
 package auth
 
@@ -11,6 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// UserIDKey is the gin context key used to store the authenticated user's ID.
 const UserIDKey = "userID"
 
 // JWTMiddleware devuelve un middleware Gin que valida el Bearer token.
