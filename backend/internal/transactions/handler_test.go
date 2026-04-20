@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/isw2-unileon/neighborlink/backend/internal/transactions"
@@ -60,10 +62,58 @@ func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) 
 	return result, nil
 }
 
+func (f *fakeRepository) Create(ctx context.Context, t transactions.Transaction) (*transactions.Transaction, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	t.ID = fmt.Sprintf("fake-%d", len(f.transactions)+1)
+	t.Status = "pending"
+	f.transactions = append(f.transactions, t)
+	created := f.transactions[len(f.transactions)-1]
+	return &created, nil
+}
+
+func (f *fakeRepository) UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string) error {
+	if f.err != nil {
+		return f.err
+	}
+	now := time.Now()
+	for i, t := range f.transactions {
+		if t.ID == id {
+			f.transactions[i].StripePaymentIntentID = paymentIntentID
+			f.transactions[i].PaymentMethodID = paymentMethodID
+			f.transactions[i].Status = "agreed"
+			f.transactions[i].AgreedAt = &now
+			return nil
+		}
+	}
+	return fmt.Errorf("transaction %s not found", id)
+}
+
+func (f *fakeRepository) UpdateStatus(ctx context.Context, id string, status string) error {
+	if f.err != nil {
+		return f.err
+	}
+	now := time.Now()
+	for i, t := range f.transactions {
+		if t.ID == id {
+			f.transactions[i].Status = status
+			switch status {
+			case "handed_over":
+				f.transactions[i].HandoverAt = &now
+			case "returned":
+				f.transactions[i].ReturnAt = &now
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("transaction %s not found", id)
+}
+
 func setupRouter(repo transactions.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := transactions.NewHandler(repo)
+	h := transactions.NewHandler(repo, nil)
 	api := r.Group("/api")
 	h.RegisterRoutes(api)
 	return r
