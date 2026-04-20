@@ -1,2 +1,3 @@
-export { default as Input } from './Input';
-export { default as Button } from './Button';
+// src/components/ui/index.ts
+export { Input } from './Input';
+export { Button } from './Button';
