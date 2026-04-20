@@ -1,4 +1,3 @@
-// Package main is the entry point for the backend server.
 package main
 
 import (
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	authModule "github.com/isw2-unileon/neighborlink/backend/internal/auth"
 	"github.com/isw2-unileon/neighborlink/backend/internal/config"
 	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
@@ -40,6 +40,10 @@ func main() {
 	userRepo := usersModule.NewPostgresRepository(pool)
 	userHandler := usersModule.NewHandler(userRepo)
 
+	// Auth module
+	authSvc := authModule.NewService(pool, cfg.JWTSecret)
+	authHandler := authModule.NewHandler(authSvc)
+
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -52,6 +56,7 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Hello from the API"})
 	})
 	userHandler.RegisterRoutes(api)
+	authHandler.RegisterRoutes(api)
 
 	listingRepo := listingsModule.NewPostgresRepository(pool)
 	listingHandler := listingsModule.NewHandler(listingRepo)

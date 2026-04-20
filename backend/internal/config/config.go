@@ -9,6 +9,7 @@ type Config struct {
 	GinMode         string
 	CORSAllowOrigin string
 	DatabaseURL     string
+	JWTSecret       string // ← NUEVO
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -18,6 +19,7 @@ func Load() *Config {
 		GinMode:         getEnv("GIN_MODE", "debug"),
 		CORSAllowOrigin: getEnv("CORS_ALLOW_ORIGIN", "*"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
+		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-prod"), // ← NUEVO
 	}
 }
 
