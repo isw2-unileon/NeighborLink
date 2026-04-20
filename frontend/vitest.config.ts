@@ -8,7 +8,9 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "happy-dom",
+    environment: "jsdom",        // ← happy-dom no tiene localStorage completo
+    globals: true,               // ← evita importar describe/it/expect en cada test
+    setupFiles: ["./src/__tests__/setup.ts"],
     coverage: {
       provider: "v8",
       thresholds: {
