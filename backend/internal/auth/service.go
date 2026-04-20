@@ -99,7 +99,7 @@ func (s *service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, e
 func (s *service) generateToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": userID,
-		"exp": time.Now().Add(7 * 24 * time.Hour).Unix(), // 7 días
+		"exp": time.Now().Add(24 * time.Hour).Unix(), // 24h
 		"iat": time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

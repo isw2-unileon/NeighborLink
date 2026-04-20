@@ -9,17 +9,18 @@ type Config struct {
 	GinMode         string
 	CORSAllowOrigin string
 	DatabaseURL     string
-	JWTSecret       string // ← NUEVO
+	StripeSecretKey string
+	JWTSecret       string
 }
 
-// Load reads configuration from environment variables with sensible defaults.
-func Load() *Config {
-	return &Config{
+func Load() Config {
+	return Config{
 		Port:            getEnv("PORT", "8080"),
 		GinMode:         getEnv("GIN_MODE", "debug"),
 		CORSAllowOrigin: getEnv("CORS_ALLOW_ORIGIN", "*"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
-		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-prod"), // ← NUEVO
+		StripeSecretKey: getEnv("STRIPE_SECRET_KEY", ""),
+		JWTSecret:       getEnv("JWT_SECRET", "dev-secret-change-in-prod"),
 	}
 }
 
