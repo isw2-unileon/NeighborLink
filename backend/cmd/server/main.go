@@ -15,6 +15,7 @@ import (
 	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
+	stripeplatform "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
 	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
@@ -57,8 +58,13 @@ func main() {
 	listingHandler := listingsModule.NewHandler(listingRepo)
 	listingHandler.RegisterRoutes(api)
 
+	// If StripeSecretKey is empty, the client is initialised without a key and
+	// all Stripe calls will fail. This is acceptable in development when payment
+	// endpoints are not used.
+	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
 	transactionRepo := transactionsModule.NewPostgresRepository(pool)
-	transactionHandler := transactionsModule.NewHandler(transactionRepo)
+	transactionService := transactionsModule.NewService(transactionRepo, stripeClient)
+	transactionHandler := transactionsModule.NewHandler(transactionRepo, transactionService)
 	transactionHandler.RegisterRoutes(api)
 
 	messageRepo := messagesModule.NewPostgresRepository(pool)

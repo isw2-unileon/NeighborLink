@@ -9,6 +9,7 @@ type Config struct {
 	GinMode         string
 	CORSAllowOrigin string
 	DatabaseURL     string
+	StripeSecretKey string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -18,6 +19,7 @@ func Load() *Config {
 		GinMode:         getEnv("GIN_MODE", "debug"),
 		CORSAllowOrigin: getEnv("CORS_ALLOW_ORIGIN", "*"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
+		StripeSecretKey: getEnv("STRIPE_SECRET_KEY", ""),
 	}
 }
 
