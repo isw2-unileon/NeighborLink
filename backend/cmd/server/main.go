@@ -62,9 +62,6 @@ func main() {
 	})
 
 	api := r.Group("/api")
-	api.GET("/hello", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Hello from the API"})
-	})
 	userHandler.RegisterRoutes(api)
 	authHandler.RegisterRoutes(api)
 
@@ -89,7 +86,12 @@ func main() {
 	reviewHandler := reviewsModule.NewHandler(reviewRepo)
 	reviewHandler.RegisterRoutes(api)
 
-	srv := buildServer(cfg.Port, r)
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      r,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -113,13 +115,4 @@ func main() {
 	}
 
 	logger.Info("server stopped")
-}
-
-func buildServer(port string, handler http.Handler) *http.Server {
-	return &http.Server{
-		Addr:         ":" + port,
-		Handler:      handler,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
 }
