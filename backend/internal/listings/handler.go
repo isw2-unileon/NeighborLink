@@ -25,11 +25,9 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 
 	protected := rg.Group("/")
 	protected.Use(authMiddleware)
-	{
-		protected.POST("/listings", h.createListing)
-		protected.PUT("/listings/:id", h.updateListing)
-		protected.DELETE("/listings/:id", h.deleteListing)
-	}
+	protected.POST("/listings", h.createListing)
+	protected.PUT("/listings/:id", h.updateListing)
+	protected.DELETE("/listings/:id", h.deleteListing)
 }
 
 func (h *Handler) listListings(c *gin.Context) {

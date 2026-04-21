@@ -48,6 +48,20 @@ export default function CreateListingPage() {
     function addPhoto() {
         const url = photoInput.trim();
         if (!url) return;
+        
+        // Validar que sea una URL http/https válida
+        try {
+            const parsed = new URL(url);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                setError('La URL debe empezar por http:// o https://');
+                return;
+            }
+        } catch {
+            setError('La URL no es válida');
+            return;
+        }
+
+        setError(null);
         setForm(p => ({ ...p, photos: [...p.photos, url] }));
         setPhotoInput('');
     }

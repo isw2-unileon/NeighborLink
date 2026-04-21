@@ -3,14 +3,14 @@ package listings
 
 import "time"
 
-// Listing represents an item offered for loan by a user.
-// Pure business data — zero external dependencies.
 const (
 	StatusAvailable = "available"
 	StatusBorrowed  = "inactive"
 	StatusInactive  = "borrowed"
 )
 
+// Listing represents an item offered for loan by a user.
+// Pure business data — zero external dependencies.
 type Listing struct {
 	ID            string    `json:"id"`
 	OwnerID       string    `json:"owner_id"`
