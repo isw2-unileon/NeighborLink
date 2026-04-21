@@ -3,12 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Input, Button } from '../components/ui';
-import type { User } from '../types';
-
-interface AuthResponse {
-    token: string;
-    user: User;
-}
+import type { AuthResponse } from '../types';
 
 export default function LoginPage() {
     const navigate = useNavigate();
