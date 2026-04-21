@@ -3,6 +3,7 @@ package listings
 
 import "time"
 
+// Status values for a listing, matching the database check constraint.
 const (
 	StatusAvailable = "available"
 	StatusBorrowed  = "inactive"

@@ -17,6 +17,18 @@ const EMPTY_FORM: ListingInput = {
     deposit_amount: 0,
 };
 
+function sanitizeUrl(url: string): string {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            return parsed.href;
+        }
+    } catch {
+        // URL inválida
+    }
+    return '';
+}
+
 export default function CreateListingPage() {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -50,14 +62,9 @@ export default function CreateListingPage() {
         if (!url) return;
         
         // Validar que sea una URL http/https válida
-        try {
-            const parsed = new URL(url);
-            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-                setError('La URL debe empezar por http:// o https://');
-                return;
-            }
-        } catch {
-            setError('La URL no es válida');
+         const safe = sanitizeUrl(url);
+        if (!safe) {
+            setError('La URL no es válida o no empieza por http:// o https://');
             return;
         }
 
@@ -148,24 +155,29 @@ export default function CreateListingPage() {
 
                     {form.photos.length > 0 && (
                         <ul className="mt-2 space-y-2">
-                            {form.photos.map((url, i) => (
-                                <li key={i} className="flex items-center gap-2 text-sm">
-                                    <img
-                                        src={url}
-                                        alt=""
-                                        className="w-12 h-12 object-cover rounded-lg border"
-                                        onError={e => (e.currentTarget.style.display = 'none')}
-                                    />
-                                    <span className="flex-1 truncate text-gray-600">{url}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => removePhoto(i)}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        ✕
-                                    </button>
-                                </li>
-                            ))}
+                            {form.photos.map((url, i) => {
+                                const safeUrl = sanitizeUrl(url);
+                                if (!safeUrl) return null;
+                                return (
+                                    <li key={i} className="flex items-center gap-2 text-sm">
+                                        <img
+                                            src={safeUrl}
+                                            alt=""
+                                            referrerPolicy="no-referrer"
+                                            className="w-12 h-12 object-cover rounded-lg border"
+                                            onError={e => (e.currentTarget.style.display = 'none')}
+                                        />
+                                        <span className="flex-1 truncate text-gray-600">{url}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removePhoto(i)}
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            ✕
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>
