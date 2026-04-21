@@ -92,7 +92,7 @@ func (r *postgresRepository) Create(ctx context.Context, ownerID string, input L
 	var l Listing
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO listings (owner_id, title, description, photos, deposit_amount, status)
-		VALUES ($1, $2, $3, $4, $5, 'active')
+		VALUES ($1, $2, $3, $4, $5, 'available')
 		RETURNING id, owner_id, title, description, photos, deposit_amount, status, created_at
 	`, ownerID, input.Title, input.Description, input.Photos, input.DepositAmount,
 	).Scan(&l.ID, &l.OwnerID, &l.Title, &l.Description, &l.Photos, &l.DepositAmount, &l.Status, &l.CreatedAt)

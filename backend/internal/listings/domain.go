@@ -5,6 +5,12 @@ import "time"
 
 // Listing represents an item offered for loan by a user.
 // Pure business data — zero external dependencies.
+const (
+	StatusAvailable = "available"
+	StatusBorrowed  = "inactive"
+	StatusInactive  = "borrowed"
+)
+
 type Listing struct {
 	ID            string    `json:"id"`
 	OwnerID       string    `json:"owner_id"`
