@@ -66,7 +66,8 @@ func main() {
 	authHandler.RegisterRoutes(api)
 
 	listingRepo := listingsModule.NewPostgresRepository(pool)
-	listingHandler := listingsModule.NewHandler(listingRepo)
+	storageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
+	listingHandler := listingsModule.NewHandler(listingRepo, storageSvc)
 	listingHandler.RegisterRoutes(api, authMiddleware)
 
 	// If StripeSecretKey is empty, the client is initialised without a key and

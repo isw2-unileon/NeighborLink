@@ -31,4 +31,20 @@ export const listingsApi = {
 
     delete: (id: string) =>
         api.delete<void>(`/listings/${id}`),
+    uploadPhoto: (id: string, file: File): Promise<Listing> => {
+        const formData = new FormData();
+        formData.append('photo', file);
+        const token = localStorage.getItem('token');
+        return fetch(`${import.meta.env.VITE_API_URL ?? '/api'}/listings/${id}/photos`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+        }).then(async r => {
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(err.error ?? `HTTP ${r.status}`);
+            }
+            return r.json().then((d: { data: Listing }) => d.data);
+        });
+    },
 };

@@ -11,4 +11,5 @@ type Repository interface {
 	Create(ctx context.Context, ownerID string, input ListingInput) (*Listing, error)
 	Update(ctx context.Context, id string, input ListingInput) (*Listing, error)
 	Delete(ctx context.Context, id string) error
+	AddPhoto(ctx context.Context, id string, photoURL string) (*Listing, error)
 }

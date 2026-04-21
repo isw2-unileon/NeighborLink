@@ -16,7 +16,7 @@ export interface Listing {
     owner_id: string;
     title: string;
     description: string;
-    photos: string;
+    photos: string[];
     deposit_amount: number;
     status: string;
     created_at: string;

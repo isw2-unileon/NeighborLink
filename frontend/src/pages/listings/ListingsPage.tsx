@@ -60,9 +60,9 @@ export default function ListingsPage() {
                             to={`/listings/${listing.id}`}
                             className="border rounded-xl p-4 hover:shadow-md transition-shadow bg-white"
                         >
-                            {listing.photos && (
+                            {listing.photos && listing.photos.length > 0 && (
                                 <img
-                                    src={listing.photos}
+                                    src={listing.photos[0]}
                                     alt={listing.title}
                                     className="w-full h-40 object-cover rounded-lg mb-3"
                                 />

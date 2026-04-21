@@ -128,3 +128,21 @@ func (r *postgresRepository) Delete(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+func (r *postgresRepository) AddPhoto(ctx context.Context, id string, photoURL string) (*Listing, error) {
+	var l Listing
+	err := r.pool.QueryRow(ctx, `
+           UPDATE listings
+		SET photos = photos || to_jsonb($1::text)
+		WHERE id = $2
+		RETURNING id, owner_id, title, description, photos, deposit_amount, status, created_at
+    `, photoURL, id).Scan(&l.ID, &l.OwnerID, &l.Title, &l.Description, &l.Photos, &l.DepositAmount, &l.Status, &l.CreatedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("listings: add photo failed: %w", err)
+	}
+	return &l, nil
+}

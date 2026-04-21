@@ -11,6 +11,61 @@ interface ListingInput {
     deposit_amount: number;
 }
 
+// --- Componente carrusel aislado (SRP) ---
+function PhotoCarousel({ photos, alt }: { photos: string[]; alt: string }) {
+    const [current, setCurrent] = useState(0);
+
+    if (photos.length === 0) return null;
+
+    const prev = () => setCurrent(i => (i - 1 + photos.length) % photos.length);
+    const next = () => setCurrent(i => (i + 1) % photos.length);
+
+    return (
+        <div className="relative w-full mb-6 select-none">
+            {/* Imagen principal */}
+            <img
+                src={photos[current]}
+                alt={`${alt} - foto ${current + 1}`}
+                className="w-full max-h-96 object-contain rounded-xl bg-gray-50"
+            />
+
+            {/* Flechas — solo si hay más de una foto */}
+            {photos.length > 1 && (
+                <>
+                    <button
+                        onClick={prev}
+                        aria-label="Foto anterior"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow rounded-full w-9 h-9 flex items-center justify-center text-gray-700 transition"
+                    >
+                        ←
+                    </button>
+                    <button
+                        onClick={next}
+                        aria-label="Foto siguiente"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow rounded-full w-9 h-9 flex items-center justify-center text-gray-700 transition"
+                    >
+                        →
+                    </button>
+
+                    {/* Indicador de puntos */}
+                    <div className="flex justify-center gap-1.5 mt-2">
+                        {photos.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrent(i)}
+                                aria-label={`Ir a foto ${i + 1}`}
+                                className={`w-2 h-2 rounded-full transition-colors ${i === current ? 'bg-blue-600' : 'bg-gray-300'
+                                    }`}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+// --- Página principal ---
 export default function ListingDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
@@ -21,13 +76,14 @@ export default function ListingDetailPage() {
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [form, setForm] = useState<ListingInput>({
         title: '',
         description: '',
         photos: [],
         deposit_amount: 0,
     });
-console.log({ loading, error, listing });
+
     const isOwner = user?.id === listing?.owner_id;
 
     useEffect(() => {
@@ -38,7 +94,7 @@ console.log({ loading, error, listing });
                 setForm({
                     title: data.title,
                     description: data.description,
-                    photos: data.photos ? [data.photos] : [],
+                    photos: data.photos ?? [],
                     deposit_amount: data.deposit_amount,
                 });
             })
@@ -71,6 +127,21 @@ console.log({ loading, error, listing });
         }
     }
 
+    async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file || !id) return;
+        setUploading(true);
+        try {
+            const updated = await listingsApi.uploadPhoto(id, file);
+            setListing(updated);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error al subir foto');
+        } finally {
+            setUploading(false);
+            e.target.value = '';
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-64">
@@ -99,23 +170,20 @@ console.log({ loading, error, listing });
         <div className="max-w-2xl mx-auto p-6">
             {!editing ? (
                 <>
-                    {listing.photos && (
-                        <img
-                            src={listing.photos}
-                            alt={listing.title}
-                            className="w-full h-64 object-cover rounded-xl mb-6"
-                        />
-                    )}
+                    {/* Carrusel */}
+                    <PhotoCarousel
+                        photos={listing.photos ?? []}
+                        alt={listing.title}
+                    />
 
                     <div className="flex justify-between items-start">
                         <h1 className="text-3xl font-bold">{listing.title}</h1>
-                        <span className={`text-sm px-3 py-1 rounded-full font-medium ${
-                            listing.status === 'available'
+                        <span className={`text-sm px-3 py-1 rounded-full font-medium ${listing.status === 'available'
                                 ? 'bg-green-100 text-green-700'
                                 : listing.status === 'borrowed'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-600'
-                        }`}>
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-600'
+                            }`}>
                             {listing.status}
                         </span>
                     </div>
@@ -126,7 +194,6 @@ console.log({ loading, error, listing });
                         {listing.deposit_amount} € depósito
                     </p>
 
-                    {/* Botones visibles solo al owner */}
                     {isOwner && (
                         <div className="mt-6 flex gap-3">
                             <button
@@ -141,6 +208,16 @@ console.log({ loading, error, listing });
                             >
                                 Borrar
                             </button>
+                            <label className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium cursor-pointer">
+                                {uploading ? 'Subiendo...' : 'Subir foto'}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handlePhotoUpload}
+                                    disabled={uploading}
+                                />
+                            </label>
                         </div>
                     )}
                 </>
