@@ -89,12 +89,7 @@ func main() {
 	reviewHandler := reviewsModule.NewHandler(reviewRepo)
 	reviewHandler.RegisterRoutes(api)
 
-	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      r,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
+	srv := buildServer(cfg.Port, r)
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -118,4 +113,13 @@ func main() {
 	}
 
 	logger.Info("server stopped")
+}
+
+func buildServer(port string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:         ":" + port,
+		Handler:      handler,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
 }
