@@ -21,15 +21,14 @@ import (
 	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 func main() {
 	ctx := context.Background()
-
 	cfg := config.Load()
-
 	gin.SetMode(cfg.GinMode)
 
 	pool, err := database.NewPool(ctx, cfg.DatabaseURL)
@@ -40,15 +39,16 @@ func main() {
 	defer pool.Close()
 	logger.Info("database connection established")
 
-	authMiddleware := middleware.RequireAuth(cfg.JWTSecret)
+	r := buildRouter(cfg, pool)
 
-	userRepo := usersModule.NewPostgresRepository(pool)
-	userHandler := usersModule.NewHandler(userRepo)
+	if err := runServer(ctx, r, cfg.Port); err != nil {
+		logger.Error("shutdown error", "error", err)
+	}
+	logger.Info("server stopped")
+}
 
-	// Auth module
-	authSvc := authModule.NewService(pool, cfg.JWTSecret)
-	authHandler := authModule.NewHandler(authSvc)
-
+// buildRouter registra todos los módulos y devuelve el engine listo.
+func buildRouter(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Use(cors.New(cors.Config{
@@ -62,34 +62,44 @@ func main() {
 	})
 
 	api := r.Group("/api")
-	userHandler.RegisterRoutes(api)
-	authHandler.RegisterRoutes(api)
+	authMiddleware := middleware.RequireAuth(cfg.JWTSecret)
 
+	registerModules(api, authMiddleware, cfg, pool)
+
+	return r
+}
+
+// registerModules inicializa y registra cada módulo en el grupo /api.
+func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg config.Config, pool *pgxpool.Pool) {
+	// Users
+	usersModule.NewHandler(usersModule.NewPostgresRepository(pool)).RegisterRoutes(api)
+
+	// Auth
+	authModule.NewHandler(authModule.NewService(pool, cfg.JWTSecret)).RegisterRoutes(api)
+
+	// Listings
 	listingRepo := listingsModule.NewPostgresRepository(pool)
 	storageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
-	listingHandler := listingsModule.NewHandler(listingRepo, storageSvc)
-	listingHandler.RegisterRoutes(api, authMiddleware)
+	listingsModule.NewHandler(listingRepo, storageSvc).RegisterRoutes(api, authMiddleware)
 
-	// If StripeSecretKey is empty, the client is initialised without a key and
-	// all Stripe calls will fail. This is acceptable in development when payment
-	// endpoints are not used.
+	// Transactions
 	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
 	transactionRepo := transactionsModule.NewPostgresRepository(pool)
-	transactionService := transactionsModule.NewService(transactionRepo, stripeClient)
-	transactionHandler := transactionsModule.NewHandler(transactionRepo, transactionService)
-	transactionHandler.RegisterRoutes(api)
+	transactionSvc := transactionsModule.NewService(transactionRepo, stripeClient)
+	transactionsModule.NewHandler(transactionRepo, transactionSvc).RegisterRoutes(api)
 
-	messageRepo := messagesModule.NewPostgresRepository(pool)
-	messageHandler := messagesModule.NewHandler(messageRepo)
-	messageHandler.RegisterRoutes(api)
+	// Messages
+	messagesModule.NewHandler(messagesModule.NewPostgresRepository(pool)).RegisterRoutes(api)
 
-	reviewRepo := reviewsModule.NewPostgresRepository(pool)
-	reviewHandler := reviewsModule.NewHandler(reviewRepo)
-	reviewHandler.RegisterRoutes(api)
+	// Reviews
+	reviewsModule.NewHandler(reviewsModule.NewPostgresRepository(pool)).RegisterRoutes(api)
+}
 
+// runServer arranca el servidor HTTP y espera señal de shutdown.
+func runServer(ctx context.Context, handler http.Handler, port string) error {
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      r,
+		Addr:         ":" + port,
+		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
@@ -111,9 +121,5 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("shutdown error", "error", err)
-	}
-
-	logger.Info("server stopped")
+	return srv.Shutdown(shutdownCtx)
 }
