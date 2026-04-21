@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import PrivateRoute from './components/PrivateRoute'
 import HomePage from './pages/HomePage'
@@ -10,23 +11,30 @@ import ListingsDetailPage from './pages/listings/ListingDetailPage'
 import CreateListingPage from './pages/CreateListingPage'
 import ProfilePage from './pages/ProfilePage'
 
+// Redirige a /listings si ya hay sesión, si no muestra la página pasada
+function PublicHome() {
+  const { token } = useAuth();
+  return token ? <Navigate to="/listings" replace /> : <HomePage />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<PublicHome />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/listings" element={<ListingsPage />} />
-            <Route path="/listings/:id" element={<ListingsDetailPage />} />
 
-            {/* Rutas protegidas — requieren token */}
             <Route element={<PrivateRoute />}>
-              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/listings" element={<ListingsPage />} />
+              <Route path="/listings/:id" element={<ListingsDetailPage />} />
               <Route path="/listings/new" element={<CreateListingPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

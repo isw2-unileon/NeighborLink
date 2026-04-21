@@ -38,6 +38,9 @@ func validationMessage(fe validator.FieldError) string {
 			"required": "La contraseña es obligatoria",
 			"min":      "La contraseña debe tener al menos 6 caracteres",
 		},
+		"Address": {
+			"required": "La dirección es obligatoria",
+		},
 	}
 	if fieldMessages, ok := messages[fe.Field()]; ok {
 		if msg, ok := fieldMessages[fe.Tag()]; ok {
