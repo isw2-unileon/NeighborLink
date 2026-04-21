@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	authModule "github.com/isw2-unileon/neighborlink/backend/internal/auth"
 	"github.com/isw2-unileon/neighborlink/backend/internal/config"
@@ -50,15 +51,17 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
-
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{cfg.CORSAllowOrigin},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+	}))
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	api := r.Group("/api")
-	api.GET("/hello", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Hello from the API"})
-	})
 	userHandler.RegisterRoutes(api)
 	authHandler.RegisterRoutes(api)
 
