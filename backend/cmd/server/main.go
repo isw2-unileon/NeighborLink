@@ -15,6 +15,7 @@ import (
 	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
+	"github.com/isw2-unileon/neighborlink/backend/internal/platform/middleware"
 	stripeplatform "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
 	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
@@ -37,6 +38,8 @@ func main() {
 	}
 	defer pool.Close()
 	logger.Info("database connection established")
+
+	authMiddleware := middleware.RequireAuth(cfg.JWTSecret)
 
 	userRepo := usersModule.NewPostgresRepository(pool)
 	userHandler := usersModule.NewHandler(userRepo)
@@ -61,7 +64,7 @@ func main() {
 
 	listingRepo := listingsModule.NewPostgresRepository(pool)
 	listingHandler := listingsModule.NewHandler(listingRepo)
-	listingHandler.RegisterRoutes(api)
+	listingHandler.RegisterRoutes(api, authMiddleware)
 
 	// If StripeSecretKey is empty, the client is initialised without a key and
 	// all Stripe calls will fail. This is acceptable in development when payment
