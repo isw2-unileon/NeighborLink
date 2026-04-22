@@ -9,7 +9,7 @@ export default function Layout() {
 
     function handleLogout() {
         logout();
-        navigate('/login');
+        navigate('/');
     }
 
     return (
@@ -19,11 +19,11 @@ export default function Layout() {
                     NeighborLink
                 </Link>
                 <div className="flex items-center gap-4">
-                    <Link to="/listings" className="text-sm text-gray-600 hover:text-teal-700">
-                        Explorar
-                    </Link>
                     {user ? (
                         <>
+                            <Link to="/listings" className="text-sm text-gray-600 hover:text-teal-700">
+                                Explorar
+                            </Link>
                             <Link to="/profile" className="text-sm text-gray-600 hover:text-teal-700">
                                 {user.name}
                             </Link>

@@ -5,6 +5,7 @@ export interface User {
     id: string;
     email: string;
     name: string;
+    address: string;
     avatar_url: string;
     reputation_score: number;
     created_at: string;
@@ -15,7 +16,7 @@ export interface Listing {
     owner_id: string;
     title: string;
     description: string;
-    photos: string;
+    photos: string[];
     deposit_amount: number;
     status: string;
     created_at: string;
@@ -49,4 +50,9 @@ export interface Review {
     rating: number;
     comment: string;
     created_at: string;
+}
+
+export interface AuthResponse {
+    token: string;
+    user: User;
 }

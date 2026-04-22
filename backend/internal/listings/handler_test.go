@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	"github.com/stretchr/testify/assert"
 )
+
+// --- Fakes ---
 
 type fakeRepository struct {
 	listings []listings.Listing
@@ -84,7 +87,30 @@ func (f *fakeRepository) Delete(ctx context.Context, id string) error {
 	return f.err
 }
 
-// fakeAuthMiddleware inyecta un userID fijo en el contexto de Gin.
+// AddPhoto — necesario para cumplir la interface Repository tras añadir subida de fotos.
+func (f *fakeRepository) AddPhoto(ctx context.Context, id string, photoURL string) (*listings.Listing, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	for _, l := range f.listings {
+		if l.ID == id {
+			l.Photos = append(l.Photos, photoURL)
+			return &l, nil
+		}
+	}
+	return nil, nil
+}
+
+// fakeStorageService — implementación mínima de StorageService para tests.
+// Devuelve siempre una URL predecible sin llamar a ningún servicio real.
+type fakeStorageService struct{}
+
+func (f *fakeStorageService) UploadPhoto(listingID string, filename string, r io.Reader, contentType string) (string, error) {
+	return "https://fake-storage.test/" + listingID + "/photo.jpg", nil
+}
+
+// --- Helpers ---
+
 func fakeAuthMiddleware(userID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("userID", userID)
@@ -99,11 +125,13 @@ func setupRouter(repo listings.Repository) *gin.Engine {
 func setupRouterWithAuth(repo listings.Repository, auth gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := listings.NewHandler(repo)
+	h := listings.NewHandler(repo, &fakeStorageService{}) // 👈 segundo argumento añadido
 	api := r.Group("/api")
 	h.RegisterRoutes(api, auth)
 	return r
 }
+
+// --- Tests (sin cambios) ---
 
 func TestListListings(t *testing.T) {
 	tests := []struct {
@@ -287,7 +315,9 @@ func TestCreateListing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var auth gin.HandlerFunc
 			if tt.noAuth {
-				auth = func(c *gin.Context) { c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"}) }
+				auth = func(c *gin.Context) {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+				}
 			} else {
 				auth = fakeAuthMiddleware(tt.userID)
 			}

@@ -45,7 +45,7 @@ describe('LoginPage', () => {
             ok: true,
             json: async () => ({
                 token: 'jwt-token',
-                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '' },
+                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '', address: ''},
             }),
         })
 
@@ -65,7 +65,7 @@ describe('LoginPage', () => {
             ok: true,
             json: async () => ({
                 token: 'jwt-token',
-                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '' },
+                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '', address: ''},
             }),
         })
 

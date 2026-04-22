@@ -43,9 +43,11 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (Response, 
 
 	var user UserDTO
 	err = s.pool.QueryRow(ctx,
-		"INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id, email, name",
-		req.Email, req.Name, string(hash),
-	).Scan(&user.ID, &user.Email, &user.Name)
+		`INSERT INTO users (email, name, password_hash, address, location)
+         VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))
+         RETURNING id, email, name, address`,
+		req.Email, req.Name, string(hash), req.Address, req.Lng, req.Lat,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Address)
 	if err != nil {
 		return Response{}, err
 	}

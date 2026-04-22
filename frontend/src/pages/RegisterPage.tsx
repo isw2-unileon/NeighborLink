@@ -3,30 +3,51 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Input, Button } from '../components/ui';
-import type { User } from '../types';
-
-interface AuthResponse {
-    token: string;
-    user: User;
-}
+import type { AuthResponse } from '../types';
 
 export default function RegisterPage() {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const [form, setForm] = useState({ name: '', email: '', password: '' });
+    const [form, setForm] = useState({ name: '', email: '', password: '', address: '', lat: 0, lng: 0 });
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [geocoding, setGeocoding] = useState(false);
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     }
 
+    async function handleAddressBlur() {
+        if (!form.address.trim()) return;
+        setGeocoding(true);
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(form.address)}&format=json&limit=1`,
+                { headers: { 'Accept-Language': 'es' } }
+            );
+            const data = await res.json();
+            if (data.length === 0) {
+                setError('No se encontró la dirección, intenta ser más específico');
+                return;
+            }
+            setForm(prev => ({ ...prev, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }));
+            setError(null);
+        } catch {
+            setError('Error al resolver la dirección');
+        } finally {
+            setGeocoding(false);
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        if (!form.lat || !form.lng) {
+            setError('Por favor, introduce una dirección válida');
+            return;
+        }
         setError(null);
         setLoading(true);
-
         try {
             const resp = await api.post<AuthResponse>('/auth/register', form);
             login(resp.token, resp.user);
@@ -78,6 +99,24 @@ export default function RegisterPage() {
                         onChange={handleChange}
                         required
                     />
+                    <div>
+                        <Input
+                            label="Dirección"
+                            name="address"
+                            type="text"
+                            placeholder="Ej: Calle Mayor 5, León"
+                            value={form.address}
+                            onChange={handleChange}
+                            onBlur={handleAddressBlur}
+                            required
+                        />
+                        {geocoding && (
+                            <p className="mt-1 text-xs text-gray-400">Buscando dirección...</p>
+                        )}
+                        {form.lat !== 0 && !geocoding && (
+                            <p className="mt-1 text-xs text-teal-600">✓ Dirección encontrada</p>
+                        )}
+                    </div>
                     <Button type="submit" loading={loading}>
                         Registrarse
                     </Button>

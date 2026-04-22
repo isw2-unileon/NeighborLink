@@ -6,6 +6,7 @@ vi.stubGlobal('fetch', mockFetch)
 beforeEach(() => {
     mockFetch.mockReset()
     localStorage.clear()
+    vi.resetModules()
 })
 
 describe('api', () => {
