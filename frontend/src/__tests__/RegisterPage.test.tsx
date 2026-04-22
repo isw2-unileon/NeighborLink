@@ -74,7 +74,7 @@ describe('RegisterPage', () => {
                 ok: true,
                 json: async () => ({
                     token: 'jwt-token',
-                    user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '' },
+                    user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
                 }),
             })
 
@@ -94,7 +94,7 @@ describe('RegisterPage', () => {
                 ok: true,
                 json: async () => ({
                     token: 'jwt-token',
-                    user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '' },
+                    user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
                 }),
             })
 

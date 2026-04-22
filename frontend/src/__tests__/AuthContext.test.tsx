@@ -10,6 +10,7 @@ const mockUser: User = {
     avatar_url: '',
     reputation_score: 0,
     created_at: '2026-01-01T00:00:00Z',
+    address: '',
 }
 
 beforeEach(() => {
