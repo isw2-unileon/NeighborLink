@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,13 +19,18 @@ var (
 )
 
 type service struct {
-	pool      *pgxpool.Pool
-	jwtSecret []byte
+	pool       *pgxpool.Pool
+	jwtSecret  []byte
+	httpClient *http.Client
 }
 
 // NewService es el constructor — devuelve la interfaz, no el struct (DIP)
 func NewService(pool *pgxpool.Pool, jwtSecret string) Service {
-	return &service{pool: pool, jwtSecret: []byte(jwtSecret)}
+	return &service{
+		pool:       pool,
+		jwtSecret:  []byte(jwtSecret),
+		httpClient: &http.Client{Timeout: 5 * time.Second},
+	}
 }
 
 func (s *service) Register(ctx context.Context, req RegisterRequest) (Response, error) {
@@ -41,13 +48,28 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (Response, 
 		return Response{}, err
 	}
 
+	// Geocodificación — fallo no bloquea el registro
+	coords, err := geocode(ctx, s.httpClient, req.Address)
+	if err != nil {
+		slog.Warn("geocoding failed, registering without location", "address", req.Address, "error", err)
+	}
+
 	var user UserDTO
-	err = s.pool.QueryRow(ctx,
-		`INSERT INTO users (email, name, password_hash, address, location)
-         VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))
-         RETURNING id, email, name, address`,
-		req.Email, req.Name, string(hash), req.Address, req.Lng, req.Lat,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Address)
+	if coords != nil {
+		err = s.pool.QueryRow(ctx,
+			`INSERT INTO users (email, name, password_hash, address, location)
+             VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))
+             RETURNING id, email, name, address`,
+			req.Email, req.Name, string(hash), req.Address, coords.Lng, coords.Lat,
+		).Scan(&user.ID, &user.Email, &user.Name, &user.Address)
+	} else {
+		err = s.pool.QueryRow(ctx,
+			`INSERT INTO users (email, name, password_hash, address)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, email, name, address`,
+			req.Email, req.Name, string(hash), req.Address,
+		).Scan(&user.ID, &user.Email, &user.Name, &user.Address)
+	}
 	if err != nil {
 		return Response{}, err
 	}

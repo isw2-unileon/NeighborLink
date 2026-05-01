@@ -5,51 +5,51 @@ import { useAuth } from '../contexts/AuthContext';
 import { Input, Button } from '../components/ui';
 import type { AuthResponse } from '../types';
 
+const NO_NUMBERS_REGEX = /^[^\d]+$/;
+const ADDRESS_ERROR_MSG = 'Este campo solo admite letras. No incluyas números — no necesitamos saber el portal ni el piso.';
+
+type AddressFieldErrors = { street: string; city: string; province: string };
+
 export default function RegisterPage() {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const [form, setForm] = useState({ name: '', email: '', password: '', address: '', lat: 0, lng: 0 });
+    const [form, setForm] = useState({ name: '', email: '', password: '', street: '', city: '', province: '' });
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<AddressFieldErrors>({ street: '', city: '', province: '' });
     const [loading, setLoading] = useState(false);
-    const [geocoding, setGeocoding] = useState(false);
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-        setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setForm(prev => ({ ...prev, [name]: value }));
+        if (name in fieldErrors) {
+            setFieldErrors(prev => ({ ...prev, [name]: '' }));
+        }
     }
 
-    async function handleAddressBlur() {
-        if (!form.address.trim()) return;
-        setGeocoding(true);
-        try {
-            const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(form.address)}&format=json&limit=1`,
-                { headers: { 'Accept-Language': 'es' } }
-            );
-            const data = await res.json();
-            if (data.length === 0) {
-                setError('No se encontró la dirección, intenta ser más específico');
-                return;
-            }
-            setForm(prev => ({ ...prev, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }));
-            setError(null);
-        } catch {
-            setError('Error al resolver la dirección');
-        } finally {
-            setGeocoding(false);
-        }
+    function validateAddressFields(): boolean {
+        const errors: AddressFieldErrors = { street: '', city: '', province: '' };
+        if (!NO_NUMBERS_REGEX.test(form.street)) errors.street = ADDRESS_ERROR_MSG;
+        if (!NO_NUMBERS_REGEX.test(form.city)) errors.city = ADDRESS_ERROR_MSG;
+        if (!NO_NUMBERS_REGEX.test(form.province)) errors.province = ADDRESS_ERROR_MSG;
+        setFieldErrors(errors);
+        return !errors.street && !errors.city && !errors.province;
     }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!form.lat || !form.lng) {
-            setError('Por favor, introduce una dirección válida');
-            return;
-        }
+        if (!validateAddressFields()) return;
+
         setError(null);
         setLoading(true);
         try {
-            const resp = await api.post<AuthResponse>('/auth/register', form);
+            const address = `${form.street}, ${form.city}, ${form.province}, España`;
+            const resp = await api.post<AuthResponse>('/auth/register', {
+                name: form.name,
+                email: form.email,
+                password: form.password,
+                address,
+            });
             login(resp.token, resp.user);
             navigate('/listings');
         } catch (err) {
@@ -99,24 +99,55 @@ export default function RegisterPage() {
                         onChange={handleChange}
                         required
                     />
-                    <div>
-                        <Input
-                            label="Dirección"
-                            name="address"
-                            type="text"
-                            placeholder="Ej: Calle Mayor 5, León"
-                            value={form.address}
-                            onChange={handleChange}
-                            onBlur={handleAddressBlur}
-                            required
-                        />
-                        {geocoding && (
-                            <p className="mt-1 text-xs text-gray-400">Buscando dirección...</p>
-                        )}
-                        {form.lat !== 0 && !geocoding && (
-                            <p className="mt-1 text-xs text-teal-600">✓ Dirección encontrada</p>
-                        )}
+
+                    <div className="flex flex-col gap-3">
+                        <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                            📍 NeighborLink no necesita tu dirección exacta. Con la calle y tu localidad es suficiente para encontrar vecinos cerca de ti.
+                        </p>
+                        <div>
+                            <Input
+                                label="Calle"
+                                name="street"
+                                type="text"
+                                placeholder="Ej: Calle Mayor"
+                                value={form.street}
+                                onChange={handleChange}
+                                required
+                            />
+                            {fieldErrors.street && (
+                                <p className="mt-1 text-xs text-red-600">{fieldErrors.street}</p>
+                            )}
+                        </div>
+                        <div>
+                            <Input
+                                label="Localidad"
+                                name="city"
+                                type="text"
+                                placeholder="Ej: León"
+                                value={form.city}
+                                onChange={handleChange}
+                                required
+                            />
+                            {fieldErrors.city && (
+                                <p className="mt-1 text-xs text-red-600">{fieldErrors.city}</p>
+                            )}
+                        </div>
+                        <div>
+                            <Input
+                                label="Provincia"
+                                name="province"
+                                type="text"
+                                placeholder="Ej: León"
+                                value={form.province}
+                                onChange={handleChange}
+                                required
+                            />
+                            {fieldErrors.province && (
+                                <p className="mt-1 text-xs text-red-600">{fieldErrors.province}</p>
+                            )}
+                        </div>
                     </div>
+
                     <Button type="submit" loading={loading}>
                         Registrarse
                     </Button>
