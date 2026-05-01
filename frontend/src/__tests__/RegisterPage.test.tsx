@@ -8,12 +8,6 @@ import RegisterPage from '../pages/RegisterPage'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-// Respuesta de Nominatim que resuelve correctamente lat/lng
-const nominatimOk = {
-    ok: true,
-    json: async () => [{ lat: '42.5987', lon: '-5.5671' }],
-}
-
 beforeEach(() => {
     mockFetch.mockReset()
 })
@@ -31,23 +25,16 @@ function renderRegisterPage() {
     )
 }
 
-// Rellena el formulario, dispara el blur de dirección (geocodificación)
-// y luego hace click en submit.
-// mockFetch debe estar ya configurado antes de llamar a este helper.
 async function fillAndSubmit(
     user: ReturnType<typeof userEvent.setup>,
-    opts: { name?: string; email?: string; password?: string; address?: string } = {}
+    opts: { name?: string; email?: string; password?: string; street?: string; city?: string; province?: string } = {}
 ) {
     await user.type(screen.getByLabelText('Nombre'), opts.name ?? 'Nuevo')
     await user.type(screen.getByLabelText('Email'), opts.email ?? 'nuevo@a.com')
     await user.type(screen.getByLabelText('Contraseña'), opts.password ?? 'password123')
-    await user.type(screen.getByLabelText('Dirección'), opts.address ?? 'Calle Mayor 1, León')
-    // Disparamos blur para que handleAddressBlur llame a Nominatim
-    await user.tab()
-    // Esperamos a que desaparezca "Buscando dirección..."
-    await waitFor(() => {
-        expect(screen.queryByText('Buscando dirección...')).toBeNull()
-    })
+    await user.type(screen.getByLabelText('Calle'), opts.street ?? 'Calle Mayor')
+    await user.type(screen.getByLabelText('Localidad'), opts.city ?? 'León')
+    await user.type(screen.getByLabelText('Provincia'), opts.province ?? 'León')
     await user.click(screen.getByRole('button', { name: 'Registrarse' }))
 }
 
@@ -57,7 +44,9 @@ describe('RegisterPage', () => {
         expect(screen.getByLabelText('Nombre')).toBeDefined()
         expect(screen.getByLabelText('Email')).toBeDefined()
         expect(screen.getByLabelText('Contraseña')).toBeDefined()
-        expect(screen.getByLabelText('Dirección')).toBeDefined()
+        expect(screen.getByLabelText('Calle')).toBeDefined()
+        expect(screen.getByLabelText('Localidad')).toBeDefined()
+        expect(screen.getByLabelText('Provincia')).toBeDefined()
     })
 
     it('renderiza el botón de submit', () => {
@@ -67,16 +56,13 @@ describe('RegisterPage', () => {
 
     it('redirige a /listings tras registro exitoso', async () => {
         const user = userEvent.setup()
-        // 1ª llamada: Nominatim  |  2ª llamada: POST /auth/register
-        mockFetch
-            .mockResolvedValueOnce(nominatimOk)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    token: 'jwt-token',
-                    user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
-                }),
-            })
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                token: 'jwt-token',
+                user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
+            }),
+        })
 
         renderRegisterPage()
         await fillAndSubmit(user)
@@ -88,15 +74,13 @@ describe('RegisterPage', () => {
 
     it('guarda el token en localStorage tras registro exitoso', async () => {
         const user = userEvent.setup()
-        mockFetch
-            .mockResolvedValueOnce(nominatimOk)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    token: 'jwt-token',
-                    user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
-                }),
-            })
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                token: 'jwt-token',
+                user: { id: '1', email: 'nuevo@a.com', name: 'Nuevo', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
+            }),
+        })
 
         renderRegisterPage()
         await fillAndSubmit(user)
@@ -108,13 +92,11 @@ describe('RegisterPage', () => {
 
     it('muestra error cuando el email ya está registrado', async () => {
         const user = userEvent.setup()
-        mockFetch
-            .mockResolvedValueOnce(nominatimOk)
-            .mockResolvedValueOnce({
-                ok: false,
-                status: 409,
-                json: async () => ({ error: 'Este email ya está registrado' }),
-            })
+        mockFetch.mockResolvedValueOnce({
+            ok: false,
+            status: 409,
+            json: async () => ({ error: 'Este email ya está registrado' }),
+        })
 
         renderRegisterPage()
         await fillAndSubmit(user, { email: 'existente@a.com', name: 'Mario' })
@@ -126,14 +108,35 @@ describe('RegisterPage', () => {
 
     it('el botón muestra "Cargando…" mientras la petición está en vuelo', async () => {
         const user = userEvent.setup()
-        // Nominatim resuelve, el registro se queda colgado
-        mockFetch
-            .mockResolvedValueOnce(nominatimOk)
-            .mockReturnValueOnce(new Promise(() => { }))
+        mockFetch.mockReturnValueOnce(new Promise(() => { }))
 
         renderRegisterPage()
         await fillAndSubmit(user, { name: 'Mario', email: 'a@a.com' })
 
         expect(screen.getByText('Cargando…')).toBeDefined()
+    })
+
+    it('muestra error bajo el campo Calle si contiene números', async () => {
+        const user = userEvent.setup()
+        renderRegisterPage()
+        await fillAndSubmit(user, { street: 'Calle Mayor 5' })
+
+        expect(screen.getByText('Este campo solo admite letras. No incluyas números — no necesitamos saber el portal ni el piso.')).toBeDefined()
+    })
+
+    it('muestra error bajo el campo Localidad si contiene números', async () => {
+        const user = userEvent.setup()
+        renderRegisterPage()
+        await fillAndSubmit(user, { city: 'León 2' })
+
+        expect(screen.getByText('Este campo solo admite letras. No incluyas números — no necesitamos saber el portal ni el piso.')).toBeDefined()
+    })
+
+    it('muestra error bajo el campo Provincia si contiene números', async () => {
+        const user = userEvent.setup()
+        renderRegisterPage()
+        await fillAndSubmit(user, { province: 'León 3' })
+
+        expect(screen.getByText('Este campo solo admite letras. No incluyas números — no necesitamos saber el portal ni el piso.')).toBeDefined()
     })
 })
