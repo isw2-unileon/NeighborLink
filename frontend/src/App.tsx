@@ -10,6 +10,7 @@ import ListingsPage from './pages/listings/ListingsPage'
 import ListingsDetailPage from './pages/listings/ListingDetailPage'
 import CreateListingPage from './pages/CreateListingPage'
 import ProfilePage from './pages/ProfilePage'
+import EditProfilePage from './pages/EditProfilePage'
 
 // Redirige a /listings si ya hay sesión, si no muestra la página pasada
 function PublicHome() {
@@ -29,9 +30,10 @@ export default function App() {
 
             <Route element={<PrivateRoute />}>
               <Route path="/listings" element={<ListingsPage />} />
-              <Route path="/listings/:id" element={<ListingsDetailPage />} />
               <Route path="/listings/new" element={<CreateListingPage />} />
+              <Route path="/listings/:id" element={<ListingsDetailPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/edit" element={<EditProfilePage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

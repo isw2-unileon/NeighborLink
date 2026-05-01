@@ -47,4 +47,6 @@ export const listingsApi = {
             return r.json().then((d: { data: Listing }) => d.data);
         });
     },
+    getByOwner: (ownerID: string) =>
+        api.get<ListingsResponse>(`/users/${ownerID}/listings`).then(r => r.data),
 };

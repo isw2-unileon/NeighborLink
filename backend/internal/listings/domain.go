@@ -5,9 +5,11 @@ import "time"
 
 // Status values for a listing, matching the database check constraint.
 const (
-	StatusAvailable = "available"
-	StatusBorrowed  = "inactive"
-	StatusInactive  = "borrowed"
+	StatusAvailable       = "available"
+	StatusPendingHandover = "pending_handover"
+	StatusPendingReturn   = "pending_return"
+	StatusBorrowed        = "borrowed"
+	StatusInactive        = "inactive"
 )
 
 // Listing represents an item offered for loan by a user.

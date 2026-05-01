@@ -26,10 +26,11 @@ type Response struct {
 
 // UserDTO es la representación pública del usuario (sin password_hash)
 type UserDTO struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Email   string `json:"email"`
-	Address string `json:"address"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Email     string  `json:"email"`
+	Address   string  `json:"address"`
+	AvatarURL *string `json:"avatar_url"`
 }
 
 // Service defines the business operations for the auth domain.

@@ -9,6 +9,7 @@ interface AuthContextValue {
     user: User | null;
     login: (token: string, user: User) => void;
     logout: () => void;
+    updateUser: (user: User) => void;
 }
 
 // Creamos el contexto con valor inicial undefined
@@ -42,6 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newUser);
     }
 
+    function updateUser(updated: User) {
+        localStorage.setItem('user', JSON.stringify(updated));
+        setUser(updated);
+    }
+
     function logout() {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -50,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ token, user, login, logout }}>
+        <AuthContext.Provider value={{ token, user, login, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

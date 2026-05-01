@@ -72,7 +72,8 @@ func buildRouter(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 // registerModules inicializa y registra cada módulo en el grupo /api.
 func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg config.Config, pool *pgxpool.Pool) {
 	// Users
-	usersModule.NewHandler(usersModule.NewPostgresRepository(pool)).RegisterRoutes(api)
+	userStorageSvc := usersModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
+	usersModule.NewHandler(usersModule.NewPostgresRepository(pool), userStorageSvc).RegisterRoutes(api, authMiddleware)
 
 	// Auth
 	authModule.NewHandler(authModule.NewService(pool, cfg.JWTSecret)).RegisterRoutes(api)

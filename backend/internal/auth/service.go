@@ -64,9 +64,9 @@ func (s *service) Login(ctx context.Context, req LoginRequest) (Response, error)
 	var user UserDTO
 	var hash string
 	err := s.pool.QueryRow(ctx,
-		"SELECT id, email, name, password_hash FROM users WHERE email = $1",
+		"SELECT id, email, name, address, avatar_url, password_hash FROM users WHERE email = $1",
 		req.Email,
-	).Scan(&user.ID, &user.Email, &user.Name, &hash)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Address, &user.AvatarURL, &hash)
 	if err != nil {
 		return Response{}, ErrInvalidCredentials
 	}
