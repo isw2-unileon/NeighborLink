@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 // coordinates holds the result of a geocoding lookup.
@@ -50,9 +51,14 @@ func geocode(ctx context.Context, client *http.Client, address string) (*coordin
 		return nil, nil // dirección no encontrada — no es un error fatal
 	}
 
-	var lat, lng float64
-	fmt.Sscanf(results[0].Lat, "%f", &lat)
-	fmt.Sscanf(results[0].Lon, "%f", &lng)
+	lat, err := strconv.ParseFloat(results[0].Lat, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lat %q: %w", results[0].Lat, err)
+	}
+	lng, err := strconv.ParseFloat(results[0].Lon, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lon %q: %w", results[0].Lon, err)
+	}
 
 	return &coordinates{Lat: lat, Lng: lng}, nil
 }
