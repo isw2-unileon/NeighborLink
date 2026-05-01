@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/isw2-unileon/neighborlink/backend/internal/platform/geocoder"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -49,7 +50,7 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (Response, 
 	}
 
 	// Geocodificación — fallo no bloquea el registro
-	coords, err := geocode(ctx, s.httpClient, req.Address)
+	coords, err := geocoder.Geocode(ctx, s.httpClient, req.Address)
 	if err != nil {
 		slog.Warn("geocoding failed, registering without location", "address", req.Address, "error", err)
 	}
