@@ -4,12 +4,10 @@ import "context"
 
 // RegisterRequest es el body del POST /api/auth/register
 type RegisterRequest struct {
-	Name     string  `json:"name"     binding:"required,min=2"`
-	Email    string  `json:"email"    binding:"required,email"`
-	Password string  `json:"password" binding:"required,min=6"`
-	Address  string  `json:"address"  binding:"required"`
-	Lat      float64 `json:"lat"      binding:"required"`
-	Lng      float64 `json:"lng"      binding:"required"`
+	Name     string `json:"name"     binding:"required,min=2"`
+	Email    string `json:"email"    binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	Address  string `json:"address"  binding:"required"`
 }
 
 // LoginRequest es el body del POST /api/auth/login
