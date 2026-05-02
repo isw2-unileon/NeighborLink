@@ -31,6 +31,11 @@ export default function ListingsPage() {
     const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
 
     useEffect(() => {
+        if (!navigator.geolocation) {
+            setCoords(null);
+            return;
+        }
+
         navigator.geolocation.getCurrentPosition(
             pos => setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
             () => setCoords(null),
@@ -196,7 +201,7 @@ export default function ListingsPage() {
                 {listings.length === 0 ? (
                     <div className="text-center py-16">
                         <p className="text-4xl mb-3">🔍</p>
-                        <p className="text-gray-500">No hay artículos con esos filtros.</p>
+                        <p className="text-gray-500">No hay artículos disponibles todavía.</p>
                         <button
                             onClick={() => setFilters(INITIAL_FILTERS)}
                             className="mt-4 text-teal-700 hover:underline text-sm"

@@ -14,21 +14,33 @@ interface ListingResponse {
     data: Listing;
 }
 
+interface ListingsResponse {
+    data: Listing[];
+}
+
 // Parámetros de filtrado — espejo del backend FilterParams
 export interface ListingFilters {
     category?: string;
     deposit?: string;
     status?: string;
     exclude_owner_id?: string;
+    lat?: string;
+    lon?: string;
+    radius_km?: string;
 }
 
 export const listingsApi = {
     // El backend devuelve Listing[] directamente (sin wrapper {data})
     getAll: (filters: ListingFilters = {}) => {
         const params = new URLSearchParams();
-        (Object.entries(filters) as [string, string | undefined][]).forEach(([key, value]) => {
-            if (value !== undefined && value !== '') params.set(key, value);
-        });
+
+        (Object.entries(filters) as [string, string | undefined][])
+            .forEach(([key, value]) => {
+                if (value !== undefined && value !== '') {
+                    params.set(key, value);
+                }
+            });
+
         const qs = params.toString();
         return api.get<Listing[]>(`/listings${qs ? `?${qs}` : ''}`);
     },
@@ -45,10 +57,13 @@ export const listingsApi = {
 
     delete: (id: string) =>
         api.delete(`/listings/${id}`).then(() => undefined),
+
     uploadPhoto: (id: string, file: File): Promise<Listing> => {
         const formData = new FormData();
         formData.append('photo', file);
+
         const token = localStorage.getItem('token');
+
         return fetch(`${import.meta.env.VITE_API_URL ?? '/api'}/listings/${id}/photos`, {
             method: 'POST',
             headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -58,9 +73,11 @@ export const listingsApi = {
                 const err = await r.json().catch(() => ({ error: 'Unknown error' }));
                 throw new Error(err.error ?? `HTTP ${r.status}`);
             }
-            return r.json().then((d: { data: Listing }) => d.data);
+
+            return r.json().then((d: ListingResponse) => d.data);
         });
     },
+
     getByOwner: (ownerID: string) =>
         api.get<ListingsResponse>(`/users/${ownerID}/listings`).then(r => r.data),
 };
