@@ -15,6 +15,7 @@ type User struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
+// UpdateUserInput holds the fields that can be modified by the user.
 type UpdateUserInput struct {
 	Name      string `json:"name"       binding:"required,max=100"`
 	AvatarURL string `json:"avatar_url"`

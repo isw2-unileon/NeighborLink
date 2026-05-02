@@ -19,6 +19,7 @@ type postgresRepository struct {
 	httpClient *http.Client
 }
 
+// NewPostgresRepository creates a new PostgreSQL-backed users repository.
 func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{
 		pool:       pool,

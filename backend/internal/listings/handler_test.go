@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- Fakes ---
@@ -607,7 +608,8 @@ func TestUploadPhoto(t *testing.T) {
 				buf := &bytes.Buffer{}
 				writer := multipart.NewWriter(buf)
 				part, _ := writer.CreateFormFile("photo", "photo.jpg")
-				part.Write([]byte("fake-image-content"))
+				_, err := part.Write([]byte("fake-image-content"))
+				require.NoError(t, err)
 				writer.Close()
 				reqBody = buf
 				contentType = writer.FormDataContentType()
