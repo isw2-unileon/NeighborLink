@@ -30,7 +30,7 @@ export const listingsApi = {
         api.put<ListingResponse>(`/listings/${id}`, input).then(r => r.data),
 
     delete: (id: string) =>
-        api.delete<void>(`/listings/${id}`),
+        api.delete(`/listings/${id}`).then(() => undefined),
     uploadPhoto: (id: string, file: File): Promise<Listing> => {
         const formData = new FormData();
         formData.append('photo', file);
