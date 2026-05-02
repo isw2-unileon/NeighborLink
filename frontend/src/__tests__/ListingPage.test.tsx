@@ -118,8 +118,10 @@ describe('ListingsPage', () => {
 
         await screen.findByText('Explorar artículos')
 
-        const [categorySelect] = screen.getAllByRole('combobox')
+        const selects = screen.getAllByRole('combobox')
+        expect(selects).toHaveLength(2)
 
+        const categorySelect = selects[0]!
         fireEvent.change(categorySelect, { target: { value: 'herramientas' } })
 
         await waitFor(() => {
@@ -138,8 +140,10 @@ describe('ListingsPage', () => {
 
         await screen.findByText('Explorar artículos')
 
-        const [, statusSelect] = screen.getAllByRole('combobox')
+        const selects = screen.getAllByRole('combobox')
+        expect(selects).toHaveLength(2)
 
+        const statusSelect = selects[1]!
         fireEvent.change(statusSelect, { target: { value: 'available' } })
 
         await waitFor(() => {

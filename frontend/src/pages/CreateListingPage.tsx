@@ -10,6 +10,7 @@ interface CreateListingInput {
     photos: string[];
     deposit_amount: number;
     category: string;
+    status: string;
 }
 
 const EMPTY_FORM: CreateListingInput = {
@@ -18,6 +19,7 @@ const EMPTY_FORM: CreateListingInput = {
     photos: [],
     deposit_amount: 0,
     category: 'otros',
+    status: 'available',
 }
 
 type Step = 'info' | 'photos';

@@ -154,7 +154,9 @@ describe('listingsApi', () => {
         })
 
         const call = mockFetch.mock.calls[0]
-        expect(call).toBeDefined()
+        if (!call) {
+            throw new Error('Expected fetch to be called')
+        }
         const url = call[0] as string
 
         expect(url).toContain('/listings?')
@@ -174,7 +176,9 @@ describe('listingsApi', () => {
         })
 
         const call = mockFetch.mock.calls[0]
-        expect(call).toBeDefined()
+        if (!call) {
+            throw new Error('Expected fetch to be called')
+        }
         const url = call[0] as string
 
         expect(url).toMatch(/\/listings$/)
