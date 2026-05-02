@@ -9,8 +9,8 @@ const mockUser: User = {
     name: 'Test User',
     avatar_url: '',
     reputation_score: 0,
+    address: 'Calle Mayor 1, León',
     created_at: '2026-01-01T00:00:00Z',
-    address: '',
 }
 
 beforeEach(() => {
@@ -64,5 +64,18 @@ describe('AuthContext', () => {
         expect(() => renderHook(() => useAuth())).toThrow(
             'useAuth must be used within AuthProvider'
         )
+    })
+
+    it('updateUser actualiza el usuario en estado y localStorage', () => {
+        const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider })
+
+        const original: User = { id: '1', name: 'Ana', email: 'ana@test.com', avatar_url: '', reputation_score: 0, address: 'Calle Test', created_at: '' }
+        const updated: User = { ...original, name: 'Ana López' }
+
+        act(() => { result.current.login('tok', original) })
+        act(() => { result.current.updateUser(updated) })
+
+        expect(result.current.user?.name).toBe('Ana López')
+        expect(JSON.parse(localStorage.getItem('user')!).name).toBe('Ana López')
     })
 })
