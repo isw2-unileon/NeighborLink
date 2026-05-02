@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const PLACEHOLDER_CODE = '654321';
 
 export default function ReturnPage() {
-    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
     const [code, setCode] = useState('');
