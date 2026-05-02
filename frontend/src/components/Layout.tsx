@@ -51,7 +51,7 @@ export default function Layout() {
             </nav>
 
             {/* Outlet renderiza la página hija activa */}
-            <main className="max-w-5xl mx-auto px-4 py-8">
+            <main className="min-h-screen pl-4">
                 <Outlet />
             </main>
         </div>

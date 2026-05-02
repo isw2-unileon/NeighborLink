@@ -6,20 +6,33 @@ interface ListingInput {
     description: string;
     photos: string[];
     deposit_amount: number;
-}
-
-interface ListingsResponse {
-    data: Listing[];
+    category: string;
 }
 
 interface ListingResponse {
     data: Listing;
 }
 
-export const listingsApi = {
-    getAll: () =>
-        api.get<ListingsResponse>('/listings').then(r => r.data),
+// Parámetros de filtrado — espejo del backend FilterParams
+export interface ListingFilters {
+    category?: string;
+    deposit?: string;
+    status?: string;
+    exclude_owner_id?: string;
+}
 
+export const listingsApi = {
+    // El backend devuelve Listing[] directamente (sin wrapper {data})
+    getAll: (filters: ListingFilters = {}) => {
+        const params = new URLSearchParams();
+        (Object.entries(filters) as [string, string | undefined][]).forEach(([key, value]) => {
+            if (value !== undefined && value !== '') params.set(key, value);
+        });
+        const qs = params.toString();
+        return api.get<Listing[]>(`/listings${qs ? `?${qs}` : ''}`);
+    },
+
+    // El backend devuelve { data: Listing } en getById, create, update
     getById: (id: string) =>
         api.get<ListingResponse>(`/listings/${id}`).then(r => r.data),
 
@@ -31,6 +44,7 @@ export const listingsApi = {
 
     delete: (id: string) =>
         api.delete<void>(`/listings/${id}`),
+
     uploadPhoto: (id: string, file: File): Promise<Listing> => {
         const formData = new FormData();
         formData.append('photo', file);

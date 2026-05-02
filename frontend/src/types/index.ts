@@ -19,6 +19,7 @@ export interface Listing {
     photos: string[];
     deposit_amount: number;
     status: string;
+    category: string;
     created_at: string;
 }
 
