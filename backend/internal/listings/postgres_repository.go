@@ -159,12 +159,17 @@ func (r *postgresRepository) Create(ctx context.Context, ownerID string, input L
 func (r *postgresRepository) Update(ctx context.Context, id string, input ListingInput) (*Listing, error) {
 	var l Listing
 	err := r.pool.QueryRow(ctx, `
-		UPDATE listings
-		SET title = $1, description = $2, photos = $3, deposit_amount = $4, category = $5
-		WHERE id = $6
-		RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
-		          deposit_amount, status, category, created_at
-	`, input.Title, input.Description, input.Photos, input.DepositAmount, input.Category, id,
+        UPDATE listings
+        SET title = $1,
+            description = $2,
+            photos = $3,
+            deposit_amount = $4,
+            category = $5,
+            status = $6
+        WHERE id = $7
+        RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
+                  deposit_amount, status, category, created_at
+    `, input.Title, input.Description, input.Photos, input.DepositAmount, input.Category, input.Status, id,
 	).Scan(
 		&l.ID, &l.OwnerID, &l.Title, &l.Description,
 		&l.Photos, &l.DepositAmount, &l.Status,

@@ -7,6 +7,7 @@ interface ListingInput {
     photos: string[];
     deposit_amount: number;
     category: string;
+    status: string;
 }
 
 interface ListingResponse {

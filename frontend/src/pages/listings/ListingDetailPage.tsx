@@ -10,6 +10,7 @@ interface ListingInput {
     photos: string[];
     deposit_amount: number;
     category: string;
+    status: string;
 }
 
 // --- Componente carrusel aislado (SRP) ---
@@ -84,6 +85,7 @@ export default function ListingDetailPage() {
         photos: [],
         deposit_amount: 0,
         category: '',
+        status: 'available',
     });
 
     const isOwner = user?.id === listing?.owner_id;
@@ -99,6 +101,7 @@ export default function ListingDetailPage() {
                     photos: data.photos ?? [],
                     deposit_amount: data.deposit_amount,
                     category: data.category ?? 'otros',
+                    status: data.status ?? 'available',
                 });
             })
             .catch(err => setError(err.message))
@@ -252,6 +255,18 @@ export default function ListingDetailPage() {
                             rows={4}
                             className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                    </label>
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Estado</span>
+                        <select
+                            value={form.status}
+                            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="available">Disponible</option>
+                            <option value="borrowed">Prestado</option>
+                            <option value="inactive">Inactivo</option>
+                        </select>
                     </label>
                     <label className="block">
                         <span className="text-sm font-medium text-gray-700">Categoría</span>

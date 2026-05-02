@@ -4,8 +4,8 @@ import "time"
 
 const (
 	StatusAvailable = "available"
-	StatusBorrowed  = "inactive"
-	StatusInactive  = "borrowed"
+	StatusBorrowed  = "borrowed"
+	StatusInactive  = "inactive"
 )
 
 type Category string
@@ -56,6 +56,7 @@ type ListingInput struct {
 	Photos        []string `json:"photos"`
 	DepositAmount float64  `json:"deposit_amount" binding:"required,gt=0"`
 	Category      Category `json:"category"       binding:"required"`
+	Status        string   `json:"status"`
 }
 
 type FilterParams struct {
