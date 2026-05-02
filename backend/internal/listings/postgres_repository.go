@@ -47,9 +47,22 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 		argN++
 	}
 	if f.Status != "" {
-		q += fmt.Sprintf(" AND status = $%d", argN)
-		args = append(args, f.Status)
-		argN++
+		if f.Status == StatusBorrowed {
+			q += fmt.Sprintf(
+				" AND status IN ($%d, $%d, $%d)",
+				argN, argN+1, argN+2,
+			)
+			args = append(args,
+				StatusPendingHandover,
+				StatusPendingReturn,
+				StatusBorrowed,
+			)
+			argN += 3
+		} else {
+			q += fmt.Sprintf(" AND status = $%d", argN)
+			args = append(args, f.Status)
+			argN++
+		}
 	}
 	if f.Deposit > 0 {
 		q += fmt.Sprintf(" AND deposit_amount <= $%d", argN)
