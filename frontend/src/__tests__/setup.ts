@@ -24,3 +24,10 @@ vi.stubGlobal('localStorage', localStorageMock)
 beforeEach(() => {
     localStorageMock.clear()
 })
+
+// Mock de IntersectionObserver — jsdom no lo implementa
+vi.stubGlobal('IntersectionObserver', class {
+    observe() { }
+    unobserve() { }
+    disconnect() { }
+})
