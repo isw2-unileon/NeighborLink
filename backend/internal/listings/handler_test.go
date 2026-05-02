@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,17 +19,21 @@ import (
 // --- Fakes ---
 
 type fakeRepository struct {
-	listings []listings.Listing
-	err      error
+	listings  []listings.Listing
+	findErr   error // error en FindAll, FindByID, FindByOwner
+	createErr error // error en Create
+	updateErr error // error en Update
+	deleteErr error // error en Delete
+	photoErr  error // error en AddPhoto
 }
 
 func (f *fakeRepository) FindAll(ctx context.Context) ([]listings.Listing, error) {
-	return f.listings, f.err
+	return f.listings, f.findErr
 }
 
 func (f *fakeRepository) FindByID(ctx context.Context, id string) (*listings.Listing, error) {
-	if f.err != nil {
-		return nil, f.err
+	if f.findErr != nil {
+		return nil, f.findErr
 	}
 	for _, l := range f.listings {
 		if l.ID == id {
@@ -39,8 +44,8 @@ func (f *fakeRepository) FindByID(ctx context.Context, id string) (*listings.Lis
 }
 
 func (f *fakeRepository) FindByOwner(ctx context.Context, ownerID string) ([]listings.Listing, error) {
-	if f.err != nil {
-		return nil, f.err
+	if f.findErr != nil {
+		return nil, f.findErr
 	}
 	var result []listings.Listing
 	for _, l := range f.listings {
@@ -52,8 +57,8 @@ func (f *fakeRepository) FindByOwner(ctx context.Context, ownerID string) ([]lis
 }
 
 func (f *fakeRepository) Create(ctx context.Context, ownerID string, input listings.ListingInput) (*listings.Listing, error) {
-	if f.err != nil {
-		return nil, f.err
+	if f.createErr != nil {
+		return nil, f.createErr
 	}
 	l := &listings.Listing{
 		ID:            "new-id",
@@ -68,8 +73,8 @@ func (f *fakeRepository) Create(ctx context.Context, ownerID string, input listi
 }
 
 func (f *fakeRepository) Update(ctx context.Context, id string, input listings.ListingInput) (*listings.Listing, error) {
-	if f.err != nil {
-		return nil, f.err
+	if f.updateErr != nil {
+		return nil, f.updateErr
 	}
 	for _, l := range f.listings {
 		if l.ID == id {
@@ -84,13 +89,12 @@ func (f *fakeRepository) Update(ctx context.Context, id string, input listings.L
 }
 
 func (f *fakeRepository) Delete(ctx context.Context, id string) error {
-	return f.err
+	return f.deleteErr
 }
 
-// AddPhoto — necesario para cumplir la interface Repository tras añadir subida de fotos.
 func (f *fakeRepository) AddPhoto(ctx context.Context, id string, photoURL string) (*listings.Listing, error) {
-	if f.err != nil {
-		return nil, f.err
+	if f.photoErr != nil {
+		return nil, f.photoErr
 	}
 	for _, l := range f.listings {
 		if l.ID == id {
@@ -101,11 +105,15 @@ func (f *fakeRepository) AddPhoto(ctx context.Context, id string, photoURL strin
 	return nil, nil
 }
 
-// fakeStorageService — implementación mínima de StorageService para tests.
-// Devuelve siempre una URL predecible sin llamar a ningún servicio real.
-type fakeStorageService struct{}
+// fakeStorageService — sin llamadas reales a Supabase.
+type fakeStorageService struct {
+	err error
+}
 
-func (f *fakeStorageService) UploadPhoto(listingID string, filename string, r io.Reader, contentType string) (string, error) {
+func (f *fakeStorageService) UploadPhoto(listingID, filename string, r io.Reader, contentType string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
 	return "https://fake-storage.test/" + listingID + "/photo.jpg", nil
 }
 
@@ -119,25 +127,33 @@ func fakeAuthMiddleware(userID string) gin.HandlerFunc {
 }
 
 func setupRouter(repo listings.Repository) *gin.Engine {
-	return setupRouterWithAuth(repo, fakeAuthMiddleware("owner-1"))
+	return setupRouterWithStorage(repo, &fakeStorageService{})
 }
 
 func setupRouterWithAuth(repo listings.Repository, auth gin.HandlerFunc) *gin.Engine {
+	return setupRouterFull(repo, &fakeStorageService{}, auth)
+}
+
+func setupRouterWithStorage(repo listings.Repository, storage listings.StorageService) *gin.Engine {
+	return setupRouterFull(repo, storage, fakeAuthMiddleware("owner-1"))
+}
+
+func setupRouterFull(repo listings.Repository, storage listings.StorageService, auth gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := listings.NewHandler(repo, &fakeStorageService{}) // 👈 segundo argumento añadido
+	h := listings.NewHandler(repo, storage)
 	api := r.Group("/api")
 	h.RegisterRoutes(api, auth)
 	return r
 }
 
-// --- Tests (sin cambios) ---
+// --- Tests ---
 
 func TestListListings(t *testing.T) {
 	tests := []struct {
 		name       string
 		repoData   []listings.Listing
-		repoErr    error
+		findErr    error
 		wantStatus int
 		wantLen    int
 	}{
@@ -155,14 +171,14 @@ func TestListListings(t *testing.T) {
 		},
 		{
 			name:       "repo error returns 500",
-			repoErr:    errors.New("db down"),
+			findErr:    errors.New("db down"),
 			wantStatus: http.StatusInternalServerError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(&fakeRepository{listings: tt.repoData, err: tt.repoErr})
+			router := setupRouter(&fakeRepository{listings: tt.repoData, findErr: tt.findErr})
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/listings", nil)
@@ -186,7 +202,7 @@ func TestGetListing(t *testing.T) {
 	tests := []struct {
 		name       string
 		repoData   []listings.Listing
-		repoErr    error
+		findErr    error
 		listingID  string
 		wantStatus int
 	}{
@@ -204,7 +220,7 @@ func TestGetListing(t *testing.T) {
 		},
 		{
 			name:       "repo error returns 500",
-			repoErr:    errors.New("db down"),
+			findErr:    errors.New("db down"),
 			listingID:  "abc-123",
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -212,7 +228,7 @@ func TestGetListing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(&fakeRepository{listings: tt.repoData, err: tt.repoErr})
+			router := setupRouter(&fakeRepository{listings: tt.repoData, findErr: tt.findErr})
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/listings/"+tt.listingID, nil)
@@ -227,7 +243,7 @@ func TestListByOwner(t *testing.T) {
 	tests := []struct {
 		name       string
 		repoData   []listings.Listing
-		repoErr    error
+		findErr    error
 		ownerID    string
 		wantStatus int
 		wantLen    int
@@ -241,7 +257,7 @@ func TestListByOwner(t *testing.T) {
 		},
 		{
 			name:       "repo error returns 500",
-			repoErr:    errors.New("db down"),
+			findErr:    errors.New("db down"),
 			ownerID:    "owner-1",
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -249,7 +265,7 @@ func TestListByOwner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(&fakeRepository{listings: tt.repoData, err: tt.repoErr})
+			router := setupRouter(&fakeRepository{listings: tt.repoData, findErr: tt.findErr})
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/users/"+tt.ownerID+"/listings", nil)
@@ -279,7 +295,7 @@ func TestCreateListing(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       any
-		repoErr    error
+		createErr  error
 		userID     string
 		noAuth     bool
 		wantStatus int
@@ -306,7 +322,7 @@ func TestCreateListing(t *testing.T) {
 			name:       "repo error returns 500",
 			body:       validBody,
 			userID:     "owner-1",
-			repoErr:    errors.New("db down"),
+			createErr:  errors.New("db down"),
 			wantStatus: http.StatusInternalServerError,
 		},
 	}
@@ -321,7 +337,7 @@ func TestCreateListing(t *testing.T) {
 			} else {
 				auth = fakeAuthMiddleware(tt.userID)
 			}
-			router := setupRouterWithAuth(&fakeRepository{err: tt.repoErr}, auth)
+			router := setupRouterFull(&fakeRepository{createErr: tt.createErr}, &fakeStorageService{}, auth)
 
 			b, _ := json.Marshal(tt.body)
 			w := httptest.NewRecorder()
@@ -344,6 +360,8 @@ func TestUpdateListing(t *testing.T) {
 		body       any
 		userID     string
 		repoData   []listings.Listing
+		findErr    error
+		updateErr  error
 		wantStatus int
 	}{
 		{
@@ -370,14 +388,41 @@ func TestUpdateListing(t *testing.T) {
 			repoData:   []listings.Listing{},
 			wantStatus: http.StatusNotFound,
 		},
+		{
+			name:       "invalid body returns 400",
+			listingID:  "1",
+			body:       map[string]any{"title": ""},
+			userID:     "owner-1",
+			repoData:   []listings.Listing{existing},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "find error returns 500",
+			listingID:  "1",
+			body:       validBody,
+			userID:     "owner-1",
+			findErr:    errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "update error returns 500",
+			listingID:  "1",
+			body:       validBody,
+			userID:     "owner-1",
+			repoData:   []listings.Listing{existing},
+			updateErr:  errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouterWithAuth(
-				&fakeRepository{listings: tt.repoData},
-				fakeAuthMiddleware(tt.userID),
-			)
+			repo := &fakeRepository{
+				listings:  tt.repoData,
+				findErr:   tt.findErr,
+				updateErr: tt.updateErr,
+			}
+			router := setupRouterWithAuth(repo, fakeAuthMiddleware(tt.userID))
 
 			b, _ := json.Marshal(tt.body)
 			w := httptest.NewRecorder()
@@ -398,6 +443,8 @@ func TestDeleteListing(t *testing.T) {
 		listingID  string
 		userID     string
 		repoData   []listings.Listing
+		findErr    error
+		deleteErr  error
 		wantStatus int
 	}{
 		{
@@ -421,17 +468,154 @@ func TestDeleteListing(t *testing.T) {
 			repoData:   []listings.Listing{},
 			wantStatus: http.StatusNotFound,
 		},
+		{
+			name:       "find error returns 500",
+			listingID:  "1",
+			userID:     "owner-1",
+			findErr:    errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "delete error returns 500",
+			listingID:  "1",
+			userID:     "owner-1",
+			repoData:   []listings.Listing{existing},
+			deleteErr:  errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouterWithAuth(
-				&fakeRepository{listings: tt.repoData},
-				fakeAuthMiddleware(tt.userID),
-			)
+			repo := &fakeRepository{
+				listings:  tt.repoData,
+				findErr:   tt.findErr,
+				deleteErr: tt.deleteErr,
+			}
+			router := setupRouterWithAuth(repo, fakeAuthMiddleware(tt.userID))
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, "/api/listings/"+tt.listingID, nil)
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+	}
+}
+
+func TestUploadPhoto(t *testing.T) {
+	existing := listings.Listing{ID: "1", OwnerID: "owner-1", Title: "Taladro"}
+
+	tests := []struct {
+		name        string
+		listingID   string
+		userID      string
+		repoData    []listings.Listing
+		findErr     error
+		photoErr    error
+		storageErr  error
+		missingFile bool
+		noAuth      bool
+		wantStatus  int
+	}{
+		{
+			name:       "owner uploads photo successfully",
+			listingID:  "1",
+			userID:     "owner-1",
+			repoData:   []listings.Listing{existing},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "missing auth returns 401",
+			listingID:  "1",
+			noAuth:     true,
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "listing not found returns 404",
+			listingID:  "nonexistent",
+			userID:     "owner-1",
+			repoData:   []listings.Listing{},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "non-owner gets 403",
+			listingID:  "1",
+			userID:     "other-user",
+			repoData:   []listings.Listing{existing},
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:        "missing file returns 400",
+			listingID:   "1",
+			userID:      "owner-1",
+			repoData:    []listings.Listing{existing},
+			missingFile: true,
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:       "storage error returns 500",
+			listingID:  "1",
+			userID:     "owner-1",
+			repoData:   []listings.Listing{existing},
+			storageErr: errors.New("storage down"),
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "find error returns 500",
+			listingID:  "1",
+			userID:     "owner-1",
+			findErr:    errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:       "addphoto error returns 500",
+			listingID:  "1",
+			userID:     "owner-1",
+			repoData:   []listings.Listing{existing},
+			photoErr:   errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{
+				listings: tt.repoData,
+				findErr:  tt.findErr,
+				photoErr: tt.photoErr,
+			}
+			storage := &fakeStorageService{err: tt.storageErr}
+
+			var auth gin.HandlerFunc
+			if tt.noAuth {
+				auth = func(c *gin.Context) {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+				}
+			} else {
+				auth = fakeAuthMiddleware(tt.userID)
+			}
+			router := setupRouterFull(repo, storage, auth)
+
+			var reqBody io.Reader
+			var contentType string
+
+			if tt.missingFile {
+				reqBody = &bytes.Buffer{}
+				contentType = "multipart/form-data; boundary=----boundary"
+			} else {
+				buf := &bytes.Buffer{}
+				writer := multipart.NewWriter(buf)
+				part, _ := writer.CreateFormFile("photo", "photo.jpg")
+				part.Write([]byte("fake-image-content"))
+				writer.Close()
+				reqBody = buf
+				contentType = writer.FormDataContentType()
+			}
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/api/listings/"+tt.listingID+"/photos", reqBody)
+			req.Header.Set("Content-Type", contentType)
 			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.wantStatus, w.Code)

@@ -76,10 +76,13 @@ func (h *Handler) updateMe(c *gin.Context) {
 		return
 	}
 
-	// Preservamos el avatar_url existente para no machacarlo
 	existing, err := h.repo.FindByID(c.Request.Context(), userID.(string))
-	if err != nil || existing == nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if existing == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 	input.AvatarURL = existing.AvatarURL
@@ -122,8 +125,12 @@ func (h *Handler) uploadAvatar(c *gin.Context) {
 
 	// Actualizamos solo el avatar_url manteniendo el resto de campos
 	existing, err := h.repo.FindByID(c.Request.Context(), userID.(string))
-	if err != nil || existing == nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if existing == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
