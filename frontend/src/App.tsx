@@ -11,6 +11,8 @@ import ListingsDetailPage from './pages/listings/ListingDetailPage'
 import CreateListingPage from './pages/CreateListingPage'
 import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
+import HandoverPage from './pages/HandoverPage'
+import ReturnPage from './pages/ReturnPage'
 
 // Redirige a /listings si ya hay sesión, si no muestra la página pasada
 function PublicHome() {
@@ -32,6 +34,8 @@ export default function App() {
               <Route path="/listings" element={<ListingsPage />} />
               <Route path="/listings/new" element={<CreateListingPage />} />
               <Route path="/listings/:id" element={<ListingsDetailPage />} />
+              <Route path="/listings/:id/handover" element={<HandoverPage />} />
+              <Route path="/listings/:id/return" element={<ReturnPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/edit" element={<EditProfilePage />} />
             </Route>

@@ -170,6 +170,11 @@ export default function ListingDetailPage() {
         <div className="max-w-2xl mx-auto p-6">
             {!editing ? (
                 <>
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="mb-4 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 transition">
+                        ← Volver
+                    </button>
                     {/* Carrusel */}
                     <PhotoCarousel
                         photos={listing.photos ?? []}
@@ -179,10 +184,10 @@ export default function ListingDetailPage() {
                     <div className="flex justify-between items-start">
                         <h1 className="text-3xl font-bold">{listing.title}</h1>
                         <span className={`text-sm px-3 py-1 rounded-full font-medium ${listing.status === 'available'
-                                ? 'bg-green-100 text-green-700'
-                                : listing.status === 'borrowed'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-gray-100 text-gray-600'
+                            ? 'bg-green-100 text-green-700'
+                            : listing.status === 'borrowed'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-gray-100 text-gray-600'
                             }`}>
                             {listing.status}
                         </span>
