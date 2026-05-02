@@ -13,18 +13,37 @@ vi.mock('react-router-dom', async () => {
 })
 
 const fakeListing: Listing = {
-    id: 'l1', owner_id: 'u1', title: 'Taladro',
-    description: 'Un taladro en buen estado', photos: [],
-    deposit_amount: 20, status: 'available', created_at: '',
+    id: 'l1',
+    owner_id: 'u1',
+    title: 'Taladro',
+    description: 'Un taladro en buen estado',
+    photos: [],
+    deposit_amount: 20,
+    status: 'available',
+    category: 'herramientas',
+    created_at: '',
 }
 
-const fakeListingWithPhoto: Listing = { ...fakeListing, id: 'l2', photos: ['http://img.test/foto.jpg'] }
+const fakeListingWithPhoto: Listing = {
+    ...fakeListing,
+    id: 'l2',
+    photos: ['http://img.test/foto.jpg'],
+}
 
 function renderPage(user: User | null = null) {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
-        user, token: null, login: vi.fn(), logout: vi.fn(), updateUser: vi.fn(),
+        user,
+        token: null,
+        login: vi.fn(),
+        logout: vi.fn(),
+        updateUser: vi.fn(),
     })
-    return render(<MemoryRouter><ListingsPage /></MemoryRouter>)
+
+    return render(
+        <MemoryRouter>
+            <ListingsPage />
+        </MemoryRouter>
+    )
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -58,7 +77,9 @@ describe('ListingsPage', () => {
     it('renderiza la foto del listing si tiene photos', async () => {
         vi.spyOn(listingsLib.listingsApi, 'getAll').mockResolvedValue([fakeListingWithPhoto])
         renderPage()
-        await waitFor(() => expect(screen.getByRole('img')).toHaveAttribute('src', 'http://img.test/foto.jpg'))
+        await waitFor(() => {
+            expect(screen.getByRole('img')).toHaveAttribute('src', 'http://img.test/foto.jpg')
+        })
     })
 
     it('no muestra el botón Publicar si no hay usuario', async () => {
@@ -88,7 +109,6 @@ describe('ListingsPage', () => {
         expect(link).toHaveAttribute('href', '/listings/l1')
     })
 
-    //filtros
     it('aplica el filtro de categoría y recarga listings', async () => {
         const getAllMock = vi
             .spyOn(listingsLib.listingsApi, 'getAll')
@@ -96,11 +116,9 @@ describe('ListingsPage', () => {
 
         renderPage()
 
-        // Esperar a que termine el loading inicial
         await screen.findByText('Explorar artículos')
 
-        const selects = screen.getAllByRole('combobox')
-        const categorySelect = selects[0]
+        const [categorySelect] = screen.getAllByRole('combobox')
 
         fireEvent.change(categorySelect, { target: { value: 'herramientas' } })
 
@@ -111,7 +129,6 @@ describe('ListingsPage', () => {
         })
     })
 
-
     it('aplica el filtro de estado y recarga listings', async () => {
         const getAllMock = vi
             .spyOn(listingsLib.listingsApi, 'getAll')
@@ -119,11 +136,9 @@ describe('ListingsPage', () => {
 
         renderPage()
 
-        // Esperar a que termine el loading inicial
         await screen.findByText('Explorar artículos')
 
-        const selects = screen.getAllByRole('combobox')
-        const statusSelect = selects[1]
+        const [, statusSelect] = screen.getAllByRole('combobox')
 
         fireEvent.change(statusSelect, { target: { value: 'available' } })
 

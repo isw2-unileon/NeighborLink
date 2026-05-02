@@ -4,7 +4,7 @@ import { listingsApi } from '../lib/listings';
 import { useAuth } from '../contexts/AuthContext';
 import type { Listing } from '../types';
 
-interface ListingInput {
+interface CreateListingInput {
     title: string;
     description: string;
     photos: string[];
@@ -12,13 +12,13 @@ interface ListingInput {
     category: string;
 }
 
-const EMPTY_FORM: ListingInput = {
+const EMPTY_FORM: CreateListingInput = {
     title: '',
     description: '',
     photos: [],
     deposit_amount: 0,
     category: 'otros',
-};
+}
 
 type Step = 'info' | 'photos';
 
@@ -27,7 +27,7 @@ export default function CreateListingPage() {
     const navigate = useNavigate();
 
     const [step, setStep] = useState<Step>('info');
-    const [form, setForm] = useState<ListingInput>(EMPTY_FORM);
+    const [form, setForm] = useState<CreateListingInput>(EMPTY_FORM)
     const [createdListing, setCreatedListing] = useState<Listing | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);

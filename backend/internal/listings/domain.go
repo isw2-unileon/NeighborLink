@@ -2,6 +2,7 @@ package listings
 
 import "time"
 
+// tipos de estados de un listing.
 const (
 	StatusAvailable       = "available"
 	StatusPendingHandover = "pending_handover"
@@ -10,8 +11,10 @@ const (
 	StatusInactive        = "inactive"
 )
 
+// Category representa la categoría de un listing.
 type Category string
 
+// Listing representa un artículo listado en la plataforma.
 const (
 	CategoryHerramientas      Category = "herramientas"
 	CategoryMaterialDeportivo Category = "material_deportivo"
@@ -25,12 +28,14 @@ const (
 	CategoryOtros             Category = "otros"
 )
 
+// ValidCategories representa las categorías válidas para validación de input.
 var ValidCategories = []Category{
 	CategoryHerramientas, CategoryMaterialDeportivo, CategoryMaterialEducativo,
 	CategoryInformatico, CategoryElectrodomesticos, CategoryJardineria,
 	CategoryVehiculos, CategoryOcioYJuegos, CategoryRopaYAccesorios, CategoryOtros,
 }
 
+// IsValidCategory función de validación para asegurar que el input de categoría es correcto.
 func IsValidCategory(c Category) bool {
 	for _, v := range ValidCategories {
 		if v == c {
@@ -40,6 +45,7 @@ func IsValidCategory(c Category) bool {
 	return false
 }
 
+// Listing representa un artículo listado en la plataforma.
 type Listing struct {
 	ID            string    `json:"id"`
 	OwnerID       string    `json:"owner_id"`
@@ -52,6 +58,7 @@ type Listing struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// ListingInput representa los datos necesarios para crear o actualizar un listing.
 type ListingInput struct {
 	Title         string   `json:"title"          binding:"required,max=120"`
 	Description   string   `json:"description"    binding:"required"`
@@ -61,6 +68,7 @@ type ListingInput struct {
 	Status        string   `json:"status"`
 }
 
+// FilterParams representa los parámetros de filtrado para la consulta de listings.
 type FilterParams struct {
 	Category       Category
 	Status         string

@@ -9,10 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// postgresRepository es la implementación de Repository usando PostgreSQL.
 type postgresRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewPostgresRepository crea una nueva instancia de Repository usando PostgreSQL.
 func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{pool: pool}
 }
@@ -26,6 +28,7 @@ func scanListing(row pgx.Row, l *Listing) error {
 	)
 }
 
+// FindAll obtiene todos los listings que cumplen con los filtros opcionales.
 func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Listing, error) {
 	args := []any{}
 	argN := 1
@@ -67,7 +70,6 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 	if f.Deposit > 0 {
 		q += fmt.Sprintf(" AND deposit_amount <= $%d", argN)
 		args = append(args, f.Deposit)
-		argN++
 	}
 
 	q += " ORDER BY created_at DESC"
@@ -81,11 +83,7 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 	listings := make([]Listing, 0)
 	for rows.Next() {
 		var l Listing
-		if err := rows.Scan(
-			&l.ID, &l.OwnerID, &l.Title, &l.Description,
-			&l.Photos, &l.DepositAmount, &l.Status,
-			&l.Category, &l.CreatedAt,
-		); err != nil {
+		if err := scanListing(rows, &l); err != nil {
 			return nil, fmt.Errorf("listings: scan failed: %w", err)
 		}
 		listings = append(listings, l)
@@ -99,16 +97,12 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 
 func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Listing, error) {
 	var l Listing
-	err := r.pool.QueryRow(ctx, `
-		SELECT id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
-		       deposit_amount, status, category, created_at
-		FROM listings
-		WHERE id = $1
-	`, id).Scan(
-		&l.ID, &l.OwnerID, &l.Title, &l.Description,
-		&l.Photos, &l.DepositAmount, &l.Status,
-		&l.Category, &l.CreatedAt,
-	)
+	err := scanListing(r.pool.QueryRow(ctx, `
+        SELECT id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
+               deposit_amount, status, category, created_at
+        FROM listings
+        WHERE id = $1
+`, id), &l)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -119,6 +113,7 @@ func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Listing,
 	return &l, nil
 }
 
+// FindByOwner obtiene todos los listings de un propietario específico.
 func (r *postgresRepository) FindByOwner(ctx context.Context, ownerID string) ([]Listing, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
@@ -135,11 +130,7 @@ func (r *postgresRepository) FindByOwner(ctx context.Context, ownerID string) ([
 	listings := make([]Listing, 0)
 	for rows.Next() {
 		var l Listing
-		if err := rows.Scan(
-			&l.ID, &l.OwnerID, &l.Title, &l.Description,
-			&l.Photos, &l.DepositAmount, &l.Status,
-			&l.Category, &l.CreatedAt,
-		); err != nil {
+		if err := scanListing(rows, &l); err != nil {
 			return nil, fmt.Errorf("listings: scan failed: %w", err)
 		}
 		listings = append(listings, l)
@@ -150,44 +141,38 @@ func (r *postgresRepository) FindByOwner(ctx context.Context, ownerID string) ([
 	return listings, nil
 }
 
+// Create inserta un nuevo listing en la base de datos y devuelve el listing creado con su ID generado.
 func (r *postgresRepository) Create(ctx context.Context, ownerID string, input ListingInput) (*Listing, error) {
 	var l Listing
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO listings (owner_id, title, description, photos, deposit_amount, status, category)
-		VALUES ($1, $2, $3, $4, $5, 'available', $6)
-		RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
-		          deposit_amount, status, category, created_at
-	`, ownerID, input.Title, input.Description, input.Photos, input.DepositAmount, input.Category,
-	).Scan(
-		&l.ID, &l.OwnerID, &l.Title, &l.Description,
-		&l.Photos, &l.DepositAmount, &l.Status,
-		&l.Category, &l.CreatedAt,
-	)
+	err := scanListing(r.pool.QueryRow(ctx, `
+        INSERT INTO listings (owner_id, title, description, photos, deposit_amount, status, category)
+        VALUES ($1, $2, $3, $4, $5, 'available', $6)
+        RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
+                  deposit_amount, status, category, created_at
+`, ownerID, input.Title, input.Description, input.Photos, input.DepositAmount, input.Category,
+	), &l)
 	if err != nil {
 		return nil, fmt.Errorf("listings: insert failed: %w", err)
 	}
 	return &l, nil
 }
 
+// Update modifica un listing existente y devuelve el listing actualizado.
 func (r *postgresRepository) Update(ctx context.Context, id string, input ListingInput) (*Listing, error) {
 	var l Listing
-	err := r.pool.QueryRow(ctx, `
-        UPDATE listings
-        SET title = $1,
-            description = $2,
-            photos = $3,
-            deposit_amount = $4,
-            category = $5,
-            status = $6
-        WHERE id = $7
-        RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
-                  deposit_amount, status, category, created_at
-    `, input.Title, input.Description, input.Photos, input.DepositAmount, input.Category, input.Status, id,
-	).Scan(
-		&l.ID, &l.OwnerID, &l.Title, &l.Description,
-		&l.Photos, &l.DepositAmount, &l.Status,
-		&l.Category, &l.CreatedAt,
-	)
+	err := scanListing(r.pool.QueryRow(ctx, `
+    UPDATE listings
+    SET title = $1,
+        description = $2,
+        photos = $3,
+        deposit_amount = $4,
+        category = $5,
+        status = $6
+    WHERE id = $7
+    RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
+              deposit_amount, status, category, created_at
+`, input.Title, input.Description, input.Photos, input.DepositAmount, input.Category, input.Status, id,
+	), &l)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -198,6 +183,7 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Listin
 	return &l, nil
 }
 
+// Delete elimina un listing de la base de datos.
 func (r *postgresRepository) Delete(ctx context.Context, id string) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM listings WHERE id = $1`, id)
 	if err != nil {
@@ -206,19 +192,16 @@ func (r *postgresRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// AddPhoto agrega una nueva foto a un listing existente y devuelve el listing actualizado.
 func (r *postgresRepository) AddPhoto(ctx context.Context, id string, photoURL string) (*Listing, error) {
 	var l Listing
-	err := r.pool.QueryRow(ctx, `
-		UPDATE listings
-		SET photos = photos || to_jsonb($1::text)
-		WHERE id = $2
-		RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
-		          deposit_amount, status, category, created_at
-	`, photoURL, id).Scan(
-		&l.ID, &l.OwnerID, &l.Title, &l.Description,
-		&l.Photos, &l.DepositAmount, &l.Status,
-		&l.Category, &l.CreatedAt,
-	)
+	err := scanListing(r.pool.QueryRow(ctx, `
+        UPDATE listings
+        SET photos = photos || to_jsonb($1::text)
+        WHERE id = $2
+        RETURNING id, owner_id, title, description, COALESCE(photos, '[]'::jsonb),
+                  deposit_amount, status, category, created_at
+	`, photoURL, id), &l)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

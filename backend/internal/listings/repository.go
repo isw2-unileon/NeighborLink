@@ -2,6 +2,7 @@ package listings
 
 import "context"
 
+// Repository define la interfaz para acceder a los listings en la base de datos.
 type Repository interface {
 	FindAll(ctx context.Context, filters FilterParams) ([]Listing, error)
 	FindByID(ctx context.Context, id string) (*Listing, error)

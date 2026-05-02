@@ -153,7 +153,10 @@ describe('listingsApi', () => {
             status: 'available',
         })
 
-        const url = mockFetch.mock.calls[0][0] as string
+        const call = mockFetch.mock.calls[0]
+        expect(call).toBeDefined()
+        const url = call[0] as string
+
         expect(url).toContain('/listings?')
         expect(url).toContain('category=herramientas')
         expect(url).toContain('deposit=50')
@@ -170,7 +173,10 @@ describe('listingsApi', () => {
             status: undefined,
         })
 
-        const url = mockFetch.mock.calls[0][0] as string
+        const call = mockFetch.mock.calls[0]
+        expect(call).toBeDefined()
+        const url = call[0] as string
+
         expect(url).toMatch(/\/listings$/)
     })
 })
