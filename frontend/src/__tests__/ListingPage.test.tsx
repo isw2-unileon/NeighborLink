@@ -87,4 +87,69 @@ describe('ListingsPage', () => {
         const link = await screen.findByRole('link', { name: /Taladro/i })
         expect(link).toHaveAttribute('href', '/listings/l1')
     })
+
+    //filtros
+    it('aplica el filtro de categoría y recarga listings', async () => {
+        const getAllMock = vi
+            .spyOn(listingsLib.listingsApi, 'getAll')
+            .mockResolvedValue([])
+
+        renderPage()
+
+        // Esperar a que termine el loading inicial
+        await screen.findByText('Explorar artículos')
+
+        const selects = screen.getAllByRole('combobox')
+        const categorySelect = selects[0]
+
+        fireEvent.change(categorySelect, { target: { value: 'herramientas' } })
+
+        await waitFor(() => {
+            expect(getAllMock).toHaveBeenLastCalledWith(
+                expect.objectContaining({ category: 'herramientas' })
+            )
+        })
+    })
+
+
+    it('aplica el filtro de estado y recarga listings', async () => {
+        const getAllMock = vi
+            .spyOn(listingsLib.listingsApi, 'getAll')
+            .mockResolvedValue([])
+
+        renderPage()
+
+        // Esperar a que termine el loading inicial
+        await screen.findByText('Explorar artículos')
+
+        const selects = screen.getAllByRole('combobox')
+        const statusSelect = selects[1]
+
+        fireEvent.change(statusSelect, { target: { value: 'available' } })
+
+        await waitFor(() => {
+            expect(getAllMock).toHaveBeenLastCalledWith(
+                expect.objectContaining({ status: 'available' })
+            )
+        })
+    })
+
+    it('filtra por texto en cliente usando el buscador', async () => {
+        vi.spyOn(listingsLib.listingsApi, 'getAll').mockResolvedValue([
+            { ...fakeListing, id: '1', title: 'Taladro', description: 'Potente' },
+            { ...fakeListing, id: '2', title: 'Bicicleta', description: 'Montaña' },
+        ])
+
+        renderPage()
+
+        expect(await screen.findByText('Taladro')).toBeInTheDocument()
+        expect(screen.getByText('Bicicleta')).toBeInTheDocument()
+
+        fireEvent.change(screen.getByPlaceholderText('Nombre del artículo...'), {
+            target: { value: 'bici' },
+        })
+
+        expect(screen.queryByText('Taladro')).not.toBeInTheDocument()
+        expect(screen.getByText('Bicicleta')).toBeInTheDocument()
+    })
 })

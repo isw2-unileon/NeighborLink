@@ -128,4 +128,49 @@ describe('listingsApi', () => {
         const file = new File(['img'], 'foto.jpg', { type: 'image/jpeg' })
         await expect(listingsApi.uploadPhoto('l1', file)).rejects.toThrow('Unknown error')
     })
+
+    //sobre filtros: 
+
+    it('getAll añade category al query string', async () => {
+        mockFetch.mockResolvedValueOnce(okResponse([]))
+        const { listingsApi } = await import('../lib/listings')
+
+        await listingsApi.getAll({ category: 'herramientas' })
+
+        expect(mockFetch).toHaveBeenCalledWith(
+            expect.stringContaining('/listings?category=herramientas'),
+            expect.any(Object)
+        )
+    })
+
+    it('getAll añade varios filtros al query string', async () => {
+        mockFetch.mockResolvedValueOnce(okResponse([]))
+        const { listingsApi } = await import('../lib/listings')
+
+        await listingsApi.getAll({
+            category: 'herramientas',
+            deposit: '50',
+            status: 'available',
+        })
+
+        const url = mockFetch.mock.calls[0][0] as string
+        expect(url).toContain('/listings?')
+        expect(url).toContain('category=herramientas')
+        expect(url).toContain('deposit=50')
+        expect(url).toContain('status=available')
+    })
+
+    it('getAll no añade filtros vacíos al query string', async () => {
+        mockFetch.mockResolvedValueOnce(okResponse([]))
+        const { listingsApi } = await import('../lib/listings')
+
+        await listingsApi.getAll({
+            category: '',
+            deposit: '',
+            status: undefined,
+        })
+
+        const url = mockFetch.mock.calls[0][0] as string
+        expect(url).toMatch(/\/listings$/)
+    })
 })
