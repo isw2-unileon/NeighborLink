@@ -1,4 +1,4 @@
-package auth
+package geocoder
 
 import (
 	"context"
@@ -9,22 +9,21 @@ import (
 	"strconv"
 )
 
-// coordinates holds the result of a geocoding lookup.
-type coordinates struct {
+// Coordinates holds the result of a geocoding lookup.
+type Coordinates struct {
 	Lat float64
 	Lng float64
 }
 
-// nominatimResult es la estructura mínima que nos interesa de la respuesta de Nominatim.
 type nominatimResult struct {
 	Lat string `json:"lat"`
 	Lon string `json:"lon"`
 }
 
-// geocode resuelve una dirección en texto a coordenadas usando Nominatim.
-// Si la dirección no se encuentra o hay un error de red, devuelve nil, nil
-// — el registro continúa sin coordenadas (location = NULL en BD).
-func geocode(ctx context.Context, client *http.Client, address string) (*coordinates, error) {
+// Geocode resuelve una dirección en texto a coordenadas usando Nominatim.
+// Si la dirección no se encuentra devuelve nil, nil — el llamador decide
+// si continuar sin coordenadas o devolver error.
+func Geocode(ctx context.Context, client *http.Client, address string) (*Coordinates, error) {
 	reqURL := fmt.Sprintf(
 		"https://nominatim.openstreetmap.org/search?q=%s&format=json&limit=1",
 		url.QueryEscape(address),
@@ -48,7 +47,7 @@ func geocode(ctx context.Context, client *http.Client, address string) (*coordin
 		return nil, err
 	}
 	if len(results) == 0 {
-		return nil, nil // dirección no encontrada — no es un error fatal
+		return nil, nil
 	}
 
 	lat, err := strconv.ParseFloat(results[0].Lat, 64)
@@ -60,5 +59,5 @@ func geocode(ctx context.Context, client *http.Client, address string) (*coordin
 		return nil, fmt.Errorf("invalid lon %q: %w", results[0].Lon, err)
 	}
 
-	return &coordinates{Lat: lat, Lng: lng}, nil
+	return &Coordinates{Lat: lat, Lng: lng}, nil
 }

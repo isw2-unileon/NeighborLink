@@ -3,9 +3,11 @@ package listings
 import "time"
 
 const (
-	StatusAvailable = "available"
-	StatusBorrowed  = "borrowed"
-	StatusInactive  = "inactive"
+	StatusAvailable       = "available"
+	StatusPendingHandover = "pending_handover"
+	StatusPendingReturn   = "pending_return"
+	StatusBorrowed        = "borrowed"
+	StatusInactive        = "inactive"
 )
 
 type Category string
