@@ -91,17 +91,6 @@ describe('ProfilePage', () => {
         expect(await screen.findByText('No se pudieron cargar tus objetos')).toBeInTheDocument()
     })
 
-    it('muestra los listings del usuario agrupados por estado', async () => {
-        const listings: Listing[] = [
-            { id: 'l1', owner_id: 'user-1', title: 'Taladro', description: '', photos: [], deposit_amount: 10, status: 'available', created_at: '' },
-            { id: 'l2', owner_id: 'user-1', title: 'Bici', description: '', photos: [], deposit_amount: 20, status: 'pending_handover', created_at: '' },
-        ]
-        vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue(listings)
-        renderPage()
-        expect(await screen.findByText('Taladro')).toBeInTheDocument()
-        expect(screen.getByText('Bici')).toBeInTheDocument()
-    })
-
     it('muestra mensaje vacío si no hay listings en un estado', async () => {
         renderPage()
         expect(await screen.findByText('No tienes objetos disponibles en este momento.')).toBeInTheDocument()
@@ -133,9 +122,51 @@ describe('ProfilePage', () => {
 
         expect(await screen.findByText('Error de red')).toBeInTheDocument()
     })
+
+    it('muestra los listings del usuario agrupados por estado', async () => {
+        const listings: Listing[] = [
+            {
+                id: 'l1',
+                owner_id: 'user-1',
+                title: 'Taladro',
+                description: '',
+                photos: [],
+                deposit_amount: 10,
+                status: 'available',
+                category: 'herramientas',
+                created_at: '',
+            },
+            {
+                id: 'l2',
+                owner_id: 'user-1',
+                title: 'Bici',
+                description: '',
+                photos: [],
+                deposit_amount: 20,
+                status: 'pending_handover',
+                category: 'material_deportivo',
+                created_at: '',
+            },
+        ]
+        vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue(listings)
+        renderPage()
+        expect(await screen.findByText('Taladro')).toBeInTheDocument()
+        expect(screen.getByText('Bici')).toBeInTheDocument()
+    })
+
     it('muestra la foto del listing si tiene photos', async () => {
         const listings: Listing[] = [
-            { id: 'l1', owner_id: 'user-1', title: 'Taladro', description: '', photos: ['https://example.com/foto.jpg'], deposit_amount: 10, status: 'available', created_at: '' },
+            {
+                id: 'l1',
+                owner_id: 'user-1',
+                title: 'Taladro',
+                description: '',
+                photos: ['https://example.com/foto.jpg'],
+                deposit_amount: 10,
+                status: 'available',
+                category: 'herramientas',
+                created_at: '',
+            },
         ]
         vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue(listings)
         renderPage()

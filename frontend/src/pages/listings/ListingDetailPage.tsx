@@ -9,6 +9,8 @@ interface ListingInput {
     description: string;
     photos: string[];
     deposit_amount: number;
+    category: string;
+    status: string;
 }
 
 // --- Componente carrusel aislado (SRP) ---
@@ -82,6 +84,8 @@ export default function ListingDetailPage() {
         description: '',
         photos: [],
         deposit_amount: 0,
+        category: '',
+        status: 'available',
     });
 
     const isOwner = user?.id === listing?.owner_id;
@@ -96,6 +100,8 @@ export default function ListingDetailPage() {
                     description: data.description,
                     photos: data.photos ?? [],
                     deposit_amount: data.deposit_amount,
+                    category: data.category ?? 'otros',
+                    status: data.status ?? 'available',
                 });
             })
             .catch(err => setError(err.message))
@@ -194,7 +200,12 @@ export default function ListingDetailPage() {
                     </div>
 
                     <p className="mt-3 text-gray-600 leading-relaxed">{listing.description}</p>
-
+                    <div className="mt-3 flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Categoría:</span>
+                        <span className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-medium capitalize">
+                            {listing.category?.replace(/_/g, ' ') ?? 'Sin categoría'}
+                        </span>
+                    </div>
                     <p className="mt-4 text-xl font-semibold text-blue-600">
                         {listing.deposit_amount} € depósito
                     </p>
@@ -250,7 +261,37 @@ export default function ListingDetailPage() {
                             className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </label>
-
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Estado</span>
+                        <select
+                            value={form.status}
+                            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="available">Disponible</option>
+                            <option value="borrowed">Prestado</option>
+                            <option value="inactive">Inactivo</option>
+                        </select>
+                    </label>
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Categoría</span>
+                        <select
+                            value={form.category}
+                            onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="herramientas">Herramientas</option>
+                            <option value="material_deportivo">Material deportivo</option>
+                            <option value="material_educativo">Material educativo</option>
+                            <option value="informatico">Informático</option>
+                            <option value="electrodomesticos">Electrodomésticos</option>
+                            <option value="jardineria">Jardinería</option>
+                            <option value="vehiculos">Vehículos</option>
+                            <option value="ocio_y_juegos">Ocio y juegos</option>
+                            <option value="ropa_y_accesorios">Ropa y accesorios</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </label>
                     <label className="block">
                         <span className="text-sm font-medium text-gray-700">Depósito (€)</span>
                         <input

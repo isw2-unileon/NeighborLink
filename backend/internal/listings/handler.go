@@ -3,6 +3,7 @@ package listings
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,14 +33,31 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected.DELETE("/listings/:id", h.deleteListing)
 }
 
-func (h *Handler) listListings(c *gin.Context) {
-	listings, err := h.repo.FindAll(c.Request.Context())
+func (h Handler) listListings(c *gin.Context) {
+	var f FilterParams
+
+	f.Category = Category(c.Query("category"))
+	f.Status = c.Query("status")
+	f.ExcludeOwnerID = c.Query("exclude_owner_id")
+
+	if v := c.Query("deposit"); v != "" {
+		if p, err := strconv.ParseFloat(v, 64); err == nil {
+			f.Deposit = p
+		}
+	}
+
+	if f.Category != "" && !IsValidCategory(f.Category) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "categoría no válida"})
+		return
+	}
+
+	result, err := h.repo.FindAll(c.Request.Context(), f)
 	if err != nil {
-		slog.Error("failed to list listings", "error", err)
+		slog.Error("listListings failed", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": listings})
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) getListing(c *gin.Context) {

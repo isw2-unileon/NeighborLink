@@ -4,19 +4,23 @@ import { listingsApi } from '../lib/listings';
 import { useAuth } from '../contexts/AuthContext';
 import type { Listing } from '../types';
 
-interface ListingInput {
+interface CreateListingInput {
     title: string;
     description: string;
     photos: string[];
     deposit_amount: number;
+    category: string;
+    status: string;
 }
 
-const EMPTY_FORM: ListingInput = {
+const EMPTY_FORM: CreateListingInput = {
     title: '',
     description: '',
     photos: [],
     deposit_amount: 0,
-};
+    category: 'otros',
+    status: 'available',
+}
 
 type Step = 'info' | 'photos';
 
@@ -25,7 +29,7 @@ export default function CreateListingPage() {
     const navigate = useNavigate();
 
     const [step, setStep] = useState<Step>('info');
-    const [form, setForm] = useState<ListingInput>(EMPTY_FORM);
+    const [form, setForm] = useState<CreateListingInput>(EMPTY_FORM)
     const [createdListing, setCreatedListing] = useState<Listing | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -126,7 +130,25 @@ export default function CreateListingPage() {
                             className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </label>
-
+                    <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Categoría *</span>
+                        <select
+                            value={form.category}
+                            onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+                            required
+                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="herramientas">Herramientas</option>
+                            <option value="material_deportivo">Material deportivo</option>
+                            <option value="material_educativo">Material educativo</option>
+                            <option value="informatico">Informático</option>
+                            <option value="electrodomesticos">Electrodomésticos</option>
+                            <option value="jardineria">Jardinería</option>
+                            <option value="vehiculos">Vehículos</option>
+                            <option value="ocio_y_juegos">Ocio y juegos</option>
+                            <option value="ropa_y_accesorios">Ropa y accesorios</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </label>
                     <label className="block">
                         <span className="text-sm font-medium text-gray-700">Depósito (€) *</span>
                         <input
