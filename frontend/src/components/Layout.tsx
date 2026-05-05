@@ -1,16 +1,10 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 // Layout — componente estructural que envuelve todas las páginas
 // Patrón: Composite — el Layout compone Navbar + contenido dinámico (Outlet)
 export default function Layout() {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
-
-    function handleLogout() {
-        logout();
-        navigate('/');
-    }
+    const { user } = useAuth();
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -27,12 +21,6 @@ export default function Layout() {
                             <Link to="/profile" className="text-sm text-gray-600 hover:text-teal-700">
                                 {user.name}
                             </Link>
-                            <button
-                                onClick={handleLogout}
-                                className="text-sm text-red-500 hover:text-red-700"
-                            >
-                                Salir
-                            </button>
                         </>
                     ) : (
                         <>

@@ -22,6 +22,8 @@ interface ListingsResponse {
 export interface ListingFilters {
     category?: string;
     deposit?: string;
+    deposit_min?: string;
+    deposit_max?: string;
     status?: string;
     exclude_owner_id?: string;
     lat?: string;

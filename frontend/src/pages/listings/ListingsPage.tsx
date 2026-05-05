@@ -9,14 +9,16 @@ interface Coords { lat: number; lon: number; }
 interface Filters {
     search: string;
     category: string;
-    deposit: string;
+    depositMin: string;
+    depositMax: string;
     status: string;
 }
 
 const INITIAL_FILTERS: Filters = {
     search: '',
     category: '',
-    deposit: '',
+    depositMin: '',
+    depositMax: '',
     status: '',
 };
 
@@ -29,6 +31,8 @@ export default function ListingsPage() {
     const [error, setError] = useState<string | null>(null);
     const [coords, setCoords] = useState<Coords | null>(null);
     const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+    const [depositMinInput, setDepositMinInput] = useState('');
+    const [depositMaxInput, setDepositMaxInput] = useState('');
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -47,7 +51,8 @@ export default function ListingsPage() {
         setError(null);
         listingsApi.getAll({
             category: filters.category || undefined,
-            deposit: filters.deposit || undefined,
+            deposit_min: filters.depositMin || undefined,
+            deposit_max: filters.depositMax || undefined,
             status: filters.status || undefined,
             //exclude_owner_id: user?.id || undefined, esto es para que no vea sus propios artículos en el apartado de listings
             lat: coords ? String(coords.lat) : undefined,
@@ -56,7 +61,19 @@ export default function ListingsPage() {
             .then(setAllListings)
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
-    }, [filters.category, filters.deposit, filters.status, coords, user?.id]);
+    }, [filters.category, filters.depositMin, filters.depositMax, filters.status, coords, user?.id]);
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            setFilters(prev => ({
+                ...prev,
+                depositMin: depositMinInput,
+                depositMax: depositMaxInput,
+            }));
+        }, 300);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [depositMinInput, depositMaxInput]);
 
     const listings = useMemo(() => {
         if (!filters.search.trim()) return allListings;
@@ -128,24 +145,40 @@ export default function ListingsPage() {
                     </select>
                 </div>
 
-                {/* Depósito máximo */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-600">
-                        Depósito máx:{' '}
-                        <span className="text-teal-700 font-semibold">
-                            {filters.deposit ? `${filters.deposit} €` : 'Sin límite'}
-                        </span>
-                    </label>
-                    <input
-                        type="range"
-                        min={20} max={200} step={10}
-                        value={filters.deposit || 200}
-                        onChange={e => handleFilter('deposit', e.target.value === '200' ? '' : e.target.value)}
-                        className="w-full accent-teal-700"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400">
-                        <span>20 €</span><span>+200 €</span>
+                {/* Rango de depósito */}
+                <div className="flex flex-col gap-3">
+                    <label className="text-sm font-medium text-gray-600">Depósito</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-500">Mín.</span>
+                            <input
+                                type="number"
+                                min={0}
+                                step={5}
+                                placeholder="Sin mínimo"
+                                value={depositMinInput}
+                                onChange={e => setDepositMinInput(e.target.value)}
+                                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-500">Máx.</span>
+                            <input
+                                type="number"
+                                min={0}
+                                step={5}
+                                placeholder="Sin máximo"
+                                value={depositMaxInput}
+                                onChange={e => setDepositMaxInput(e.target.value)}
+                                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            />
+                        </div>
                     </div>
+                    <p className="text-sm text-gray-500">
+                        {depositMinInput || depositMaxInput
+                            ? `Depósito: ${depositMinInput || '0'} € - ${depositMaxInput || 'sin límite'} €`
+                            : 'Todos los listings'}
+                    </p>
                 </div>
 
                 {/* Estado */}
@@ -170,7 +203,11 @@ export default function ListingsPage() {
                 )}
 
                 <button
-                    onClick={() => setFilters(INITIAL_FILTERS)}
+                    onClick={() => {
+                        setFilters(INITIAL_FILTERS);
+                        setDepositMinInput('');
+                        setDepositMaxInput('');
+                    }}
                     className="text-sm text-gray-500 hover:text-gray-700 underline text-left"
                 >
                     Limpiar filtros
@@ -203,7 +240,11 @@ export default function ListingsPage() {
                         <p className="text-4xl mb-3">🔍</p>
                         <p className="text-gray-500">No hay artículos disponibles todavía.</p>
                         <button
-                            onClick={() => setFilters(INITIAL_FILTERS)}
+                            onClick={() => {
+                                setFilters(INITIAL_FILTERS);
+                                setDepositMinInput('');
+                                setDepositMaxInput('');
+                            }}
                             className="mt-4 text-teal-700 hover:underline text-sm"
                         >
                             Limpiar filtros

@@ -110,13 +110,18 @@ function MyListings({ userID }: { userID: string }) {
 
 
 export default function ProfilePage() {
-    const { user, token, updateUser } = useAuth();
+    const { user, token, updateUser, logout } = useAuth();
     const navigate = useNavigate();
 
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    function handleLogout() {
+        logout();
+        navigate('/');
+    }
 
     if (!user || !token) return null;
 
@@ -172,10 +177,16 @@ export default function ProfilePage() {
                         )}
                     </div>
 
-                    <button onClick={() => navigate('/profile/edit')}
-                        className="flex-shrink-0 text-sm font-medium text-teal-700 border border-teal-200 rounded-lg px-4 py-2 hover:bg-teal-50 transition">
-                        Editar perfil
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => navigate('/profile/edit')}
+                            className="flex-shrink-0 text-sm font-medium text-teal-700 border border-teal-200 rounded-lg px-4 py-2 hover:bg-teal-50 transition">
+                            Editar perfil
+                        </button>
+                        <button onClick={handleLogout}
+                            className="flex-shrink-0 text-sm font-medium text-red-500 border border-red-200 rounded-lg px-4 py-2 hover:bg-red-50 transition">
+                            Salir
+                        </button>
+                    </div>
                 </div>
 
                 {success && (

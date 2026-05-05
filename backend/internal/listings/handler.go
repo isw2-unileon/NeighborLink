@@ -40,9 +40,18 @@ func (h Handler) listListings(c *gin.Context) {
 	f.Status = c.Query("status")
 	f.ExcludeOwnerID = c.Query("exclude_owner_id")
 
-	if v := c.Query("deposit"); v != "" {
+	if v := c.Query("deposit_min"); v != "" {
 		if p, err := strconv.ParseFloat(v, 64); err == nil {
-			f.Deposit = p
+			f.MinDeposit = p
+		}
+	}
+	if v := c.Query("deposit_max"); v != "" {
+		if p, err := strconv.ParseFloat(v, 64); err == nil {
+			f.MaxDeposit = p
+		}
+	} else if v := c.Query("deposit"); v != "" {
+		if p, err := strconv.ParseFloat(v, 64); err == nil {
+			f.MaxDeposit = p
 		}
 	}
 
