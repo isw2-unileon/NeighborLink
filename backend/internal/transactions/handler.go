@@ -20,14 +20,17 @@ func NewHandler(repo Repository, service *Service) *Handler {
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
-func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
+func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	rg.GET("/transactions", h.listTransactions)
 	rg.GET("/transactions/:id", h.getTransaction)
 	rg.GET("/listings/:id/transactions", h.listByListing)
 	rg.GET("/users/:id/transactions", h.listByBorrower)
-	rg.POST("/transactions", h.createTransaction)
-	rg.POST("/transactions/:id/handover", h.handoverTransaction)
-	rg.POST("/transactions/:id/return", h.returnTransaction)
+
+	protected := rg.Group("/")
+	protected.Use(authMiddleware)
+	protected.POST("/transactions", h.createTransaction)
+	protected.POST("/transactions/:id/handover", h.handoverTransaction)
+	protected.POST("/transactions/:id/return", h.returnTransaction)
 }
 
 func (h *Handler) listTransactions(c *gin.Context) {
