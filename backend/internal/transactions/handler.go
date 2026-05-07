@@ -85,9 +85,15 @@ func (h *Handler) listByBorrower(c *gin.Context) {
 }
 
 func (h *Handler) createTransaction(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	borrowerID := userID.(string)
+
 	var body struct {
 		ListingID          string `json:"listing_id"`
-		BorrowerID         string `json:"borrower_id"`
 		PaymentMethodID    string `json:"payment_method_id"`
 		DepositAmountCents int64  `json:"deposit_amount_cents"`
 	}
@@ -95,13 +101,6 @@ func (h *Handler) createTransaction(c *gin.Context) {
 		slog.Error("failed to parse create transaction body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-
-	// TODO: when JWT is implemented, borrower_id must be extracted from the token,
-	// not from the body or the X-User-ID header.
-	borrowerID := c.GetHeader("X-User-ID")
-	if borrowerID == "" {
-		borrowerID = body.BorrowerID
 	}
 
 	t, err := h.service.AgreeDeal(c.Request.Context(), body.ListingID, borrowerID, body.PaymentMethodID, body.DepositAmountCents)
