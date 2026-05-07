@@ -133,6 +133,19 @@ func (r *postgresRepository) UpdatePaymentIntent(ctx context.Context, id string,
 	return nil
 }
 
+func (r *postgresRepository) FindListingOwnerByTransactionID(ctx context.Context, transactionID string) (string, error) {
+	const q = `SELECT l.owner_id FROM transactions t JOIN listings l ON t.listing_id = l.id WHERE t.id = $1`
+	var ownerID string
+	err := r.pool.QueryRow(ctx, q, transactionID).Scan(&ownerID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("transaction %s not found", transactionID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("transactions: find listing owner failed: %w", err)
+	}
+	return ownerID, nil
+}
+
 func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status string) error {
 	var err error
 	switch status {
