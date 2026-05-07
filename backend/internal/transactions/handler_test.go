@@ -142,6 +142,7 @@ func makeToken(userID string) string {
 func setupRouter(repo transactions.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.Use(gin.Recovery())
 	h := transactions.NewHandler(repo, nil)
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
