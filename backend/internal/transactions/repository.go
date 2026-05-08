@@ -20,4 +20,8 @@ type Repository interface {
 	// UpdateStatus updates only the status field and the corresponding timestamp.
 	// validStatuses: handed_over (sets handover_at), returned (sets return_at), cancelled.
 	UpdateStatus(ctx context.Context, id string, status string) error
+
+	// FindListingOwnerByTransactionID returns the owner_id of the listing associated
+	// with the given transaction. Returns an error if the transaction does not exist.
+	FindListingOwnerByTransactionID(ctx context.Context, transactionID string) (string, error)
 }

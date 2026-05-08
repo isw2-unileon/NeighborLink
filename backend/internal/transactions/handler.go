@@ -20,14 +20,17 @@ func NewHandler(repo Repository, service *Service) *Handler {
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
-func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
+func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	rg.GET("/transactions", h.listTransactions)
 	rg.GET("/transactions/:id", h.getTransaction)
 	rg.GET("/listings/:id/transactions", h.listByListing)
 	rg.GET("/users/:id/transactions", h.listByBorrower)
-	rg.POST("/transactions", h.createTransaction)
-	rg.POST("/transactions/:id/handover", h.handoverTransaction)
-	rg.POST("/transactions/:id/return", h.returnTransaction)
+
+	protected := rg.Group("/")
+	protected.Use(authMiddleware)
+	protected.POST("/transactions", h.createTransaction)
+	protected.POST("/transactions/:id/handover", h.handoverTransaction)
+	protected.POST("/transactions/:id/return", h.returnTransaction)
 }
 
 func (h *Handler) listTransactions(c *gin.Context) {
@@ -82,9 +85,15 @@ func (h *Handler) listByBorrower(c *gin.Context) {
 }
 
 func (h *Handler) createTransaction(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	borrowerID := userID.(string)
+
 	var body struct {
 		ListingID          string `json:"listing_id"`
-		BorrowerID         string `json:"borrower_id"`
 		PaymentMethodID    string `json:"payment_method_id"`
 		DepositAmountCents int64  `json:"deposit_amount_cents"`
 	}
@@ -92,13 +101,6 @@ func (h *Handler) createTransaction(c *gin.Context) {
 		slog.Error("failed to parse create transaction body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-
-	// TODO: when JWT is implemented, borrower_id must be extracted from the token,
-	// not from the body or the X-User-ID header.
-	borrowerID := c.GetHeader("X-User-ID")
-	if borrowerID == "" {
-		borrowerID = body.BorrowerID
 	}
 
 	t, err := h.service.AgreeDeal(c.Request.Context(), body.ListingID, borrowerID, body.PaymentMethodID, body.DepositAmountCents)
@@ -114,8 +116,20 @@ func (h *Handler) createTransaction(c *gin.Context) {
 func (h *Handler) handoverTransaction(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: when JWT is implemented, validate that the caller is the owner of the listing.
-	_ = c.GetHeader("X-User-ID")
+	callerID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+	if ownerID != callerID.(string) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
 
 	if err := h.service.Handover(c.Request.Context(), id); err != nil {
 		slog.Error("failed to handover transaction", "id", id, "error", err)
@@ -137,8 +151,20 @@ func (h *Handler) handoverTransaction(c *gin.Context) {
 func (h *Handler) returnTransaction(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: when JWT is implemented, validate that the caller is the owner of the listing.
-	_ = c.GetHeader("X-User-ID")
+	callerID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+	if ownerID != callerID.(string) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
 
 	var body struct {
 		DepositAmountCents int64 `json:"deposit_amount_cents"`
