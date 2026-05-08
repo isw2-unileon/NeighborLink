@@ -33,7 +33,8 @@ func (s *Service) AgreeDeal(ctx context.Context, listingID, borrowerID, paymentM
 		return nil, fmt.Errorf("service: create transaction: %w", err)
 	}
 
-	paymentIntentID, err := s.stripe.AuthorizeDeposit(depositAmountCents, "eur", paymentMethodID)
+	totalCents := depositAmountCents + PlatformFeeCents
+	paymentIntentID, err := s.stripe.AuthorizeDeposit(totalCents, "eur", paymentMethodID)
 	if err != nil {
 		return nil, fmt.Errorf("service: authorize deposit: %w", err)
 	}
