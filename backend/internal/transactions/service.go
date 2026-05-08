@@ -3,19 +3,25 @@ package transactions
 import (
 	"context"
 	"fmt"
-
-	stripeclient "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
 )
+
+// stripeDepositor is the subset of stripe.Client used by the service.
+// Declared here so the service can be tested without a real Stripe key.
+type stripeDepositor interface {
+	AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error)
+	CaptureDeposit(paymentIntentID string) error
+	ReleaseDeposit(paymentIntentID string, totalAmountCents int64) error
+}
 
 // Service orchestrates the deposit lifecycle, combining the transaction
 // repository with the Stripe client. Handlers must never call Stripe directly.
 type Service struct {
 	repo   Repository
-	stripe *stripeclient.Client
+	stripe stripeDepositor
 }
 
 // NewService creates a Service with the given repository and Stripe client.
-func NewService(repo Repository, stripe *stripeclient.Client) *Service {
+func NewService(repo Repository, stripe stripeDepositor) *Service {
 	return &Service{repo: repo, stripe: stripe}
 }
 
