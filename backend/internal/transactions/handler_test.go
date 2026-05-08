@@ -73,7 +73,7 @@ func (f *fakeRepository) Create(ctx context.Context, t transactions.Transaction)
 	return &created, nil
 }
 
-func (f *fakeRepository) UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string) error {
+func (f *fakeRepository) UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string, totalChargedCents int64) error {
 	if f.err != nil {
 		return f.err
 	}

@@ -13,9 +13,9 @@ type Repository interface {
 	// Create inserts a new transaction and returns it with the generated ID.
 	Create(ctx context.Context, t Transaction) (*Transaction, error)
 
-	// UpdatePaymentIntent stores the Stripe PaymentIntent ID and payment method ID
-	// on the transaction and sets its status to agreed.
-	UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string) error
+	// UpdatePaymentIntent stores the Stripe PaymentIntent ID, payment method ID, and total
+	// charged amount on the transaction and sets its status to agreed.
+	UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string, totalChargedCents int64) error
 
 	// UpdateStatus updates only the status field and the corresponding timestamp.
 	// validStatuses: handed_over (sets handover_at), returned (sets return_at), cancelled.

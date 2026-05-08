@@ -39,12 +39,13 @@ func (s *Service) AgreeDeal(ctx context.Context, listingID, borrowerID, paymentM
 		return nil, fmt.Errorf("service: authorize deposit: %w", err)
 	}
 
-	if err := s.repo.UpdatePaymentIntent(ctx, t.ID, paymentIntentID, paymentMethodID); err != nil {
+	if err := s.repo.UpdatePaymentIntent(ctx, t.ID, paymentIntentID, paymentMethodID, totalCents); err != nil {
 		return nil, fmt.Errorf("service: update payment intent: %w", err)
 	}
 
 	t.StripePaymentIntentID = paymentIntentID
 	t.PaymentMethodID = paymentMethodID
+	t.TotalChargedCents = totalCents
 	t.Status = "agreed"
 	return t, nil
 }
