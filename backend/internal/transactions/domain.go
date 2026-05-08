@@ -3,6 +3,9 @@ package transactions
 
 import "time"
 
+// PlatformFeeCents is the fixed management + insurance fee charged to the borrower on top of the deposit.
+const PlatformFeeCents int64 = 200
+
 // Transaction represents a loan agreement between an owner and a borrower.
 // Pure business data — zero external dependencies.
 type Transaction struct {
