@@ -47,10 +47,10 @@ func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error)
 func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transaction, error) {
 	var t Transaction
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
+		SELECT id, listing_id, borrower_id, status, stripe_payment_intent_id, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at
 		FROM transactions
 		WHERE id = $1
-	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
+	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.StripePaymentIntentID, &t.PaymentMethodID, &t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -105,12 +105,12 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 func (r *postgresRepository) Create(ctx context.Context, t Transaction) (*Transaction, error) {
 	var created Transaction
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO transactions (listing_id, borrower_id, status)
-		VALUES ($1, $2, 'pending')
-		RETURNING id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
-	`, t.ListingID, t.BorrowerID).Scan(
+		INSERT INTO transactions (listing_id, borrower_id, payment_method_id, status)
+		VALUES ($1, $2, $3, 'pending')
+		RETURNING id, listing_id, borrower_id, status, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at
+	`, t.ListingID, t.BorrowerID, t.PaymentMethodID).Scan(
 		&created.ID, &created.ListingID, &created.BorrowerID, &created.Status,
-		&created.TotalChargedCents, &created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
+		&created.PaymentMethodID, &created.TotalChargedCents, &created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("transactions: insert failed: %w", err)

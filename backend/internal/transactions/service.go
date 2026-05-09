@@ -25,35 +25,43 @@ func NewService(repo Repository, stripe stripeDepositor) *Service {
 	return &Service{repo: repo, stripe: stripe}
 }
 
-// TODO: borrower_id is currently passed by the handler from a temporary header.
-// When JWT is implemented it must be extracted from the token instead.
-
-// AgreeDeal creates a pending transaction, authorizes the deposit on Stripe,
-// and marks the transaction as agreed.
-func (s *Service) AgreeDeal(ctx context.Context, listingID, borrowerID, paymentMethodID string, depositAmountCents int64) (*Transaction, error) {
-	t, err := s.repo.Create(ctx, Transaction{
-		ListingID:  listingID,
-		BorrowerID: borrowerID,
-	})
+// Accept authorizes the deposit on Stripe for a pending transaction and marks it as agreed.
+// The transaction must already exist in pending status with a stored payment_method_id.
+func (s *Service) Accept(ctx context.Context, transactionID string, depositAmountCents int64) error {
+	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
-		return nil, fmt.Errorf("service: create transaction: %w", err)
+		return fmt.Errorf("service: find transaction: %w", err)
+	}
+	if t == nil || t.Status != "pending" {
+		return fmt.Errorf("service: transaction %s must be in pending status to accept", transactionID)
 	}
 
 	totalCents := depositAmountCents + PlatformFeeCents
-	paymentIntentID, err := s.stripe.AuthorizeDeposit(totalCents, "eur", paymentMethodID)
+	paymentIntentID, err := s.stripe.AuthorizeDeposit(totalCents, "eur", t.PaymentMethodID)
 	if err != nil {
-		return nil, fmt.Errorf("service: authorize deposit: %w", err)
+		return fmt.Errorf("service: authorize deposit: %w", err)
 	}
 
-	if err := s.repo.UpdatePaymentIntent(ctx, t.ID, paymentIntentID, paymentMethodID, totalCents); err != nil {
-		return nil, fmt.Errorf("service: update payment intent: %w", err)
+	if err := s.repo.UpdatePaymentIntent(ctx, transactionID, paymentIntentID, t.PaymentMethodID, totalCents); err != nil {
+		return fmt.Errorf("service: update payment intent: %w", err)
+	}
+	return nil
+}
+
+// Reject cancels a pending transaction without any payment action.
+func (s *Service) Reject(ctx context.Context, transactionID string) error {
+	t, err := s.repo.FindByID(ctx, transactionID)
+	if err != nil {
+		return fmt.Errorf("service: find transaction: %w", err)
+	}
+	if t == nil || t.Status != "pending" {
+		return fmt.Errorf("service: transaction %s must be in pending status to reject", transactionID)
 	}
 
-	t.StripePaymentIntentID = paymentIntentID
-	t.PaymentMethodID = paymentMethodID
-	t.TotalChargedCents = totalCents
-	t.Status = "agreed"
-	return t, nil
+	if err := s.repo.UpdateStatus(ctx, transactionID, "cancelled"); err != nil {
+		return fmt.Errorf("service: update status: %w", err)
+	}
+	return nil
 }
 
 // Handover captures the authorized deposit and marks the transaction as handed_over.

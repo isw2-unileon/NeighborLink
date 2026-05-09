@@ -29,6 +29,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected := rg.Group("/")
 	protected.Use(authMiddleware)
 	protected.POST("/transactions", h.createTransaction)
+	protected.PUT("/transactions/:id/accept", h.acceptTransaction)
+	protected.PUT("/transactions/:id/reject", h.rejectTransaction)
 	protected.POST("/transactions/:id/handover", h.handoverTransaction)
 	protected.POST("/transactions/:id/return", h.returnTransaction)
 }
@@ -93,9 +95,8 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	borrowerID := userID.(string)
 
 	var body struct {
-		ListingID          string `json:"listing_id"`
-		PaymentMethodID    string `json:"payment_method_id"`
-		DepositAmountCents int64  `json:"deposit_amount_cents"`
+		ListingID       string `json:"listing_id"`
+		PaymentMethodID string `json:"payment_method_id"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Error("failed to parse create transaction body", "error", err)
@@ -103,45 +104,110 @@ func (h *Handler) createTransaction(c *gin.Context) {
 		return
 	}
 
-	t, err := h.service.AgreeDeal(c.Request.Context(), body.ListingID, borrowerID, body.PaymentMethodID, body.DepositAmountCents)
+	t, err := h.repo.Create(c.Request.Context(), Transaction{
+		ListingID:       body.ListingID,
+		BorrowerID:      borrowerID,
+		PaymentMethodID: body.PaymentMethodID,
+	})
 	if err != nil {
-		slog.Error("failed to agree deal", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("failed to create transaction", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
 
-func (h *Handler) handoverTransaction(c *gin.Context) {
-	id := c.Param("id")
+// parseDepositAmountCents reads deposit_amount_cents from the JSON body.
+// Returns the amount and true on success; writes a 400 response and returns false on failure.
+func (h *Handler) parseDepositAmountCents(c *gin.Context) (int64, bool) {
+	var body struct {
+		DepositAmountCents int64 `json:"deposit_amount_cents"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		slog.Error("failed to parse transaction body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return 0, false
+	}
+	return body.DepositAmountCents, true
+}
 
+// handleServiceError maps service-layer errors to HTTP responses.
+func (h *Handler) handleServiceError(c *gin.Context, action, id string, err error) {
+	slog.Error("failed to "+action+" transaction", "id", id, "error", err)
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not found"):
+		c.JSON(http.StatusNotFound, gin.H{"error": msg})
+	case strings.Contains(msg, "status"):
+		c.JSON(http.StatusConflict, gin.H{"error": msg})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+	}
+}
+
+// requireOwner checks that the authenticated caller is the listing owner for the
+// given transaction. It writes the appropriate error response and returns false
+// when the caller should stop processing.
+func (h *Handler) requireOwner(c *gin.Context, id string) bool {
 	callerID, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
+		return false
 	}
 	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
+		return false
 	}
 	if ownerID != callerID.(string) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return false
+	}
+	return true
+}
+
+func (h *Handler) acceptTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+
+	depositAmountCents, ok := h.parseDepositAmountCents(c)
+	if !ok {
+		return
+	}
+
+	if err := h.service.Accept(c.Request.Context(), id, depositAmountCents); err != nil {
+		h.handleServiceError(c, "accept", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) rejectTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+
+	if err := h.service.Reject(c.Request.Context(), id); err != nil {
+		h.handleServiceError(c, "reject", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) handoverTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
 		return
 	}
 
 	if err := h.service.Handover(c.Request.Context(), id); err != nil {
-		slog.Error("failed to handover transaction", "id", id, "error", err)
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": msg})
-		case strings.Contains(msg, "status"):
-			c.JSON(http.StatusConflict, gin.H{"error": msg})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
-		}
+		h.handleServiceError(c, "handover", id, err)
 		return
 	}
 
@@ -150,42 +216,17 @@ func (h *Handler) handoverTransaction(c *gin.Context) {
 
 func (h *Handler) returnTransaction(c *gin.Context) {
 	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
 
-	callerID, ok := c.Get("userID")
+	depositAmountCents, ok := h.parseDepositAmountCents(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
-	}
-	if ownerID != callerID.(string) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
-	var body struct {
-		DepositAmountCents int64 `json:"deposit_amount_cents"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		slog.Error("failed to parse return transaction body", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents); err != nil {
-		slog.Error("failed to return transaction", "id", id, "error", err)
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": msg})
-		case strings.Contains(msg, "status"):
-			c.JSON(http.StatusConflict, gin.H{"error": msg})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
-		}
+	if err := h.service.Return(c.Request.Context(), id, depositAmountCents); err != nil {
+		h.handleServiceError(c, "return", id, err)
 		return
 	}
 
