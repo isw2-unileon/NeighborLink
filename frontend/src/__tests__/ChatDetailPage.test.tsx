@@ -6,21 +6,29 @@ import { messagesApi } from '../lib/messages';
 import { listingsApi } from '../lib/listings';
 import { api } from '../lib/api';
 import * as AuthContext from '../contexts/AuthContext';
+import type { Message, Listing, User } from '../types';
 
 vi.mock('../lib/messages');
 vi.mock('../lib/listings');
 vi.mock('../lib/api');
 
-const mockUser = { id: 'user-1', name: 'Test', email: 'test@test.com' };
+const mockUser: User = {
+    id: 'user-1',
+    name: 'Test',
+    email: 'test@test.com',
+    address: '',
+    avatar_url: '',
+    reputation_score: 0,
+    created_at: '2026-01-01T00:00:00Z',
+};
 
-const mockMessages = [
+const mockMessages: Message[] = [
     {
         id: 'msg-1',
         transaction_id: 'tx-abc',
         sender_id: 'user-1',
         content: 'Hola!',
         listing_title: 'Taladro',
-        listing_photo: null,
         created_at: '2026-05-01T10:00:00Z',
     },
     {
@@ -29,12 +37,21 @@ const mockMessages = [
         sender_id: 'user-2',
         content: 'Buenas!',
         listing_title: 'Taladro',
-        listing_photo: null,
         created_at: '2026-05-01T10:01:00Z',
     },
 ];
 
-const mockListing = { id: 'listing-1', title: 'Taladro Bosch', photos: [], listing_id: 'listing-1' };
+const mockListing: Listing = {
+    id: 'listing-1',
+    owner_id: 'user-2',
+    title: 'Taladro Bosch',
+    description: '',
+    photos: [],
+    deposit_amount: 0,
+    status: 'available',
+    category: 'tools',
+    created_at: '2026-01-01T00:00:00Z',
+};
 
 function renderPage() {
     return render(
@@ -48,9 +65,15 @@ function renderPage() {
 
 describe('ChatDetailPage', () => {
     beforeEach(() => {
-        vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: mockUser } as any);
-        vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1' } } as any);
-        vi.mocked(listingsApi.getById).mockResolvedValue(mockListing as any);
+        vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+            user: mockUser,
+            token: 'fake-token',
+            login: vi.fn(),
+            logout: vi.fn(),
+            updateUser: vi.fn(),
+        });
+        vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1' } });
+        vi.mocked(listingsApi.getById).mockResolvedValue(mockListing);
     });
 
     it('muestra el estado vacío cuando no hay mensajes', async () => {
@@ -62,7 +85,7 @@ describe('ChatDetailPage', () => {
     });
 
     it('renderiza los mensajes cuando la API responde', async () => {
-        vi.mocked(messagesApi.getByTransaction).mockResolvedValue(mockMessages as any);
+        vi.mocked(messagesApi.getByTransaction).mockResolvedValue(mockMessages);
         renderPage();
         await waitFor(() => {
             expect(screen.getByText('Hola!')).toBeInTheDocument();
@@ -95,7 +118,7 @@ describe('ChatDetailPage', () => {
             sender_id: 'user-1',
             content: 'Nuevo mensaje',
             created_at: '2026-05-01T10:05:00Z',
-        } as any);
+        });
         renderPage();
 
         await waitFor(() => screen.getByPlaceholderText('Escribe un mensaje…'));

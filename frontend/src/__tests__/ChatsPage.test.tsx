@@ -4,19 +4,28 @@ import { MemoryRouter } from 'react-router-dom';
 import ChatsPage from '../pages/chats/ChatsPage';
 import { messagesApi } from '../lib/messages';
 import * as AuthContext from '../contexts/AuthContext';
+import type { Message, User } from '../types';
 
 vi.mock('../lib/messages');
 
-const mockUser = { id: 'user-1', name: 'Test User', email: 'test@test.com' };
+const mockUser: User = {
+    id: 'user-1',
+    name: 'Test User',
+    email: 'test@test.com',
+    address: '',
+    avatar_url: '',
+    reputation_score: 0,
+    created_at: '2026-01-01T00:00:00Z',
+};
 
-const mockChats = [
+const mockChats: Message[] = [
     {
         id: 'msg-1',
         transaction_id: 'tx-1',
         sender_id: 'user-1',
         content: 'Hola, cuándo puedo pasar?',
         listing_title: 'Taladro Bosch',
-        listing_photo: null,
+        listing_photo: undefined,
         created_at: '2026-05-01T10:00:00Z',
     },
     {
@@ -25,7 +34,7 @@ const mockChats = [
         sender_id: 'user-2',
         content: '',
         listing_title: 'Escalera de mano',
-        listing_photo: null,
+        listing_photo: undefined,
         created_at: '2026-05-02T10:00:00Z',
     },
 ];
@@ -40,7 +49,13 @@ function renderPage() {
 
 describe('ChatsPage', () => {
     beforeEach(() => {
-        vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: mockUser } as any);
+        vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+            user: mockUser,
+            token: 'fake-token',
+            login: vi.fn(),
+            logout: vi.fn(),
+            updateUser: vi.fn(),
+        });
     });
 
     it('muestra el estado de carga inicial', () => {
@@ -50,7 +65,7 @@ describe('ChatsPage', () => {
     });
 
     it('renderiza los chats cuando la API responde', async () => {
-        vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats as any);
+        vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats);
         renderPage();
         await waitFor(() => {
             expect(screen.getByText('Taladro Bosch')).toBeInTheDocument();
@@ -59,7 +74,7 @@ describe('ChatsPage', () => {
     });
 
     it('muestra "Tú:" cuando el mensaje es del usuario actual', async () => {
-        vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats as any);
+        vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats);
         renderPage();
         await waitFor(() => {
             expect(screen.getByText(/Tú:/)).toBeInTheDocument();
@@ -83,7 +98,7 @@ describe('ChatsPage', () => {
     });
 
     it('muestra la sección "Sin mensajes" para chats sin contenido', async () => {
-        vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats as any);
+        vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats);
         renderPage();
         await waitFor(() => {
             expect(screen.getByText('Sin mensajes')).toBeInTheDocument();
