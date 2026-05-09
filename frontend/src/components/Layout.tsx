@@ -24,6 +24,9 @@ export default function Layout() {
                             <Link to="/listings" className="text-sm text-gray-600 hover:text-teal-700">
                                 Explorar
                             </Link>
+                            <Link to="/chats" className="text-sm text-gray-600 hover:text-teal-700">
+                                Chats
+                            </Link>
                             <Link to="/profile" className="text-sm text-gray-600 hover:text-teal-700">
                                 {user.name}
                             </Link>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import { listingsApi } from '../../lib/listings';
@@ -29,6 +29,7 @@ function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
 export default function ChatDetailPage() {
     const { id: transactionId } = useParams<{ id: string }>();
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [listing, setListing] = useState<Listing | null>(null);
@@ -36,8 +37,8 @@ export default function ChatDetailPage() {
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const initialScrollDone = useRef(false);
 
-    // Carga el listing a partir de la transacción
     useEffect(() => {
         if (!transactionId) return;
         api.get<{ data: { listing_id: string } }>(`/transactions/${transactionId}`)
@@ -46,24 +47,27 @@ export default function ChatDetailPage() {
             .catch(() => { });
     }, [transactionId]);
 
-    // Carga inicial + polling cada 3s
     useEffect(() => {
         if (!transactionId) return;
 
-        const fetch = () =>
+        const fetchMessages = () =>
             messagesApi.getByTransaction(transactionId)
-                .then(setMessages)
+                .then(msgs => {
+                    setMessages(msgs);
+                    // Solo scroll automático en la carga inicial
+                    if (!initialScrollDone.current) {
+                        setTimeout(() => {
+                            bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+                            initialScrollDone.current = true;
+                        }, 50);
+                    }
+                })
                 .catch(() => setError('No se pudieron cargar los mensajes'));
 
-        fetch();
-        const interval = setInterval(fetch, POLL_INTERVAL_MS);
+        fetchMessages();
+        const interval = setInterval(fetchMessages, POLL_INTERVAL_MS);
         return () => clearInterval(interval);
     }, [transactionId]);
-
-    // Auto-scroll al último mensaje
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
 
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
@@ -75,6 +79,8 @@ export default function ChatDetailPage() {
             const newMsg = await messagesApi.create(transactionId, content.trim());
             setMessages(prev => [...prev, newMsg]);
             setContent('');
+            // Scroll al enviar un mensaje propio
+            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Error al enviar el mensaje');
         } finally {
@@ -85,9 +91,13 @@ export default function ChatDetailPage() {
     if (!user) return null;
 
     return (
-        <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-4rem)]">
+        <div className="max-w-2xl mx-auto flex flex-col fixed inset-x-0 bottom-0" style={{ top: '4rem' }}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center gap-3">
+                <button onClick={() => navigate('/chats')}
+                    className="text-sm text-gray-500 hover:text-gray-700 mr-1">
+                    ←
+                </button>
                 {listing?.photos?.[0]
                     ? <img src={listing.photos[0]} alt={listing.title}
                         className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
