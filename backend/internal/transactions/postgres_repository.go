@@ -105,12 +105,12 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 func (r *postgresRepository) Create(ctx context.Context, t Transaction) (*Transaction, error) {
 	var created Transaction
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO transactions (listing_id, borrower_id, status)
-		VALUES ($1, $2, 'pending')
-		RETURNING id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
-	`, t.ListingID, t.BorrowerID).Scan(
+		INSERT INTO transactions (listing_id, borrower_id, payment_method_id, status)
+		VALUES ($1, $2, $3, 'pending')
+		RETURNING id, listing_id, borrower_id, status, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at
+	`, t.ListingID, t.BorrowerID, t.PaymentMethodID).Scan(
 		&created.ID, &created.ListingID, &created.BorrowerID, &created.Status,
-		&created.TotalChargedCents, &created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
+		&created.PaymentMethodID, &created.TotalChargedCents, &created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("transactions: insert failed: %w", err)
