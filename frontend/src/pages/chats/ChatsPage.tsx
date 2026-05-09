@@ -12,14 +12,16 @@ function ChatCard({ message, currentUserID }: { message: Message; currentUserID:
             to={`/transactions/${message.transaction_id}/chat`}
             className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm hover:border-teal-300 hover:shadow-md transition"
         >
-            <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold flex-shrink-0">
-                💬
-            </div>
+            {message.listing_photo
+                ? <img src={message.listing_photo} alt={message.listing_title}
+                    className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                : <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center text-2xl flex-shrink-0">📦</div>
+            }
             <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-400 mb-0.5">
-                    Transacción {message.transaction_id.slice(0, 8)}…
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                    {message.listing_title ?? 'Objeto'}
                 </p>
-                <p className="text-sm text-gray-700 truncate">
+                <p className="text-sm text-gray-500 truncate">
                     {isMe ? 'Tú: ' : ''}{message.content}
                 </p>
             </div>

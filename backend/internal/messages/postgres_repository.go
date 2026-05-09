@@ -80,15 +80,17 @@ func (r *postgresRepository) Create(ctx context.Context, m Message) (*Message, e
 
 func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID string) ([]Message, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT DISTINCT ON (m.transaction_id)
-			m.id, m.transaction_id, m.sender_id, m.content, m.created_at
-		FROM messages m
-		JOIN transactions t ON t.id = m.transaction_id
-		JOIN listings l ON l.id = t.listing_id
-		WHERE (t.borrower_id = $1 OR l.owner_id = $1)
-		  AND t.status IN ('agreed', 'handed_over')
-		ORDER BY m.transaction_id, m.created_at DESC
-	`, userID)
+        SELECT DISTINCT ON (m.transaction_id)
+            m.id, m.transaction_id, m.sender_id, m.content, m.created_at,
+            l.title,
+            COALESCE(l.photos->>0, '')
+        FROM messages m
+        JOIN transactions t ON t.id = m.transaction_id
+        JOIN listings l     ON l.id = t.listing_id
+        WHERE (t.borrower_id = $1 OR l.owner_id = $1)
+          AND t.status IN ('agreed', 'handed_over')
+        ORDER BY m.transaction_id, m.created_at DESC
+    `, userID)
 	if err != nil {
 		return nil, fmt.Errorf("messages: query active chats failed: %w", err)
 	}
@@ -97,7 +99,10 @@ func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID
 	messages := make([]Message, 0)
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.TransactionID, &m.SenderID, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&m.ID, &m.TransactionID, &m.SenderID, &m.Content, &m.CreatedAt,
+			&m.ListingTitle, &m.ListingPhoto,
+		); err != nil {
 			return nil, fmt.Errorf("messages: scan failed: %w", err)
 		}
 		messages = append(messages, m)

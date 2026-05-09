@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
-import type { Message } from '../../types';
+import { listingsApi } from '../../lib/listings';
+import type { Message, Listing } from '../../types';
+import { api } from '../../lib/api';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -10,8 +12,8 @@ function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
     return (
         <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${isMe
-                    ? 'bg-teal-600 text-white rounded-br-sm'
-                    : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
+                ? 'bg-teal-600 text-white rounded-br-sm'
+                : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
                 }`}>
                 <p>{message.content}</p>
                 <p className={`text-xs mt-1 ${isMe ? 'text-teal-200' : 'text-gray-400'}`}>
@@ -29,10 +31,20 @@ export default function ChatDetailPage() {
     const { user } = useAuth();
 
     const [messages, setMessages] = useState<Message[]>([]);
+    const [listing, setListing] = useState<Listing | null>(null);
     const [content, setContent] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+
+    // Carga el listing a partir de la transacción
+    useEffect(() => {
+        if (!transactionId) return;
+        api.get<{ data: { listing_id: string } }>(`/transactions/${transactionId}`)
+            .then(r => listingsApi.getById(r.data.listing_id))
+            .then(setListing)
+            .catch(() => { });
+    }, [transactionId]);
 
     // Carga inicial + polling cada 3s
     useEffect(() => {
@@ -75,9 +87,20 @@ export default function ChatDetailPage() {
     return (
         <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-4rem)]">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-white">
-                <h1 className="text-base font-semibold text-gray-900">Chat</h1>
-                <p className="text-xs text-gray-400">Transacción {transactionId?.slice(0, 8)}…</p>
+            <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center gap-3">
+                {listing?.photos?.[0]
+                    ? <img src={listing.photos[0]} alt={listing.title}
+                        className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+                    : <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-xl flex-shrink-0">📦</div>
+                }
+                <div>
+                    <h1 className="text-base font-semibold text-gray-900">
+                        {listing?.title ?? 'Chat'}
+                    </h1>
+                    <p className="text-xs text-gray-400">
+                        Transacción {transactionId?.slice(0, 8)}…
+                    </p>
+                </div>
             </div>
 
             {/* Mensajes */}
@@ -97,7 +120,6 @@ export default function ChatDetailPage() {
                 <div ref={bottomRef} />
             </div>
 
-            {/* Error */}
             {error && (
                 <p className="text-xs text-red-500 text-center py-1 bg-red-50">{error}</p>
             )}
