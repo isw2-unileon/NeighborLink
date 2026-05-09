@@ -118,6 +118,20 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
 
+// handleServiceError maps service-layer errors to HTTP responses.
+func (h *Handler) handleServiceError(c *gin.Context, action, id string, err error) {
+	slog.Error("failed to "+action+" transaction", "id", id, "error", err)
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not found"):
+		c.JSON(http.StatusNotFound, gin.H{"error": msg})
+	case strings.Contains(msg, "status"):
+		c.JSON(http.StatusConflict, gin.H{"error": msg})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+	}
+}
+
 // requireOwner checks that the authenticated caller is the listing owner for the
 // given transaction. It writes the appropriate error response and returns false
 // when the caller should stop processing.
@@ -155,16 +169,7 @@ func (h *Handler) acceptTransaction(c *gin.Context) {
 	}
 
 	if err := h.service.Accept(c.Request.Context(), id, body.DepositAmountCents); err != nil {
-		slog.Error("failed to accept transaction", "id", id, "error", err)
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": msg})
-		case strings.Contains(msg, "status"):
-			c.JSON(http.StatusConflict, gin.H{"error": msg})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
-		}
+		h.handleServiceError(c, "accept", id, err)
 		return
 	}
 
@@ -178,16 +183,7 @@ func (h *Handler) rejectTransaction(c *gin.Context) {
 	}
 
 	if err := h.service.Reject(c.Request.Context(), id); err != nil {
-		slog.Error("failed to reject transaction", "id", id, "error", err)
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": msg})
-		case strings.Contains(msg, "status"):
-			c.JSON(http.StatusConflict, gin.H{"error": msg})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
-		}
+		h.handleServiceError(c, "reject", id, err)
 		return
 	}
 
@@ -201,16 +197,7 @@ func (h *Handler) handoverTransaction(c *gin.Context) {
 	}
 
 	if err := h.service.Handover(c.Request.Context(), id); err != nil {
-		slog.Error("failed to handover transaction", "id", id, "error", err)
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": msg})
-		case strings.Contains(msg, "status"):
-			c.JSON(http.StatusConflict, gin.H{"error": msg})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
-		}
+		h.handleServiceError(c, "handover", id, err)
 		return
 	}
 
@@ -233,16 +220,7 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 	}
 
 	if err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents); err != nil {
-		slog.Error("failed to return transaction", "id", id, "error", err)
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": msg})
-		case strings.Contains(msg, "status"):
-			c.JSON(http.StatusConflict, gin.H{"error": msg})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
-		}
+		h.handleServiceError(c, "return", id, err)
 		return
 	}
 
