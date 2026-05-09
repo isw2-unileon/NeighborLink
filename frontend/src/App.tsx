@@ -13,6 +13,8 @@ import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
 import HandoverPage from './pages/HandoverPage'
 import ReturnPage from './pages/ReturnPage'
+import ChatsPage from './pages/chats/ChatsPage'
+import ChatDetailPage from './pages/chats/ChatDetailPage'
 
 // Redirige a /listings si ya hay sesión, si no muestra la página pasada
 function PublicHome() {
@@ -38,6 +40,8 @@ export default function App() {
               <Route path="/listings/:id/return" element={<ReturnPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/edit" element={<EditProfilePage />} />
+              <Route path="/chats" element={<ChatsPage />} />
+              <Route path="/transactions/:id/chat" element={<ChatDetailPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

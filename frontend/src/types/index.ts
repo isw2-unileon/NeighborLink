@@ -41,6 +41,8 @@ export interface Message {
     sender_id: string;
     content: string;
     created_at: string;
+    listing_title?: string;
+    listing_photo?: string;
 }
 
 export interface Review {
