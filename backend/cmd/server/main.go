@@ -22,6 +22,7 @@ import (
 	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
+	walletModule "github.com/isw2-unileon/neighborlink/backend/internal/wallet"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -83,6 +84,11 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	listingRepo := listingsModule.NewPostgresRepository(pool)
 	storageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
 	listingsModule.NewHandler(listingRepo, storageSvc).RegisterRoutes(api, authMiddleware)
+
+	// Wallet (init before transactions so walletSvc can be injected there)
+	walletRepo := walletModule.NewPostgresRepository(pool)
+	walletSvc := walletModule.NewService(walletRepo)
+	walletModule.NewHandler(walletSvc).RegisterRoutes(api, authMiddleware)
 
 	// Transactions
 	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
