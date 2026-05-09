@@ -15,6 +15,7 @@ import (
 	"github.com/isw2-unileon/neighborlink/backend/internal/config"
 	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
+	"github.com/isw2-unileon/neighborlink/backend/internal/platform/adapters"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/middleware"
 	stripeplatform "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
@@ -90,7 +91,10 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	transactionsModule.NewHandler(transactionRepo, transactionSvc).RegisterRoutes(api, authMiddleware)
 
 	// Messages
-	messagesModule.NewHandler(messagesModule.NewPostgresRepository(pool)).RegisterRoutes(api)
+	messagesModule.NewHandler(
+		messagesModule.NewPostgresRepository(pool),
+		adapters.NewTxReaderAdapter(transactionRepo),
+	).RegisterRoutes(api, authMiddleware)
 
 	// Reviews
 	reviewsModule.NewHandler(reviewsModule.NewPostgresRepository(pool)).RegisterRoutes(api)
