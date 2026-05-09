@@ -288,13 +288,117 @@ func TestListByBorrower(t *testing.T) {
 func TestCreateTransaction_RequiresAuth(t *testing.T) {
 	router := setupRouter(&fakeRepository{})
 
-	body := `{"listing_id":"l-1","payment_method_id":"pm_test","deposit_amount_cents":5000}`
+	body := `{"listing_id":"l-1","payment_method_id":"pm_test"}`
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/transactions", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestCreateTransaction_CreatesPendingRecord(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	body := `{"listing_id":"l-1","payment_method_id":"pm_test"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var resp struct {
+		Data transactions.Transaction `json:"data"`
+	}
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Equal(t, "pending", resp.Data.Status)
+}
+
+func TestAcceptTransaction_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/accept", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAcceptTransaction_ForbidsNonOwner(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/accept", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestAcceptTransaction_AllowsOwner(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/accept", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.NotEqual(t, http.StatusUnauthorized, w.Code)
+	assert.NotEqual(t, http.StatusForbidden, w.Code)
+}
+
+func TestRejectTransaction_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/reject", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestRejectTransaction_ForbidsNonOwner(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/reject", nil)
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestRejectTransaction_AllowsOwner(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/reject", nil)
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.NotEqual(t, http.StatusUnauthorized, w.Code)
+	assert.NotEqual(t, http.StatusForbidden, w.Code)
 }
 
 func TestHandoverTransaction_RequiresAuth(t *testing.T) {
