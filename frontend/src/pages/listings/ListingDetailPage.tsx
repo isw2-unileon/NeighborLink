@@ -206,9 +206,13 @@ export default function ListingDetailPage() {
                             {listing.category?.replace(/_/g, ' ') ?? 'Sin categoría'}
                         </span>
                     </div>
-                    <p className="mt-4 text-xl font-semibold text-blue-600">
-                        {listing.deposit_amount} € depósito
-                    </p>
+                    <div className="mt-4 space-y-1">
+                        <p className="text-sm text-gray-600">Depósito: {listing.deposit_amount} €</p>
+                        <p className="text-sm text-gray-600">Tarifa de gestión: 2 €</p>
+                        <p className="text-xl font-semibold text-blue-600">
+                            Total: {listing.deposit_amount + 2} €
+                        </p>
+                    </div>
 
                     {isOwner && (
                         <div className="mt-6 flex gap-3">
