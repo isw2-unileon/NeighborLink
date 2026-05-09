@@ -237,6 +237,14 @@ func TestCreateMessage(t *testing.T) {
 			body:       map[string]string{},
 			wantStatus: http.StatusBadRequest,
 		},
+		{
+			name:       "repo error on create returns 500",
+			senderID:   "user-1",
+			txSummary:  &messages.TransactionSummary{BorrowerID: "user-1", OwnerID: "user-2", Status: "agreed"},
+			repoErr:    errors.New("db down"),
+			body:       map[string]string{"content": "Hola"},
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
@@ -257,6 +265,54 @@ func TestCreateMessage(t *testing.T) {
 			r.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.wantStatus, w.Code)
+		})
+	}
+}
+
+func TestListActiveChats(t *testing.T) {
+	tests := []struct {
+		name       string
+		repoData   []messages.Message
+		repoErr    error
+		wantStatus int
+		wantLen    int
+	}{
+		{
+			name:       "returns active chats for user",
+			repoData:   []messages.Message{{ID: "1", TransactionID: "tx-1"}, {ID: "2", TransactionID: "tx-2"}},
+			wantStatus: http.StatusOK,
+			wantLen:    2,
+		},
+		{
+			name:       "returns empty list when no active chats",
+			repoData:   []messages.Message{},
+			wantStatus: http.StatusOK,
+			wantLen:    0,
+		},
+		{
+			name:       "repo error returns 500",
+			repoErr:    errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{messages: tt.repoData, err: tt.repoErr}
+			router := setupRouter(repo, &fakeTxReader{})
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/api/chats", nil)
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+			if tt.wantStatus == http.StatusOK {
+				var resp struct {
+					Data []messages.Message `json:"data"`
+				}
+				assert.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+				assert.Len(t, resp.Data, tt.wantLen)
+			}
 		})
 	}
 }
