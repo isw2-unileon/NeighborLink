@@ -118,6 +118,20 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
 
+// parseDepositAmountCents reads deposit_amount_cents from the JSON body.
+// Returns the amount and true on success; writes a 400 response and returns false on failure.
+func (h *Handler) parseDepositAmountCents(c *gin.Context) (int64, bool) {
+	var body struct {
+		DepositAmountCents int64 `json:"deposit_amount_cents"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		slog.Error("failed to parse transaction body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return 0, false
+	}
+	return body.DepositAmountCents, true
+}
+
 // handleServiceError maps service-layer errors to HTTP responses.
 func (h *Handler) handleServiceError(c *gin.Context, action, id string, err error) {
 	slog.Error("failed to "+action+" transaction", "id", id, "error", err)
@@ -159,16 +173,12 @@ func (h *Handler) acceptTransaction(c *gin.Context) {
 		return
 	}
 
-	var body struct {
-		DepositAmountCents int64 `json:"deposit_amount_cents"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		slog.Error("failed to parse accept transaction body", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	depositAmountCents, ok := h.parseDepositAmountCents(c)
+	if !ok {
 		return
 	}
 
-	if err := h.service.Accept(c.Request.Context(), id, body.DepositAmountCents); err != nil {
+	if err := h.service.Accept(c.Request.Context(), id, depositAmountCents); err != nil {
 		h.handleServiceError(c, "accept", id, err)
 		return
 	}
@@ -210,16 +220,12 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 		return
 	}
 
-	var body struct {
-		DepositAmountCents int64 `json:"deposit_amount_cents"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		slog.Error("failed to parse return transaction body", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	depositAmountCents, ok := h.parseDepositAmountCents(c)
+	if !ok {
 		return
 	}
 
-	if err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents); err != nil {
+	if err := h.service.Return(c.Request.Context(), id, depositAmountCents); err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
