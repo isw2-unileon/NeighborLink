@@ -118,21 +118,30 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
 
-func (h *Handler) acceptTransaction(c *gin.Context) {
-	id := c.Param("id")
-
+// requireOwner checks that the authenticated caller is the listing owner for the
+// given transaction. It writes the appropriate error response and returns false
+// when the caller should stop processing.
+func (h *Handler) requireOwner(c *gin.Context, id string) bool {
 	callerID, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
+		return false
 	}
 	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
+		return false
 	}
 	if ownerID != callerID.(string) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return false
+	}
+	return true
+}
+
+func (h *Handler) acceptTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
 		return
 	}
 
@@ -164,19 +173,7 @@ func (h *Handler) acceptTransaction(c *gin.Context) {
 
 func (h *Handler) rejectTransaction(c *gin.Context) {
 	id := c.Param("id")
-
-	callerID, ok := c.Get("userID")
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
-	}
-	if ownerID != callerID.(string) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	if !h.requireOwner(c, id) {
 		return
 	}
 
@@ -199,19 +196,7 @@ func (h *Handler) rejectTransaction(c *gin.Context) {
 
 func (h *Handler) handoverTransaction(c *gin.Context) {
 	id := c.Param("id")
-
-	callerID, ok := c.Get("userID")
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
-	}
-	if ownerID != callerID.(string) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	if !h.requireOwner(c, id) {
 		return
 	}
 
@@ -234,19 +219,7 @@ func (h *Handler) handoverTransaction(c *gin.Context) {
 
 func (h *Handler) returnTransaction(c *gin.Context) {
 	id := c.Param("id")
-
-	callerID, ok := c.Get("userID")
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	ownerID, err := h.repo.FindListingOwnerByTransactionID(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
-	}
-	if ownerID != callerID.(string) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	if !h.requireOwner(c, id) {
 		return
 	}
 
