@@ -5,6 +5,7 @@ import ProfilePage from '../pages/ProfilePage'
 import * as AuthContext from '../contexts/AuthContext'
 import * as usersLib from '../lib/users'
 import * as listingsLib from '../lib/listings'
+import * as walletLib from '../lib/wallet'
 import type { User, Listing } from '../types'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ const fakeUser: User = {
     avatar_url: '',
     address: 'Calle Mayor 1, León',
     reputation_score: 4,
+    points: 0,
     created_at: '2024-01-01',
 }
 
@@ -45,6 +47,11 @@ function renderPage(user: User | null = fakeUser, token: string | null = 'tok') 
 beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue([])
+    vi.spyOn(walletLib.walletApi, 'getPointsHistory').mockResolvedValue([])
+    vi.spyOn(walletLib.walletApi, 'redeemPoints').mockResolvedValue({
+        id: 'r1', user_id: 'user-1', points_redeemed: 1000,
+        amount_euros: 10, status: 'pending', created_at: new Date().toISOString(),
+    })
 })
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -172,5 +179,44 @@ describe('ProfilePage', () => {
         renderPage()
         const img = await screen.findByAltText('Taladro')
         expect(img).toHaveAttribute('src', 'https://example.com/foto.jpg')
+    })
+})
+
+describe('ProfilePage — Cartera tab', () => {
+    async function openWalletTab(user: User = fakeUser) {
+        renderPage(user)
+        await screen.findByText('Ana García')
+        fireEvent.click(screen.getByText('Cartera'))
+    }
+
+    it('muestra la pestaña Cartera al hacer clic', async () => {
+        await openWalletTab()
+        expect(await screen.findByText('Mi cartera')).toBeInTheDocument()
+    })
+
+    it('deshabilita el botón de canjear cuando points < 1000', async () => {
+        await openWalletTab({ ...fakeUser, points: 900 })
+        const btn = await screen.findByRole('button', { name: /Canjear puntos/i })
+        expect(btn).toBeDisabled()
+    })
+
+    it('habilita el botón de canjear cuando points >= 1000', async () => {
+        await openWalletTab({ ...fakeUser, points: 1000 })
+        const btn = await screen.findByRole('button', { name: /Canjear puntos/i })
+        expect(btn).not.toBeDisabled()
+    })
+
+    it('muestra el balance en puntos y euros', async () => {
+        await openWalletTab({ ...fakeUser, points: 1500 })
+        expect(await screen.findByText(/15\.00 puntos/)).toBeInTheDocument()
+        expect(screen.getByText(/15\.00 €/)).toBeInTheDocument()
+    })
+
+    it('muestra mensaje de éxito tras canjear', async () => {
+        await openWalletTab({ ...fakeUser, points: 1000 })
+        const btn = await screen.findByRole('button', { name: /Canjear puntos/i })
+        fireEvent.click(btn)
+        expect(await screen.findByText(/Solicitud de cobro enviada/)).toBeInTheDocument()
+        expect(mockUpdateUser).toHaveBeenCalledWith(expect.objectContaining({ points: 0 }))
     })
 })
