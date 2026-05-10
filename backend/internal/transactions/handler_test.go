@@ -19,6 +19,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type noopPointsAdder struct{}
+
+func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
+
 type fakeRepository struct {
 	transactions          []transactions.Transaction
 	err                   error
@@ -143,7 +147,7 @@ func setupRouter(repo transactions.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	h := transactions.NewHandler(repo, nil)
+	h := transactions.NewHandler(repo, nil, noopPointsAdder{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r

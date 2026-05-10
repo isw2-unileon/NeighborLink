@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -8,15 +9,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler holds the HTTP handlers for the transactions module.
-type Handler struct {
-	repo    Repository
-	service *Service
+// pointsAdder is a narrow interface so the transactions package does not import the wallet package.
+type pointsAdder interface {
+	AddPoints(ctx context.Context, userID string, points int) error
 }
 
-// NewHandler creates a new Handler injecting the Repository interface and the Service.
-func NewHandler(repo Repository, service *Service) *Handler {
-	return &Handler{repo: repo, service: service}
+// Handler holds the HTTP handlers for the transactions module.
+type Handler struct {
+	repo      Repository
+	service   *Service
+	walletSvc pointsAdder
+}
+
+// NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
+func NewHandler(repo Repository, service *Service, walletSvc pointsAdder) *Handler {
+	return &Handler{repo: repo, service: service, walletSvc: walletSvc}
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
@@ -228,6 +235,13 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 	if err := h.service.Return(c.Request.Context(), id, depositAmountCents); err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
+	}
+
+	// requireOwner already validated that the caller IS the listing owner.
+	ownerID := c.MustGet("userID").(string)
+	pointsEarned := int(depositAmountCents * 5 / 100)
+	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
+		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})

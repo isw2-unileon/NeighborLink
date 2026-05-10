@@ -8,6 +8,7 @@ export interface User {
     address: string;
     avatar_url: string;
     reputation_score: number;
+    points: number;
     created_at: string;
 }
 
@@ -53,6 +54,22 @@ export interface Review {
     rating: number;
     comment: string;
     created_at: string;
+}
+
+export interface Redemption {
+    id: string;
+    user_id: string;
+    points_redeemed: number;
+    amount_euros: number;
+    status: string;
+    created_at: string;
+}
+
+export interface PointsHistoryEntry {
+    transaction_id: string;
+    listing_title: string;
+    points_earned: number;
+    completed_at: string;
 }
 
 export interface AuthResponse {

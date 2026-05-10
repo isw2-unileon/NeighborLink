@@ -19,6 +19,7 @@ const fakeUser: User = {
     avatar_url: '',
     address: 'Calle Mayor, León, León',
     reputation_score: 4,
+    points: 0,
     created_at: '2024-01-01',
 }
 

@@ -35,6 +35,7 @@ const diagram = `erDiagram
     int reputation_score
     point location
     timestamp created_at
+    int8 points
   }
   listings {
     uuid id PK
@@ -75,6 +76,14 @@ const diagram = `erDiagram
     text comment
     timestamp created_at
   }
+  redemptions {
+    uuid id PK
+    uuid user_id FK
+    int8 points_redeemed
+    numeric amount_euros
+    text status
+    timestamp created_at
+  }
 
   users ||--o{ listings : "owns"
   users ||--o{ transactions : "borrows via"
@@ -83,6 +92,7 @@ const diagram = `erDiagram
   transactions ||--o{ reviews : "generates"
   users ||--o{ reviews : "writes"
   users ||--o{ reviews : "receives"
+  users ||--o{ redemptions : "redeems"
 `;
 
 const { svg } = await mermaid.render('erd-svg', diagram);
