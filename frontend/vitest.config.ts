@@ -8,7 +8,7 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",        // ← happy-dom no tiene localStorage completo
+    environment: "happy-dom",    // ← localStorage is fully mocked in setup.ts
     globals: true,               // ← evita importar describe/it/expect en cada test
     setupFiles: ["./src/__tests__/setup.ts"],
     coverage: {

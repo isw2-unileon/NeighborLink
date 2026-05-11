@@ -31,3 +31,5 @@ vi.stubGlobal('IntersectionObserver', class {
     unobserve() { }
     disconnect() { }
 })
+
+window.HTMLElement.prototype.scrollIntoView = vi.fn();

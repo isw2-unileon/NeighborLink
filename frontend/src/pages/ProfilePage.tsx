@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usersApi } from '../lib/users';
 import { listingsApi } from '../lib/listings';
-import type { Listing } from '../types';
+import { walletApi } from '../lib/wallet';
+import type { Listing, PointsHistoryEntry } from '../types';
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +107,102 @@ function MyListings({ userID }: { userID: string }) {
 }
 
 
+// ── WalletTab ─────────────────────────────────────────────────────────────────
+
+
+function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void }) {
+    const [history, setHistory] = useState<PointsHistoryEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [redeeming, setRedeeming] = useState(false);
+    const [success, setSuccess] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        walletApi.getPointsHistory()
+            .then(setHistory)
+            .catch(() => setError('No se pudo cargar el historial'))
+            .finally(() => setLoading(false));
+    }, []);
+
+    async function handleRedeem() {
+        setRedeeming(true);
+        setError(null);
+        try {
+            await walletApi.redeemPoints();
+            onRedeem();
+            setSuccess('Solicitud de cobro enviada. El pago se procesará en breve.');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error al canjear puntos');
+        } finally {
+            setRedeeming(false);
+        }
+    }
+
+    const displayPoints = (points / 100).toFixed(2);
+    const canRedeem = points >= 1000;
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-6">
+            <div>
+                <h2 className="text-base font-semibold text-gray-900 mb-4">Mi cartera</h2>
+                <div className="flex items-center justify-between bg-teal-50 border border-teal-100 rounded-xl px-5 py-4">
+                    <div>
+                        <p className="text-2xl font-bold text-teal-800">{displayPoints} puntos</p>
+                        <p className="text-sm text-teal-600 mt-0.5">{displayPoints} €</p>
+                    </div>
+                    <button
+                        onClick={handleRedeem}
+                        disabled={!canRedeem || redeeming}
+                        className="text-sm font-medium px-4 py-2 rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed bg-teal-700 text-white border-teal-700 hover:bg-teal-800 disabled:bg-teal-700"
+                    >
+                        {redeeming ? 'Procesando…' : 'Canjear puntos'}
+                    </button>
+                </div>
+                {!canRedeem && (
+                    <p className="text-xs text-gray-400 mt-2">
+                        Necesitas al menos 10,00 puntos para canjear.
+                    </p>
+                )}
+                {success && (
+                    <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        ✓ {success}
+                    </p>
+                )}
+                {error && (
+                    <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        {error}
+                    </p>
+                )}
+            </div>
+
+            <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+                    Historial de préstamos completados
+                </h3>
+                {loading && <p className="text-sm text-gray-400">Cargando historial…</p>}
+                {!loading && history.length === 0 && (
+                    <p className="text-sm text-gray-400 py-2">Aún no tienes préstamos completados.</p>
+                )}
+                {!loading && history.map(entry => (
+                    <div key={entry.transaction_id}
+                        className="flex items-center justify-between py-3 border-t border-gray-100 first:border-0">
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{entry.listing_title}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {new Date(entry.completed_at).toLocaleDateString('es-ES')}
+                            </p>
+                        </div>
+                        <span className="text-sm font-semibold text-teal-700 ml-4 flex-shrink-0">
+                            +{(entry.points_earned / 100).toFixed(2)} pts
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+
 // ── ProfilePage ───────────────────────────────────────────────────────────────
 
 
@@ -113,6 +210,7 @@ export default function ProfilePage() {
     const { user, token, updateUser, logout } = useAuth();
     const navigate = useNavigate();
 
+    const [tab, setTab] = useState<'listings' | 'wallet'>('listings');
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -201,7 +299,29 @@ export default function ProfilePage() {
                 )}
             </div>
 
-            <MyListings userID={user.id} />
+            <div className="flex border-b border-gray-200">
+                {(['listings', 'wallet'] as const).map(t => (
+                    <button
+                        key={t}
+                        onClick={() => setTab(t)}
+                        className={`px-5 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${
+                            tab === t
+                                ? 'border-teal-700 text-teal-700'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        {t === 'listings' ? 'Mis Objetos' : 'Cartera'}
+                    </button>
+                ))}
+            </div>
+
+            {tab === 'listings' && <MyListings userID={user.id} />}
+            {tab === 'wallet' && (
+                <WalletTab
+                    points={user.points ?? 0}
+                    onRedeem={() => updateUser({ ...user, points: 0 })}
+                />
+            )}
         </div>
     );
 }

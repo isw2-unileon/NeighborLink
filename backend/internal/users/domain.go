@@ -12,6 +12,7 @@ type User struct {
 	AvatarURL       string    `json:"avatar_url"`
 	Address         string    `json:"address"`
 	ReputationScore int       `json:"reputation_score"`
+	Points          int       `json:"points"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 
