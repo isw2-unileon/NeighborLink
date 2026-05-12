@@ -172,3 +172,51 @@ func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status
 	}
 	return nil
 }
+
+func (r *postgresRepository) Reserve(ctx context.Context, t Transaction) (*Transaction, error) {
+	var created Transaction
+	err := r.pool.QueryRow(ctx, `
+        INSERT INTO transactions (listing_id, borrower_id, payment_method_id, status, start_date, end_date)
+        VALUES ($1, $2, $3, 'pending', $4, $5)
+        RETURNING id, listing_id, borrower_id, status, payment_method_id,
+                  total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
+    `, t.ListingID, t.BorrowerID, t.PaymentMethodID, t.StartDate, t.EndDate,
+	).Scan(
+		&created.ID, &created.ListingID, &created.BorrowerID, &created.Status,
+		&created.PaymentMethodID, &created.TotalChargedCents,
+		&created.StartDate, &created.EndDate,
+		&created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("transactions: reserve failed: %w", err)
+	}
+	return &created, nil
+}
+
+func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID string) ([]DateRange, error) {
+	rows, err := r.pool.Query(ctx, `
+        SELECT start_date, end_date
+        FROM transactions
+        WHERE listing_id = $1
+          AND status IN ('pending', 'active')
+          AND start_date IS NOT NULL
+          AND end_date   IS NOT NULL
+    `, listingID)
+	if err != nil {
+		return nil, fmt.Errorf("transactions: query blocked dates failed: %w", err)
+	}
+	defer rows.Close()
+
+	ranges := make([]DateRange, 0)
+	for rows.Next() {
+		var dr DateRange
+		if err := rows.Scan(&dr.StartDate, &dr.EndDate); err != nil {
+			return nil, fmt.Errorf("transactions: scan blocked dates failed: %w", err)
+		}
+		ranges = append(ranges, dr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("transactions: iteration failed: %w", err)
+	}
+	return ranges, nil
+}

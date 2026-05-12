@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { listingsApi } from '../../lib/listings';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Listing } from '../../types';
+import ReserveModal from '../../components/ReserveModal';
+import Toast from '../../components/Toast';
 
 interface ListingInput {
     title: string;
@@ -87,6 +89,9 @@ export default function ListingDetailPage() {
         category: '',
         status: 'available',
     });
+
+    const [showReserve, setShowReserve] = useState(false);
+    const [toast, setToast] = useState<string | null>(null);
 
     const isOwner = user?.id === listing?.owner_id;
 
@@ -198,6 +203,16 @@ export default function ListingDetailPage() {
                             {listing.status}
                         </span>
                     </div>
+
+                    {/* Botón reservar — visible si no eres el owner y el listing está available */}
+                    {!isOwner && listing.status === 'available' && (
+                        <button
+                            onClick={() => setShowReserve(true)}
+                            className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium"
+                        >
+                            Reservar
+                        </button>
+                    )}
 
                     <p className="mt-3 text-gray-600 leading-relaxed">{listing.description}</p>
                     <div className="mt-3 flex items-center gap-2">
@@ -328,6 +343,20 @@ export default function ListingDetailPage() {
                     </div>
                 </form>
             )}
-        </div>
-    );
+
+            {showReserve && (
+                <ReserveModal
+                    listingId={listing.id}
+                    depositAmount={listing.deposit_amount}
+                    onClose={() => setShowReserve(false)}
+                    onSuccess={() => {
+                        setShowReserve(false);
+                        setToast('¡Reserva confirmada! El propietario revisará tu solicitud.');
+                    }}
+                />
+            )}
+
+            {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+                    </div>
+                );
 }

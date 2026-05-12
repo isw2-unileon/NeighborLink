@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,6 +33,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	rg.GET("/transactions/:id", h.getTransaction)
 	rg.GET("/listings/:id/transactions", h.listByListing)
 	rg.GET("/users/:id/transactions", h.listByBorrower)
+	rg.GET("/listings/:id/availability", h.getAvailability)
 
 	protected := rg.Group("/")
 	protected.Use(authMiddleware)
@@ -40,6 +42,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected.PUT("/transactions/:id/reject", h.rejectTransaction)
 	protected.POST("/transactions/:id/handover", h.handoverTransaction)
 	protected.POST("/transactions/:id/return", h.returnTransaction)
+	protected.POST("/listings/:id/reserve", h.reserveListing)
 }
 
 func (h *Handler) listTransactions(c *gin.Context) {
@@ -245,4 +248,84 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) getAvailability(c *gin.Context) {
+	listingID := c.Param("id")
+
+	blocked, err := h.repo.FindBlockedDates(c.Request.Context(), listingID)
+	if err != nil {
+		slog.Error("failed to get availability", "listing_id", listingID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": blocked})
+}
+
+func (h *Handler) reserveListing(c *gin.Context) {
+	listingID := c.Param("id")
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var input ReserveInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	startDate, err := time.Parse("2006-01-02", input.StartDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_date format, use YYYY-MM-DD"})
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", input.EndDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_date format, use YYYY-MM-DD"})
+		return
+	}
+
+	// Validar máximo 7 días
+	days := int(endDate.Sub(startDate).Hours() / 24)
+	if days < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
+		return
+	}
+	if days > 7 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maximum loan period is 7 days"})
+		return
+	}
+
+	// Validar que no hay solapamiento con reservas existentes
+	blocked, err := h.repo.FindBlockedDates(c.Request.Context(), listingID)
+	if err != nil {
+		slog.Error("failed to check availability", "listing_id", listingID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	for _, dr := range blocked {
+		bStart, _ := time.Parse("2006-01-02", dr.StartDate)
+		bEnd, _ := time.Parse("2006-01-02", dr.EndDate)
+		if startDate.Before(bEnd) && endDate.After(bStart) {
+			c.JSON(http.StatusConflict, gin.H{"error": "selected dates overlap with an existing reservation"})
+			return
+		}
+	}
+
+	t, err := h.repo.Reserve(c.Request.Context(), Transaction{
+		ListingID:       listingID,
+		BorrowerID:      userID.(string),
+		PaymentMethodID: input.PaymentMethodID,
+		StartDate:       &startDate,
+		EndDate:         &endDate,
+	})
+	if err != nil {
+		slog.Error("failed to reserve listing", "listing_id", listingID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"data": t})
 }

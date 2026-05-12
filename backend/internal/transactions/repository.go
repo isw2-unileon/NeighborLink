@@ -24,4 +24,9 @@ type Repository interface {
 	// FindListingOwnerByTransactionID returns the owner_id of the listing associated
 	// with the given transaction. Returns an error if the transaction does not exist.
 	FindListingOwnerByTransactionID(ctx context.Context, transactionID string) (string, error)
+
+	// Reserve creates a transaction with start/end dates after validating no overlap.
+	Reserve(ctx context.Context, t Transaction) (*Transaction, error)
+	// FindBlockedDates returns all date ranges blocked by pending/active transactions.
+	FindBlockedDates(ctx context.Context, listingID string) ([]DateRange, error)
 }
