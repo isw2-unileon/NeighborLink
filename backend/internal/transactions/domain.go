@@ -16,7 +16,22 @@ type Transaction struct {
 	StripePaymentIntentID string     `json:"stripe_payment_intent_id,omitempty"`
 	PaymentMethodID       string     `json:"payment_method_id,omitempty"`
 	TotalChargedCents     int64      `json:"total_charged_cents,omitempty"`
+	StartDate             *time.Time `json:"start_date"`
+	EndDate               *time.Time `json:"end_date"`
 	AgreedAt              *time.Time `json:"agreed_at"`
 	HandoverAt            *time.Time `json:"handover_at"`
 	ReturnAt              *time.Time `json:"return_at"`
+}
+
+// ReserveInput is the body for POST /api/listings/:id/reserve.
+type ReserveInput struct {
+	StartDate       string `json:"start_date"        binding:"required"`
+	EndDate         string `json:"end_date"          binding:"required"`
+	PaymentMethodID string `json:"payment_method_id" binding:"required"`
+}
+
+// DateRange represents a blocked date range for availability checks.
+type DateRange struct {
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
