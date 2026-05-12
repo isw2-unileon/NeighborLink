@@ -24,9 +24,11 @@ type noopPointsAdder struct{}
 func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
 
 type fakeRepository struct {
-	transactions          []transactions.Transaction
-	err                   error
-	ownerByTransactionID  map[string]string
+	transactions         []transactions.Transaction
+	err                  error
+	ownerByTransactionID map[string]string
+	blockedDates         []transactions.DateRange
+	reserved             *transactions.Transaction
 }
 
 func (f *fakeRepository) FindAll(ctx context.Context) ([]transactions.Transaction, error) {
@@ -129,6 +131,19 @@ func (f *fakeRepository) UpdateStatus(ctx context.Context, id string, status str
 		}
 	}
 	return fmt.Errorf("transaction %s not found", id)
+}
+
+func (f *fakeRepository) Reserve(ctx context.Context, t transactions.Transaction) (*transactions.Transaction, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	t.ID = "new-id"
+	f.reserved = &t
+	return &t, nil
+}
+
+func (f *fakeRepository) FindBlockedDates(ctx context.Context, listingID string) ([]transactions.DateRange, error) {
+	return f.blockedDates, f.err
 }
 
 const testJWTSecret = "test-secret"
@@ -491,4 +506,159 @@ func TestReturnTransaction_AllowsOwner(t *testing.T) {
 
 	assert.NotEqual(t, http.StatusUnauthorized, w.Code)
 	assert.NotEqual(t, http.StatusForbidden, w.Code)
+}
+
+func TestGetAvailability_ReturnsBlockedDates(t *testing.T) {
+	repo := &fakeRepository{
+		blockedDates: []transactions.DateRange{
+			{StartDate: "2026-06-01", EndDate: "2026-06-03"},
+		},
+	}
+	router := setupRouter(repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/listings/listing-1/availability", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Data []transactions.DateRange `json:"data"`
+	}
+	assert.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Len(t, resp.Data, 1)
+	assert.Equal(t, "2026-06-01", resp.Data[0].StartDate)
+}
+
+func TestGetAvailability_RepoError_Returns500(t *testing.T) {
+	router := setupRouter(&fakeRepository{err: errors.New("db down")})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/listings/listing-1/availability", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// ---- POST /api/listings/:id/reserve ----
+
+func TestReserveListing_ValidInput_Returns201(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-10","end_date":"2026-06-14","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+}
+
+func TestReserveListing_NoAuth_Returns401(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-10","end_date":"2026-06-14","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestReserveListing_MoreThan7Days_Returns400(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-01","end_date":"2026-06-10","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestReserveListing_EndBeforeStart_Returns400(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-10","end_date":"2026-06-08","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestReserveListing_OverlapWithExisting_Returns409(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		blockedDates: []transactions.DateRange{
+			{StartDate: "2026-06-08", EndDate: "2026-06-12"},
+		},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-10","end_date":"2026-06-14","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+}
+
+func TestReserveListing_InvalidDateFormat_Returns400(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"10-06-2026","end_date":"2026-06-14","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestReserveListing_RepoError_Returns500(t *testing.T) {
+	router := setupRouter(&fakeRepository{err: errors.New("db down")})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-10","end_date":"2026-06-14","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestReserveListing_SavesCorrectData(t *testing.T) {
+	repo := &fakeRepository{}
+	router := setupRouter(repo)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/listings/listing-1/reserve",
+		strings.NewReader(`{"start_date":"2026-06-10","end_date":"2026-06-14","payment_method_id":"pm_sim"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("user-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.NotNil(t, repo.reserved)
+	assert.Equal(t, "listing-1", repo.reserved.ListingID)
+	assert.Equal(t, "user-1", repo.reserved.BorrowerID)
+	assert.Equal(t, 2026, repo.reserved.StartDate.Year())
+	assert.Equal(t, 6, int(repo.reserved.StartDate.Month()))
+	assert.Equal(t, 10, repo.reserved.StartDate.Day())
 }
