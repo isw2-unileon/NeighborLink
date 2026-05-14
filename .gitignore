@@ -41,3 +41,6 @@ test-results/
 
 #Claude
 CLAUDE.md
+
+#Build Info
+*.tsbuildinfo
