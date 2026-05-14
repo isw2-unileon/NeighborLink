@@ -356,7 +356,7 @@ func (h *Handler) generateDeliveryCode(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"code": code})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"code": code}})
 }
 
 func (h *Handler) generateReturnCode(c *gin.Context) {
@@ -381,7 +381,7 @@ func (h *Handler) generateReturnCode(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"code": code})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"code": code}})
 }
 
 func (h *Handler) confirmHandover(c *gin.Context) {

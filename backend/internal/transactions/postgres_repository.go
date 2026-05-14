@@ -99,7 +99,7 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 		FROM transactions t
 		JOIN listings l ON t.listing_id = l.id
 		WHERE t.borrower_id = $1
-		  AND t.status IN ('pending', 'agreed', 'handed_over')
+		  AND t.status IN ('pending', 'agreed', 'handed_over', 'returned', 'cancelled')
 		ORDER BY t.agreed_at DESC NULLS LAST
 	`, borrowerID)
 	if err != nil {
