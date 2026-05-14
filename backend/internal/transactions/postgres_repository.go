@@ -2,9 +2,10 @@ package transactions
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -249,9 +250,13 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
 }
 
 func (r *postgresRepository) GenerateCode(ctx context.Context, transactionID string, field string) (string, error) {
-	code := fmt.Sprintf("%06d", rand.Intn(1000000))
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secure code: %w", err)
+	}
+	code := fmt.Sprintf("%06d", n.Int64())
 	query := fmt.Sprintf("UPDATE transactions SET %s = $1 WHERE id = $2", field)
-	_, err := r.pool.Exec(ctx, query, code, transactionID)
+	_, err = r.pool.Exec(ctx, query, code, transactionID) // = en vez de :=
 	if err != nil {
 		return "", fmt.Errorf("transactions: generate code failed: %w", err)
 	}

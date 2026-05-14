@@ -15,16 +15,19 @@ type listingStatusUpdater interface {
 	UpdateStatus(ctx context.Context, id string, status string) error
 }
 
+// Service holds the business logic for the transactions domain.
 type Service struct {
 	repo       Repository
 	stripe     stripeDepositor
 	listingSvc listingStatusUpdater
 }
 
+// NewService creates a new Service instance with the required dependencies.
 func NewService(repo Repository, stripe stripeDepositor, listingSvc listingStatusUpdater) *Service {
 	return &Service{repo: repo, stripe: stripe, listingSvc: listingSvc}
 }
 
+// Accept processes a transaction acceptance and authorizes the Stripe deposit.
 func (s *Service) Accept(ctx context.Context, transactionID string, depositAmountCents int64) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
@@ -46,6 +49,7 @@ func (s *Service) Accept(ctx context.Context, transactionID string, depositAmoun
 	return nil
 }
 
+// Reject cancels a pending transaction and updates its status to cancelled.
 func (s *Service) Reject(ctx context.Context, transactionID string) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
@@ -87,7 +91,7 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 		return fmt.Errorf("service: update status: %w", err)
 	}
 
-	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "pending_return"); err != nil { // ← cambiado
+	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "pending_return"); err != nil {
 		return fmt.Errorf("service: update listing status: %w", err)
 	}
 	return nil
@@ -114,7 +118,7 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 		return fmt.Errorf("service: update status: %w", err)
 	}
 
-	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil { // ← ya estaba bien
+	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil {
 		return fmt.Errorf("service: update listing status: %w", err)
 	}
 	return nil

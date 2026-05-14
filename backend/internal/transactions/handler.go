@@ -334,55 +334,40 @@ func (h *Handler) reserveListing(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
 
-func (h *Handler) generateDeliveryCode(c *gin.Context) {
+// handler.go — reemplaza las dos funciones por esta:
+
+// generateCode handles code generation for both delivery and return codes.
+func (h *Handler) generateCode(c *gin.Context, codeType string) {
 	id := c.Param("id")
 	userID, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
+
 	t, err := h.repo.FindByID(c.Request.Context(), id)
 	if err != nil || t == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
 		return
 	}
+
 	if t.BorrowerID != userID.(string) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	code, err := h.repo.GenerateCode(c.Request.Context(), id, "delivery_code")
+
+	code, err := h.repo.GenerateCode(c.Request.Context(), id, codeType)
 	if err != nil {
-		slog.Error("failed to generate delivery code", "id", id, "error", err)
+		slog.Error("failed to generate code", "id", id, "type", codeType, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"code": code}})
 }
 
-func (h *Handler) generateReturnCode(c *gin.Context) {
-	id := c.Param("id")
-	userID, ok := c.Get("userID")
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	t, err := h.repo.FindByID(c.Request.Context(), id)
-	if err != nil || t == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
-		return
-	}
-	if t.BorrowerID != userID.(string) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-	code, err := h.repo.GenerateCode(c.Request.Context(), id, "return_code")
-	if err != nil {
-		slog.Error("failed to generate return code", "id", id, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"code": code}})
-}
+func (h *Handler) generateDeliveryCode(c *gin.Context) { h.generateCode(c, "delivery_code") }
+func (h *Handler) generateReturnCode(c *gin.Context)   { h.generateCode(c, "return_code") }
 
 func (h *Handler) confirmHandover(c *gin.Context) {
 	id := c.Param("id")
