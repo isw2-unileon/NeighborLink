@@ -29,4 +29,11 @@ type Repository interface {
 	Reserve(ctx context.Context, t Transaction) (*Transaction, error)
 	// FindBlockedDates returns all date ranges blocked by pending/active transactions.
 	FindBlockedDates(ctx context.Context, listingID string) ([]DateRange, error)
+
+	// GenerateCode generates a random 6-digit code, stores it in the given column
+	// ("delivery_code" or "return_code") and returns it.
+	GenerateCode(ctx context.Context, transactionID string, field string) (string, error)
+
+	// ValidateCode checks if the given code matches the stored value in the given column.
+	ValidateCode(ctx context.Context, transactionID string, field string, code string) (bool, error)
 }

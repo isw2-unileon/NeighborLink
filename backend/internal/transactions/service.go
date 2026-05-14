@@ -13,20 +13,26 @@ type stripeDepositor interface {
 	ReleaseDeposit(paymentIntentID string, totalAmountCents int64) error
 }
 
+// listingStatusUpdater is a narrow interface to update a listing's status
+// without coupling the transactions package to the listings package.
+type listingStatusUpdater interface {
+	UpdateStatus(ctx context.Context, id string, status string) error
+}
+
 // Service orchestrates the deposit lifecycle, combining the transaction
 // repository with the Stripe client. Handlers must never call Stripe directly.
 type Service struct {
-	repo   Repository
-	stripe stripeDepositor
+	repo       Repository
+	stripe     stripeDepositor
+	listingSvc listingStatusUpdater
 }
 
-// NewService creates a Service with the given repository and Stripe client.
-func NewService(repo Repository, stripe stripeDepositor) *Service {
-	return &Service{repo: repo, stripe: stripe}
+// NewService creates a Service with the given repository, Stripe client and listing updater.
+func NewService(repo Repository, stripe stripeDepositor, listingSvc listingStatusUpdater) *Service {
+	return &Service{repo: repo, stripe: stripe, listingSvc: listingSvc}
 }
 
 // Accept authorizes the deposit on Stripe for a pending transaction and marks it as agreed.
-// The transaction must already exist in pending status with a stored payment_method_id.
 func (s *Service) Accept(ctx context.Context, transactionID string, depositAmountCents int64) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
@@ -64,8 +70,8 @@ func (s *Service) Reject(ctx context.Context, transactionID string) error {
 	return nil
 }
 
-// Handover captures the authorized deposit and marks the transaction as handed_over.
-// The transaction must be in agreed status.
+// Handover captures the authorized deposit, marks the transaction as handed_over
+// and updates the listing status to borrowed.
 func (s *Service) Handover(ctx context.Context, transactionID string) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
@@ -82,12 +88,15 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 	if err := s.repo.UpdateStatus(ctx, transactionID, "handed_over"); err != nil {
 		return fmt.Errorf("service: update status: %w", err)
 	}
+
+	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "borrowed"); err != nil {
+		return fmt.Errorf("service: update listing status: %w", err)
+	}
 	return nil
 }
 
-// Return refunds 95% of the deposit to the borrower and marks the transaction as returned.
-// The transaction must be in handed_over status.
-// depositAmountCents is the original deposit amount obtained externally from the listing.
+// Return refunds 95% of the deposit to the borrower, marks the transaction as returned
+// and updates the listing status back to available.
 func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
@@ -103,6 +112,10 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 
 	if err := s.repo.UpdateStatus(ctx, transactionID, "returned"); err != nil {
 		return fmt.Errorf("service: update status: %w", err)
+	}
+
+	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil {
+		return fmt.Errorf("service: update listing status: %w", err)
 	}
 	return nil
 }

@@ -20,6 +20,10 @@ func (f *fakeStripe) AuthorizeDeposit(amountCents int64, currency, paymentMethod
 func (f *fakeStripe) CaptureDeposit(_ string) error          { return nil }
 func (f *fakeStripe) ReleaseDeposit(_ string, _ int64) error { return nil }
 
+type fakeListingSvc struct{}
+
+func (f *fakeListingSvc) UpdateStatus(_ context.Context, _ string, _ string) error { return nil }
+
 func TestAccept_ChargesDepositPlusPlatformFee(t *testing.T) {
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
@@ -27,7 +31,7 @@ func TestAccept_ChargesDepositPlusPlatformFee(t *testing.T) {
 		},
 	}
 	fs := &fakeStripe{}
-	svc := transactions.NewService(repo, fs)
+	svc := transactions.NewService(repo, fs, &fakeListingSvc{})
 
 	err := svc.Accept(context.Background(), "tx-1", 500)
 
@@ -41,7 +45,7 @@ func TestAccept_FailsIfNotPending(t *testing.T) {
 			{ID: "tx-1", Status: "agreed", PaymentMethodID: "pm_test"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
 
 	err := svc.Accept(context.Background(), "tx-1", 500)
 
@@ -54,7 +58,7 @@ func TestReject_SetsCancelledStatus(t *testing.T) {
 			{ID: "tx-1", Status: "pending"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
 
 	err := svc.Reject(context.Background(), "tx-1")
 
@@ -68,7 +72,7 @@ func TestReject_FailsIfNotPending(t *testing.T) {
 			{ID: "tx-1", Status: "agreed"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
 
 	err := svc.Reject(context.Background(), "tx-1")
 

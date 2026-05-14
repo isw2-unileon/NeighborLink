@@ -146,6 +146,20 @@ func (f *fakeRepository) FindBlockedDates(ctx context.Context, listingID string)
 	return f.blockedDates, f.err
 }
 
+func (f *fakeRepository) GenerateCode(_ context.Context, _ string, _ string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return "123456", nil
+}
+
+func (f *fakeRepository) ValidateCode(_ context.Context, _ string, _ string, code string) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return code == "123456", nil
+}
+
 const testJWTSecret = "test-secret"
 
 func makeToken(userID string) string {

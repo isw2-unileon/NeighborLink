@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -245,4 +246,27 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
 		return nil, fmt.Errorf("transactions: iteration failed: %w", err)
 	}
 	return ranges, nil
+}
+
+func (r *postgresRepository) GenerateCode(ctx context.Context, transactionID string, field string) (string, error) {
+	code := fmt.Sprintf("%06d", rand.Intn(1000000))
+	query := fmt.Sprintf("UPDATE transactions SET %s = $1 WHERE id = $2", field)
+	_, err := r.pool.Exec(ctx, query, code, transactionID)
+	if err != nil {
+		return "", fmt.Errorf("transactions: generate code failed: %w", err)
+	}
+	return code, nil
+}
+
+func (r *postgresRepository) ValidateCode(ctx context.Context, transactionID string, field string, code string) (bool, error) {
+	var stored string
+	query := fmt.Sprintf("SELECT %s FROM transactions WHERE id = $1", field)
+	err := r.pool.QueryRow(ctx, query, transactionID).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, fmt.Errorf("transaction %s not found", transactionID)
+	}
+	if err != nil {
+		return false, fmt.Errorf("transactions: validate code failed: %w", err)
+	}
+	return stored == code, nil
 }

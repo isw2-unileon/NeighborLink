@@ -93,7 +93,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	// Transactions
 	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
 	transactionRepo := transactionsModule.NewPostgresRepository(pool)
-	transactionSvc := transactionsModule.NewService(transactionRepo, stripeClient)
+	transactionSvc := transactionsModule.NewService(transactionRepo, stripeClient, listingRepo)
 	transactionsModule.NewHandler(transactionRepo, transactionSvc, walletSvc).RegisterRoutes(api, authMiddleware)
 
 	// Messages
