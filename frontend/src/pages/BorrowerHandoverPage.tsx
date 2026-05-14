@@ -2,24 +2,26 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 
-const PLACEHOLDER_CODE = '123456';
-
 export default function BorrowerHandoverPage() {
     const navigate = useNavigate();
     const { id: transactionId } = useParams<{ id: string }>();
     const [listingTitle, setListingTitle] = useState<string | null>(null);
+    const [code, setCode] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!transactionId) return;
         api.get<{ data: { listing_title?: string } }>(`/transactions/${transactionId}`)
             .then(r => setListingTitle(r.data.listing_title ?? null))
             .catch(() => { });
+
+        api.post<{ data: { code: string } }>(`/transactions/${transactionId}/generate-delivery-code`, {})
+            .then(r => setCode(r.data.code))
+            .catch(() => setError('No se pudo generar el código. Inténtalo de nuevo.'));
     }, [transactionId]);
 
     return (
         <div className="max-w-md mx-auto p-6 flex flex-col gap-4">
-
-            {/* Banner chat */}
             {transactionId && (
                 <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex items-center justify-between gap-4">
                     <div>
@@ -36,25 +38,27 @@ export default function BorrowerHandoverPage() {
                     </Link>
                 </div>
             )}
-
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
                 <button onClick={() => navigate('/profile')}
                     className="text-sm text-gray-500 hover:text-gray-700 mb-6 block">
                     ← Volver
                 </button>
                 <h1 className="text-xl font-bold text-gray-900 mb-2">Código de entrega</h1>
-                {listingTitle && (
-                    <p className="text-sm text-gray-500 mb-1">{listingTitle}</p>
-                )}
+                {listingTitle && <p className="text-sm text-gray-500 mb-1">{listingTitle}</p>}
                 <p className="text-sm text-gray-500 mb-8">
                     Muestra este código al propietario para que confirme la entrega del objeto.
                 </p>
-
                 <div className="flex flex-col items-center gap-2">
-                    <span className="text-5xl font-bold tracking-widest text-teal-700">
-                        {PLACEHOLDER_CODE}
-                    </span>
-                    <p className="text-xs text-gray-400">Código de 6 dígitos</p>
+                    {error ? (
+                        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+                    ) : code ? (
+                        <>
+                            <span className="text-5xl font-bold tracking-widest text-teal-700">{code}</span>
+                            <p className="text-xs text-gray-400">Código de 6 dígitos</p>
+                        </>
+                    ) : (
+                        <span className="text-gray-400 text-sm">Generando código...</span>
+                    )}
                 </div>
             </div>
         </div>
