@@ -94,7 +94,7 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, t.listing_id, t.borrower_id, t.status,
 		       t.total_charged_cents, t.agreed_at, t.handover_at, t.return_at,
-		       l.title, COALESCE(l.photos[1], '')
+		       l.title, l.photos
 		FROM transactions t
 		JOIN listings l ON t.listing_id = l.id
 		WHERE t.borrower_id = $1
@@ -109,12 +109,16 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 	result := make([]BorrowerTransaction, 0)
 	for rows.Next() {
 		var bt BorrowerTransaction
+		var photos []string
 		if err := rows.Scan(
 			&bt.ID, &bt.ListingID, &bt.BorrowerID, &bt.Status,
 			&bt.TotalChargedCents, &bt.AgreedAt, &bt.HandoverAt, &bt.ReturnAt,
-			&bt.ListingTitle, &bt.ListingPhoto,
+			&bt.ListingTitle, &photos,
 		); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)
+		}
+		if len(photos) > 0 {
+			bt.ListingPhoto = photos[0]
 		}
 		result = append(result, bt)
 	}

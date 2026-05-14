@@ -5,6 +5,8 @@ import { usersApi } from '../lib/users';
 import { listingsApi } from '../lib/listings';
 import { walletApi } from '../lib/wallet';
 import type { Listing, PointsHistoryEntry } from '../types';
+import { reservationsApi } from '../lib/reservations';
+import type { Transaction } from '../types';
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -20,6 +22,22 @@ const STATUS_COLORS: Record<string, string> = {
     available: 'bg-green-100 text-green-700',
     pending_handover: 'bg-yellow-100 text-yellow-700',
     pending_return: 'bg-blue-100 text-blue-700',
+};
+
+const RESERVATION_STATUS_LABELS: Record<string, string> = {
+    pending: 'Pendiente de confirmación',
+    agreed: 'Pendiente de entrega',
+    handed_over: 'Pendiente de devolución',
+    returned: 'Completada',
+    rejected: 'Rechazada',
+};
+
+const RESERVATION_STATUS_COLORS: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-700',
+    agreed: 'bg-blue-100 text-blue-700',
+    handed_over: 'bg-purple-100 text-purple-700',
+    returned: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-700',
 };
 
 const VISIBLE_STATUSES = ['available', 'pending_handover', 'pending_return'];
@@ -203,6 +221,90 @@ function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void 
 }
 
 
+function MyReservations({ userID }: { userID: string }) {
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        reservationsApi.getMyBorrowedTransactions(userID)
+            .then(setTransactions)
+            .catch(() => setError('No se pudieron cargar tus reservas'))
+            .finally(() => setLoading(false));
+    }, [userID]);
+
+    const active = transactions.filter(t => ['pending', 'agreed', 'handed_over'].includes(t.status));
+    const past = transactions.filter(t => ['returned', 'rejected'].includes(t.status));
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-6">
+            <h2 className="text-base font-semibold text-gray-900">Mis reservas</h2>
+
+            {loading && <p className="text-sm text-gray-400 text-center">Cargando reservas…</p>}
+            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+
+            {!loading && !error && (
+                <>
+                    <div className="flex flex-col gap-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Activas</h3>
+                        {active.length === 0
+                            ? <p className="text-sm text-gray-400 py-2">No tienes reservas activas.</p>
+                            : active.map(t => (
+                                <Link key={t.id}
+                                    to={t.status === 'agreed' ? `/reservations/${t.id}/handover` : t.status === 'handed_over' ? `/reservations/${t.id}/return` : '#'}
+                                    className="flex items-center gap-4 py-3 border-t border-gray-100 first:border-0 hover:bg-gray-50 rounded-lg px-2 transition">
+                                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                        {t.listing_photo
+                                            ? <img src={t.listing_photo} alt={t.listing_title ?? ''} className="w-full h-full object-cover" />
+                                            : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">📦</div>
+                                        }
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">{t.listing_title ?? t.listing_id}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            {t.start_date && t.end_date
+                                                ? `${new Date(t.start_date).toLocaleDateString('es-ES')} – ${new Date(t.end_date).toLocaleDateString('es-ES')}`
+                                                : 'Sin fechas'}
+                                        </p>
+                                    </div>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RESERVATION_STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        {RESERVATION_STATUS_LABELS[t.status] ?? t.status}
+                                    </span>
+                                </Link>
+                            ))
+                        }
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Historial</h3>
+                        {past.length === 0
+                            ? <p className="text-sm text-gray-400 py-2">Aún no tienes reservas completadas.</p>
+                            : past.map(t => (
+                                <div key={t.id} className="flex items-center gap-4 py-3 border-t border-gray-100 first:border-0 px-2">
+                                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                        {t.listing_photo
+                                            ? <img src={t.listing_photo} alt={t.listing_title ?? ''} className="w-full h-full object-cover" />
+                                            : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">📦</div>
+                                        }
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">{t.listing_title ?? t.listing_id}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            {t.return_at ? new Date(t.return_at).toLocaleDateString('es-ES') : ''}
+                                        </p>
+                                    </div>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RESERVATION_STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        {RESERVATION_STATUS_LABELS[t.status] ?? t.status}
+                                    </span>
+                                </div>
+                            ))
+                        }
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 // ── ProfilePage ───────────────────────────────────────────────────────────────
 
 
@@ -210,7 +312,7 @@ export default function ProfilePage() {
     const { user, token, updateUser } = useAuth();
     const navigate = useNavigate();
 
-    const [tab, setTab] = useState<'listings' | 'wallet'>('listings');
+    const [tab, setTab] = useState<'listings' | 'reservations' | 'wallet'>('listings');
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -289,22 +391,22 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex border-b border-gray-200">
-                {(['listings', 'wallet'] as const).map(t => (
+                {(['listings', 'reservations', 'wallet'] as const).map(t => (
                     <button
                         key={t}
                         onClick={() => setTab(t)}
-                        className={`px-5 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${
-                            tab === t
+                        className={`px-5 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${tab === t
                                 ? 'border-teal-700 text-teal-700'
                                 : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
+                            }`}
                     >
-                        {t === 'listings' ? 'Mis Objetos' : 'Cartera'}
+                        {t === 'listings' ? 'Mis Objetos' : t === 'reservations' ? 'Mis Reservas' : 'Cartera'}
                     </button>
                 ))}
             </div>
 
             {tab === 'listings' && <MyListings userID={user.id} />}
+            {tab === 'reservations' && <MyReservations userID={user.id} />}
             {tab === 'wallet' && (
                 <WalletTab
                     points={user.points ?? 0}
