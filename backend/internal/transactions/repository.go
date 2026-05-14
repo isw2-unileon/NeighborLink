@@ -8,7 +8,7 @@ type Repository interface {
 	FindAll(ctx context.Context) ([]Transaction, error)
 	FindByID(ctx context.Context, id string) (*Transaction, error)
 	FindByListing(ctx context.Context, listingID string) ([]Transaction, error)
-	FindByBorrower(ctx context.Context, borrowerID string) ([]Transaction, error)
+	FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error)
 
 	// Create inserts a new transaction and returns it with the generated ID.
 	Create(ctx context.Context, t Transaction) (*Transaction, error)

@@ -60,14 +60,14 @@ func (f *fakeRepository) FindByListing(ctx context.Context, listingID string) ([
 	return result, nil
 }
 
-func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]transactions.Transaction, error) {
+func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]transactions.BorrowerTransaction, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	var result []transactions.Transaction
+	var result []transactions.BorrowerTransaction
 	for _, t := range f.transactions {
 		if t.BorrowerID == borrowerID {
-			result = append(result, t)
+			result = append(result, transactions.BorrowerTransaction{Transaction: t})
 		}
 	}
 	return result, nil
@@ -294,7 +294,7 @@ func TestListByBorrower(t *testing.T) {
 
 			if tt.wantStatus == http.StatusOK {
 				var resp struct {
-					Data []transactions.Transaction `json:"data"`
+					Data []transactions.BorrowerTransaction `json:"data"`
 				}
 				err := json.NewDecoder(w.Body).Decode(&resp)
 				assert.NoError(t, err)

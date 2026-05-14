@@ -90,16 +90,38 @@ func (r *postgresRepository) FindByListing(ctx context.Context, listingID string
 	return r.scanRows(rows)
 }
 
-func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]Transaction, error) {
+func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error) {
 	rows, err := r.pool.Query(ctx, `
-        SELECT id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
-        FROM transactions WHERE borrower_id = $1
-    `, borrowerID)
+		SELECT t.id, t.listing_id, t.borrower_id, t.status,
+		       t.total_charged_cents, t.agreed_at, t.handover_at, t.return_at,
+		       l.title, COALESCE(l.photos[1], '')
+		FROM transactions t
+		JOIN listings l ON t.listing_id = l.id
+		WHERE t.borrower_id = $1
+		  AND t.status IN ('pending', 'agreed', 'handed_over')
+		ORDER BY t.agreed_at DESC NULLS LAST
+	`, borrowerID)
 	if err != nil {
 		return nil, fmt.Errorf("transactions: query failed: %w", err)
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+
+	result := make([]BorrowerTransaction, 0)
+	for rows.Next() {
+		var bt BorrowerTransaction
+		if err := rows.Scan(
+			&bt.ID, &bt.ListingID, &bt.BorrowerID, &bt.Status,
+			&bt.TotalChargedCents, &bt.AgreedAt, &bt.HandoverAt, &bt.ReturnAt,
+			&bt.ListingTitle, &bt.ListingPhoto,
+		); err != nil {
+			return nil, fmt.Errorf("transactions: scan failed: %w", err)
+		}
+		result = append(result, bt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("transactions: iteration failed: %w", err)
+	}
+	return result, nil
 }
 
 func (r *postgresRepository) Create(ctx context.Context, t Transaction) (*Transaction, error) {

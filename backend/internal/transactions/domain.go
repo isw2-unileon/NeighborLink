@@ -35,3 +35,11 @@ type DateRange struct {
 	StartDate string `json:"start_date"`
 	EndDate   string `json:"end_date"`
 }
+
+// BorrowerTransaction enriches a Transaction with listing display data
+// for the borrower's "My Reservations" view.
+type BorrowerTransaction struct {
+	Transaction
+	ListingTitle string `json:"listing_title"`
+	ListingPhoto string `json:"listing_photo"`
+}
