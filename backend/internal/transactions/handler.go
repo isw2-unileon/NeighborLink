@@ -40,6 +40,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected.POST("/transactions", h.createTransaction)
 	protected.PUT("/transactions/:id/accept", h.acceptTransaction)
 	protected.PUT("/transactions/:id/reject", h.rejectTransaction)
+	protected.PUT("/transactions/:id/pay", h.payTransaction)
 	protected.POST("/transactions/:id/handover", h.handoverTransaction)
 	protected.POST("/transactions/:id/return", h.returnTransaction)
 	protected.POST("/listings/:id/reserve", h.reserveListing)
@@ -181,9 +182,28 @@ func (h *Handler) requireOwner(c *gin.Context, id string) bool {
 	return true
 }
 
-func (h *Handler) acceptTransaction(c *gin.Context) {
+// requireBorrower checks that the authenticated caller is the borrower of the transaction.
+func (h *Handler) requireBorrower(c *gin.Context, id string) bool {
+	callerID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return false
+	}
+	t, err := h.repo.FindByID(c.Request.Context(), id)
+	if err != nil || t == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return false
+	}
+	if t.BorrowerID != callerID.(string) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return false
+	}
+	return true
+}
+
+func (h *Handler) payTransaction(c *gin.Context) {
 	id := c.Param("id")
-	if !h.requireOwner(c, id) {
+	if !h.requireBorrower(c, id) {
 		return
 	}
 
@@ -192,7 +212,21 @@ func (h *Handler) acceptTransaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Accept(c.Request.Context(), id, depositAmountCents); err != nil {
+	if err := h.service.ConfirmPayment(c.Request.Context(), id, depositAmountCents); err != nil {
+		h.handleServiceError(c, "pay", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) acceptTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+
+	if err := h.service.AcceptRequest(c.Request.Context(), id); err != nil {
 		h.handleServiceError(c, "accept", id, err)
 		return
 	}

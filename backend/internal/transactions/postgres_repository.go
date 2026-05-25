@@ -100,7 +100,7 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 		FROM transactions t
 		JOIN listings l ON t.listing_id = l.id
 		WHERE t.borrower_id = $1
-		  AND t.status IN ('pending', 'agreed', 'handed_over', 'returned', 'cancelled')
+		  AND t.status IN ('pending', 'agreed', 'awaiting_payment', 'handed_over', 'returned', 'cancelled')
 		ORDER BY t.agreed_at DESC NULLS LAST
 	`, borrowerID)
 	if err != nil {
@@ -226,7 +226,7 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
         SELECT start_date, end_date
         FROM transactions
         WHERE listing_id = $1
-          AND status IN ('pending', 'active')
+          AND status IN ('pending', 'agreed', 'awaiting_payment')
           AND start_date IS NOT NULL
           AND end_date   IS NOT NULL
     `, listingID)
