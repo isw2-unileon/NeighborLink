@@ -49,10 +49,15 @@ func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error)
 func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transaction, error) {
 	var t Transaction
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, listing_id, borrower_id, status, stripe_payment_intent_id, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at
+		SELECT id, listing_id, borrower_id, status,
+			COALESCE(stripe_payment_intent_id, '') AS stripe_payment_intent_id,
+			COALESCE(payment_method_id, '')        AS payment_method_id,
+			total_charged_cents, agreed_at, handover_at, return_at
 		FROM transactions
 		WHERE id = $1
-	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.StripePaymentIntentID, &t.PaymentMethodID, &t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
+	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status,
+		&t.StripePaymentIntentID, &t.PaymentMethodID,
+		&t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

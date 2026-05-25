@@ -90,7 +90,7 @@ export default function ChatsPage() {
                 <div className="text-center py-16 text-gray-400">
                     <p className="text-4xl mb-3">💬</p>
                     <p className="text-sm">No tienes conversaciones activas.</p>
-                    <p className="text-xs mt-1">Los chats aparecen cuando tienes un préstamo en curso.</p>
+                    <p className="text-xs mt-1">Los chats aparecen cuando haces o recibes una solicitud de préstamo.</p>
                 </div>
             )}
 
