@@ -27,14 +27,28 @@ func NewService(repo Repository, stripe stripeDepositor, listingSvc listingStatu
 	return &Service{repo: repo, stripe: stripe, listingSvc: listingSvc}
 }
 
-// Accept processes a transaction acceptance and authorizes the Stripe deposit.
-func (s *Service) Accept(ctx context.Context, transactionID string, depositAmountCents int64) error {
+// AcceptRequest marca la transacción como awaiting_payment.
+// El owner acepta la solicitud pero el borrower aún no ha pagado.
+func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
 		return fmt.Errorf("service: find transaction: %w", err)
 	}
 	if t == nil || t.Status != "pending" {
 		return fmt.Errorf("service: transaction %s must be in pending status to accept", transactionID)
+	}
+	return s.repo.UpdateStatus(ctx, transactionID, "awaiting_payment")
+}
+
+// ConfirmPayment autoriza el depósito en Stripe y mueve la transacción a agreed.
+// Solo puede llamarlo el borrower cuando status = awaiting_payment.
+func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64) error {
+	t, err := s.repo.FindByID(ctx, transactionID)
+	if err != nil {
+		return fmt.Errorf("service: find transaction: %w", err)
+	}
+	if t == nil || t.Status != "awaiting_payment" {
+		return fmt.Errorf("service: transaction %s must be in awaiting_payment status to pay", transactionID)
 	}
 
 	totalCents := depositAmountCents + PlatformFeeCents
@@ -43,10 +57,7 @@ func (s *Service) Accept(ctx context.Context, transactionID string, depositAmoun
 		return fmt.Errorf("service: authorize deposit: %w", err)
 	}
 
-	if err := s.repo.UpdatePaymentIntent(ctx, transactionID, paymentIntentID, t.PaymentMethodID, totalCents); err != nil {
-		return fmt.Errorf("service: update payment intent: %w", err)
-	}
-	return nil
+	return s.repo.UpdatePaymentIntent(ctx, transactionID, paymentIntentID, t.PaymentMethodID, totalCents)
 }
 
 // Reject cancels a pending transaction and updates its status to cancelled.

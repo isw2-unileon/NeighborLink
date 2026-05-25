@@ -28,6 +28,7 @@ const mockChats: Message[] = [
         listing_title: 'Taladro Bosch',
         listing_photo: undefined,
         created_at: '2026-05-01T10:00:00Z',
+        status: 'agreed',
     },
     {
         id: 'msg-2',
@@ -37,6 +38,7 @@ const mockChats: Message[] = [
         listing_title: 'Escalera de mano',
         listing_photo: undefined,
         created_at: '2026-05-02T10:00:00Z',
+        status: 'agreed',
     },
 ];
 
