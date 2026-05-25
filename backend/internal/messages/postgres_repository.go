@@ -80,12 +80,13 @@ func (r *postgresRepository) Create(ctx context.Context, m Message) (*Message, e
 
 func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID string) ([]Message, error) {
 	rows, err := r.pool.Query(ctx, `
-        SELECT id, transaction_id, sender_id, content, created_at, title, photo
+        SELECT id, transaction_id, sender_id, content, created_at, title, photo, status
         FROM (
             SELECT DISTINCT ON (m.transaction_id)
                 m.id, m.transaction_id, m.sender_id, m.content, m.created_at,
                 l.title,
-                COALESCE(l.photos->>0, '') AS photo
+                COALESCE(l.photos->>0, '') AS photo,
+                t.status
             FROM messages m
             JOIN transactions t ON t.id = m.transaction_id
             JOIN listings l     ON l.id = t.listing_id
@@ -99,14 +100,15 @@ func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID
         SELECT
             t.id, t.id, '00000000-0000-0000-0000-000000000000'::uuid, '', COALESCE(t.agreed_at, t.start_date::timestamptz),
             l.title,
-            COALESCE(l.photos->>0, '') AS photo
+            COALESCE(l.photos->>0, '') AS photo,
+            t.status
         FROM transactions t
         JOIN listings l ON l.id = t.listing_id
         WHERE (t.borrower_id = $1 OR l.owner_id = $1)
-        AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over')
-        AND NOT EXISTS (
-            SELECT 1 FROM messages m WHERE m.transaction_id = t.id
-        )
+          AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over')
+          AND NOT EXISTS (
+              SELECT 1 FROM messages m WHERE m.transaction_id = t.id
+          )
     `, userID)
 	if err != nil {
 		return nil, fmt.Errorf("messages: query active chats failed: %w", err)
@@ -118,7 +120,7 @@ func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID
 		var m Message
 		if err := rows.Scan(
 			&m.ID, &m.TransactionID, &m.SenderID, &m.Content, &m.CreatedAt,
-			&m.ListingTitle, &m.ListingPhoto,
+			&m.ListingTitle, &m.ListingPhoto, &m.Status,
 		); err != nil {
 			return nil, fmt.Errorf("messages: scan failed: %w", err)
 		}

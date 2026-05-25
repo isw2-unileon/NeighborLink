@@ -35,6 +35,14 @@ function ChatCard({ message, currentUserID }: { message: Message; currentUserID:
 }
 
 function EmptyChatCard({ message }: { message: Message }) {
+    const subtitle = message.status === 'pending'
+        ? '⏳ Pendiente de aceptar y concretar el pago'
+        : '💬 Inicia la conversación para concretar la entrega';
+
+    const subtitleColor = message.status === 'pending'
+        ? 'text-amber-500'
+        : 'text-teal-600';
+
     return (
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
@@ -49,8 +57,8 @@ function EmptyChatCard({ message }: { message: Message }) {
                 <p className="text-sm font-semibold text-gray-900 truncate">
                     {message.listing_title ?? 'Objeto'}
                 </p>
-                <p className="text-sm text-teal-600 truncate">
-                    💬 Inicia la conversación para concretar la entrega
+                <p className={`text-sm truncate ${subtitleColor}`}>
+                    {subtitle}
                 </p>
             </div>
         </Link>
@@ -72,8 +80,10 @@ export default function ChatsPage() {
 
     if (!user) return null;
 
-    const withMessages = chats.filter(c => c.content !== '');
-    const withoutMessages = chats.filter(c => c.content === '');
+    const pending = chats.filter(c => c.status === 'pending');
+    const awaitingPayment = chats.filter(c => c.status === 'awaiting_payment');
+    const activeNoMsg = chats.filter(c => ['agreed', 'handed_over'].includes(c.status ?? '') && c.content === '');
+    const activeWithMsg = chats.filter(c => ['agreed', 'handed_over'].includes(c.status ?? '') && c.content !== '');
 
     return (
         <div className="max-w-2xl mx-auto p-6 flex flex-col gap-4">
@@ -94,25 +104,37 @@ export default function ChatsPage() {
                 </div>
             )}
 
-            {!loading && !error && withoutMessages.length > 0 && (
+            {!loading && !error && pending.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                        Sin mensajes
-                    </h2>
-                    {withoutMessages.map(msg => (
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pendientes</h2>
+                    {pending.map(msg => (
                         <EmptyChatCard key={msg.transaction_id} message={msg} />
                     ))}
                 </div>
             )}
 
-            {!loading && !error && withMessages.length > 0 && (
+            {!loading && !error && awaitingPayment.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    {withoutMessages.length > 0 && (
-                        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                            Conversaciones
-                        </h2>
-                    )}
-                    {withMessages.map(msg => (
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pendiente de pago</h2>
+                    {awaitingPayment.map(msg => (
+                        <EmptyChatCard key={msg.transaction_id} message={msg} />
+                    ))}
+                </div>
+            )}
+
+            {!loading && !error && activeNoMsg.length > 0 && (
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Sin mensajes</h2>
+                    {activeNoMsg.map(msg => (
+                        <EmptyChatCard key={msg.transaction_id} message={msg} />
+                    ))}
+                </div>
+            )}
+
+            {!loading && !error && activeWithMsg.length > 0 && (
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Conversaciones</h2>
+                    {activeWithMsg.map(msg => (
                         <ChatCard key={msg.id} message={msg} currentUserID={user.id} />
                     ))}
                 </div>
