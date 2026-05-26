@@ -2,8 +2,10 @@ package transactions
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,10 +49,15 @@ func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error)
 func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transaction, error) {
 	var t Transaction
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, listing_id, borrower_id, status, stripe_payment_intent_id, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at
+		SELECT id, listing_id, borrower_id, status,
+			COALESCE(stripe_payment_intent_id, '') AS stripe_payment_intent_id,
+			COALESCE(payment_method_id, '')        AS payment_method_id,
+			total_charged_cents, agreed_at, handover_at, return_at
 		FROM transactions
 		WHERE id = $1
-	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.StripePaymentIntentID, &t.PaymentMethodID, &t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
+	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status,
+		&t.StripePaymentIntentID, &t.PaymentMethodID,
+		&t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -90,16 +97,42 @@ func (r *postgresRepository) FindByListing(ctx context.Context, listingID string
 	return r.scanRows(rows)
 }
 
-func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]Transaction, error) {
+func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error) {
 	rows, err := r.pool.Query(ctx, `
-        SELECT id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
-        FROM transactions WHERE borrower_id = $1
-    `, borrowerID)
+		SELECT t.id, t.listing_id, t.borrower_id, t.status,
+		       t.total_charged_cents, t.agreed_at, t.handover_at, t.return_at,
+		       l.title, l.photos
+		FROM transactions t
+		JOIN listings l ON t.listing_id = l.id
+		WHERE t.borrower_id = $1
+		  AND t.status IN ('pending', 'agreed', 'awaiting_payment', 'handed_over', 'returned', 'cancelled')
+		ORDER BY t.agreed_at DESC NULLS LAST
+	`, borrowerID)
 	if err != nil {
 		return nil, fmt.Errorf("transactions: query failed: %w", err)
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+
+	result := make([]BorrowerTransaction, 0)
+	for rows.Next() {
+		var bt BorrowerTransaction
+		var photos []string
+		if err := rows.Scan(
+			&bt.ID, &bt.ListingID, &bt.BorrowerID, &bt.Status,
+			&bt.TotalChargedCents, &bt.AgreedAt, &bt.HandoverAt, &bt.ReturnAt,
+			&bt.ListingTitle, &photos,
+		); err != nil {
+			return nil, fmt.Errorf("transactions: scan failed: %w", err)
+		}
+		if len(photos) > 0 {
+			bt.ListingPhoto = photos[0]
+		}
+		result = append(result, bt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("transactions: iteration failed: %w", err)
+	}
+	return result, nil
 }
 
 func (r *postgresRepository) Create(ctx context.Context, t Transaction) (*Transaction, error) {
@@ -198,7 +231,7 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
         SELECT start_date, end_date
         FROM transactions
         WHERE listing_id = $1
-          AND status IN ('pending', 'active')
+          AND status IN ('pending', 'agreed', 'awaiting_payment')
           AND start_date IS NOT NULL
           AND end_date   IS NOT NULL
     `, listingID)
@@ -219,4 +252,31 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
 		return nil, fmt.Errorf("transactions: iteration failed: %w", err)
 	}
 	return ranges, nil
+}
+
+func (r *postgresRepository) GenerateCode(ctx context.Context, transactionID string, field string) (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secure code: %w", err)
+	}
+	code := fmt.Sprintf("%06d", n.Int64())
+	query := fmt.Sprintf("UPDATE transactions SET %s = $1 WHERE id = $2", field)
+	_, err = r.pool.Exec(ctx, query, code, transactionID) // = en vez de :=
+	if err != nil {
+		return "", fmt.Errorf("transactions: generate code failed: %w", err)
+	}
+	return code, nil
+}
+
+func (r *postgresRepository) ValidateCode(ctx context.Context, transactionID string, field string, code string) (bool, error) {
+	var stored string
+	query := fmt.Sprintf("SELECT %s FROM transactions WHERE id = $1", field)
+	err := r.pool.QueryRow(ctx, query, transactionID).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, fmt.Errorf("transaction %s not found", transactionID)
+	}
+	if err != nil {
+		return false, fmt.Errorf("transactions: validate code failed: %w", err)
+	}
+	return stored == code, nil
 }

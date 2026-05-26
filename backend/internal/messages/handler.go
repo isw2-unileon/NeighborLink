@@ -92,8 +92,13 @@ func (h *Handler) createMessage(c *gin.Context) {
 		return
 	}
 
-	// Only active transactions allow messages.
-	if tx.Status != "agreed" && tx.Status != "handed_over" {
+	allowedStatuses := map[string]bool{
+		"pending":          true,
+		"awaiting_payment": true,
+		"agreed":           true,
+		"handed_over":      true,
+	}
+	if !allowedStatuses[tx.Status] {
 		c.JSON(http.StatusConflict, gin.H{"error": "chat is not available for this transaction"})
 		return
 	}

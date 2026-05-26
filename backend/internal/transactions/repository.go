@@ -8,7 +8,7 @@ type Repository interface {
 	FindAll(ctx context.Context) ([]Transaction, error)
 	FindByID(ctx context.Context, id string) (*Transaction, error)
 	FindByListing(ctx context.Context, listingID string) ([]Transaction, error)
-	FindByBorrower(ctx context.Context, borrowerID string) ([]Transaction, error)
+	FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error)
 
 	// Create inserts a new transaction and returns it with the generated ID.
 	Create(ctx context.Context, t Transaction) (*Transaction, error)
@@ -29,4 +29,11 @@ type Repository interface {
 	Reserve(ctx context.Context, t Transaction) (*Transaction, error)
 	// FindBlockedDates returns all date ranges blocked by pending/active transactions.
 	FindBlockedDates(ctx context.Context, listingID string) ([]DateRange, error)
+
+	// GenerateCode generates a random 6-digit code, stores it in the given column
+	// ("delivery_code" or "return_code") and returns it.
+	GenerateCode(ctx context.Context, transactionID string, field string) (string, error)
+
+	// ValidateCode checks if the given code matches the stored value in the given column.
+	ValidateCode(ctx context.Context, transactionID string, field string, code string) (bool, error)
 }

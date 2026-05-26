@@ -40,9 +40,14 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected.POST("/transactions", h.createTransaction)
 	protected.PUT("/transactions/:id/accept", h.acceptTransaction)
 	protected.PUT("/transactions/:id/reject", h.rejectTransaction)
+	protected.PUT("/transactions/:id/pay", h.payTransaction)
 	protected.POST("/transactions/:id/handover", h.handoverTransaction)
 	protected.POST("/transactions/:id/return", h.returnTransaction)
 	protected.POST("/listings/:id/reserve", h.reserveListing)
+	protected.POST("/transactions/:id/generate-delivery-code", h.generateDeliveryCode)
+	protected.POST("/transactions/:id/generate-return-code", h.generateReturnCode)
+	protected.POST("/transactions/:id/confirm-handover", h.confirmHandover)
+	protected.POST("/transactions/:id/confirm-return", h.confirmReturn)
 }
 
 func (h *Handler) listTransactions(c *gin.Context) {
@@ -177,9 +182,28 @@ func (h *Handler) requireOwner(c *gin.Context, id string) bool {
 	return true
 }
 
-func (h *Handler) acceptTransaction(c *gin.Context) {
+// requireBorrower checks that the authenticated caller is the borrower of the transaction.
+func (h *Handler) requireBorrower(c *gin.Context, id string) bool {
+	callerID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return false
+	}
+	t, err := h.repo.FindByID(c.Request.Context(), id)
+	if err != nil || t == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return false
+	}
+	if t.BorrowerID != callerID.(string) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return false
+	}
+	return true
+}
+
+func (h *Handler) payTransaction(c *gin.Context) {
 	id := c.Param("id")
-	if !h.requireOwner(c, id) {
+	if !h.requireBorrower(c, id) {
 		return
 	}
 
@@ -188,7 +212,21 @@ func (h *Handler) acceptTransaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Accept(c.Request.Context(), id, depositAmountCents); err != nil {
+	if err := h.service.ConfirmPayment(c.Request.Context(), id, depositAmountCents); err != nil {
+		h.handleServiceError(c, "pay", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) acceptTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+
+	if err := h.service.AcceptRequest(c.Request.Context(), id); err != nil {
 		h.handleServiceError(c, "accept", id, err)
 		return
 	}
@@ -328,4 +366,102 @@ func (h *Handler) reserveListing(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": t})
+}
+
+// handler.go — reemplaza las dos funciones por esta:
+
+// generateCode handles code generation for both delivery and return codes.
+func (h *Handler) generateCode(c *gin.Context, codeType string) {
+	id := c.Param("id")
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	t, err := h.repo.FindByID(c.Request.Context(), id)
+	if err != nil || t == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+
+	if t.BorrowerID != userID.(string) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	code, err := h.repo.GenerateCode(c.Request.Context(), id, codeType)
+	if err != nil {
+		slog.Error("failed to generate code", "id", id, "type", codeType, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"code": code}})
+}
+
+func (h *Handler) generateDeliveryCode(c *gin.Context) { h.generateCode(c, "delivery_code") }
+func (h *Handler) generateReturnCode(c *gin.Context)   { h.generateCode(c, "return_code") }
+
+func (h *Handler) confirmHandover(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+	var body struct {
+		Code               string `json:"code"`
+		DepositAmountCents int64  `json:"deposit_amount_cents"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	valid, err := h.repo.ValidateCode(c.Request.Context(), id, "delivery_code", body.Code)
+	if err != nil {
+		h.handleServiceError(c, "confirm handover", id, err)
+		return
+	}
+	if !valid {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid delivery code"})
+		return
+	}
+	if err := h.service.Handover(c.Request.Context(), id); err != nil {
+		h.handleServiceError(c, "handover", id, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) confirmReturn(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+	var body struct {
+		Code               string `json:"code"`
+		DepositAmountCents int64  `json:"deposit_amount_cents"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	valid, err := h.repo.ValidateCode(c.Request.Context(), id, "return_code", body.Code)
+	if err != nil {
+		h.handleServiceError(c, "confirm return", id, err)
+		return
+	}
+	if !valid {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid return code"})
+		return
+	}
+	if err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents); err != nil {
+		h.handleServiceError(c, "return", id, err)
+		return
+	}
+	ownerID := c.MustGet("userID").(string)
+	pointsEarned := int(body.DepositAmountCents * 5 / 100)
+	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
+		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }

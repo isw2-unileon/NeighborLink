@@ -23,6 +23,10 @@ type noopPointsAdder struct{}
 
 func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
 
+type noopListingUpdater struct{}
+
+func (noopListingUpdater) UpdateStatus(_ context.Context, _ string, _ string) error { return nil }
+
 type fakeRepository struct {
 	transactions         []transactions.Transaction
 	err                  error
@@ -60,14 +64,14 @@ func (f *fakeRepository) FindByListing(ctx context.Context, listingID string) ([
 	return result, nil
 }
 
-func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]transactions.Transaction, error) {
+func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]transactions.BorrowerTransaction, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	var result []transactions.Transaction
+	var result []transactions.BorrowerTransaction
 	for _, t := range f.transactions {
 		if t.BorrowerID == borrowerID {
-			result = append(result, t)
+			result = append(result, transactions.BorrowerTransaction{Transaction: t})
 		}
 	}
 	return result, nil
@@ -146,6 +150,20 @@ func (f *fakeRepository) FindBlockedDates(ctx context.Context, listingID string)
 	return f.blockedDates, f.err
 }
 
+func (f *fakeRepository) GenerateCode(_ context.Context, _ string, _ string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return "123456", nil
+}
+
+func (f *fakeRepository) ValidateCode(_ context.Context, _ string, _ string, code string) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return code == "123456", nil
+}
+
 const testJWTSecret = "test-secret"
 
 func makeToken(userID string) string {
@@ -162,7 +180,8 @@ func setupRouter(repo transactions.Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	h := transactions.NewHandler(repo, nil, noopPointsAdder{})
+	svc := transactions.NewService(repo, nil, noopListingUpdater{})
+	h := transactions.NewHandler(repo, svc, noopPointsAdder{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r
@@ -294,7 +313,7 @@ func TestListByBorrower(t *testing.T) {
 
 			if tt.wantStatus == http.StatusOK {
 				var resp struct {
-					Data []transactions.Transaction `json:"data"`
+					Data []transactions.BorrowerTransaction `json:"data"`
 				}
 				err := json.NewDecoder(w.Body).Decode(&resp)
 				assert.NoError(t, err)
@@ -661,4 +680,235 @@ func TestReserveListing_SavesCorrectData(t *testing.T) {
 	assert.Equal(t, 2026, repo.reserved.StartDate.Year())
 	assert.Equal(t, 6, int(repo.reserved.StartDate.Month()))
 	assert.Equal(t, 10, repo.reserved.StartDate.Day())
+}
+
+// ---- POST /api/transactions/:id/generate-delivery-code ----
+
+func TestGenerateDeliveryCode_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1", Status: "agreed"}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/generate-delivery-code", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestGenerateDeliveryCode_ForbidsNonBorrower(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1", Status: "agreed"}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/generate-delivery-code", nil)
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestGenerateDeliveryCode_ReturnsBorrowerCode(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1", Status: "agreed"}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/generate-delivery-code", nil)
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Data struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	assert.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "123456", resp.Data.Code)
+}
+
+func TestGenerateDeliveryCode_TransactionNotFound_Returns404(t *testing.T) {
+	router := setupRouter(&fakeRepository{transactions: []transactions.Transaction{}})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/nonexistent/generate-delivery-code", nil)
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+// ---- POST /api/transactions/:id/generate-return-code ----
+
+func TestGenerateReturnCode_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1", Status: "handed_over"}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/generate-return-code", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestGenerateReturnCode_ForbidsNonBorrower(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1", Status: "handed_over"}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/generate-return-code", nil)
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestGenerateReturnCode_ReturnsBorrowerCode(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1", Status: "handed_over"}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/generate-return-code", nil)
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp struct {
+		Data struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	assert.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "123456", resp.Data.Code)
+}
+
+// ---- POST /api/transactions/:id/confirm-handover ----
+
+func TestConfirmHandover_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"code":"123456","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-handover", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestConfirmHandover_ForbidsNonOwner(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"code":"123456","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-handover", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestConfirmHandover_InvalidCode_Returns422(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions:         []transactions.Transaction{{ID: "tx-1", Status: "agreed"}},
+	})
+
+	body := `{"code":"wrong-code","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-handover", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+}
+
+func TestConfirmHandover_ValidCode_Returns200(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions:         []transactions.Transaction{{ID: "tx-1", Status: "agreed"}},
+	})
+
+	body := `{"code":"123456","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-handover", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// ---- POST /api/transactions/:id/confirm-return ----
+
+func TestConfirmReturn_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"code":"123456","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-return", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestConfirmReturn_ForbidsNonOwner(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+	})
+
+	body := `{"code":"123456","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-return", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestConfirmReturn_InvalidCode_Returns422(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions:         []transactions.Transaction{{ID: "tx-1", Status: "handed_over"}},
+	})
+
+	body := `{"code":"wrong-code","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-return", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+}
+
+func TestConfirmReturn_ValidCode_Returns200(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions:         []transactions.Transaction{{ID: "tx-1", Status: "handed_over"}},
+	})
+
+	body := `{"code":"123456","deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/confirm-return", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
 }

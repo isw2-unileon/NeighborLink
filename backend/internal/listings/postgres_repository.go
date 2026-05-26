@@ -217,3 +217,14 @@ func (r *postgresRepository) AddPhoto(ctx context.Context, id string, photoURL s
 	}
 	return &l, nil
 }
+
+func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE listings SET status = $1 WHERE id = $2`,
+		status, id,
+	)
+	if err != nil {
+		return fmt.Errorf("listings: update status failed: %w", err)
+	}
+	return nil
+}

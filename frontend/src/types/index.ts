@@ -24,16 +24,23 @@ export interface Listing {
     created_at: string;
 }
 
-export type TransactionStatus = 'pending' | 'active' | 'completed' | 'cancelled' | 'disputed';
+export type TransactionStatus = 'pending' | 'awaiting_payment' | 'agreed' | 'handed_over' | 'returned' | 'cancelled';
 
 export interface Transaction {
     id: string;
     listing_id: string;
     borrower_id: string;
     status: TransactionStatus;
+    stripe_payment_intent_id?: string;
+    payment_method_id?: string;
+    total_charged_cents: number;
+    start_date: string | null;
+    end_date: string | null;
     agreed_at: string | null;
     handover_at: string | null;
     return_at: string | null;
+    listing_title?: string;
+    listing_photo?: string;
 }
 
 export interface Message {
@@ -42,6 +49,7 @@ export interface Message {
     sender_id: string;
     content: string;
     created_at: string;
+    status?: string;
     listing_title?: string;
     listing_photo?: string;
 }

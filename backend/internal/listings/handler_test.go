@@ -57,6 +57,10 @@ func (f *fakeRepository) AddPhoto(ctx context.Context, id string, photoURL strin
 	return f.listing, f.photoErr
 }
 
+func (f *fakeRepository) UpdateStatus(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
 type fakeStorageService struct {
 	url string
 	err error
