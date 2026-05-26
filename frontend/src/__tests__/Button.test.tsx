@@ -43,11 +43,11 @@ describe('Button', () => {
 
     it('aplica clases de variante primary por defecto', () => {
         render(<Button>Primary</Button>)
-        expect((screen.getByRole('button') as HTMLButtonElement).className).toContain('bg-teal-700')
+        expect((screen.getByRole('button') as HTMLButtonElement).className).toContain('bg-[var(--accent)]')
     })
 
     it('aplica clases de variante ghost cuando se indica', () => {
         render(<Button variant="ghost">Ghost</Button>)
-        expect((screen.getByRole('button') as HTMLButtonElement).className).toContain('border-gray-300')
+        expect((screen.getByRole('button') as HTMLButtonElement).className).toContain('border-[var(--border)]')
     })
 })

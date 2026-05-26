@@ -10,10 +10,10 @@ export default function Button({
     disabled,
     ...props
 }: ButtonProps) {
-    const base = 'w-full rounded-md px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed';
+    const base = 'w-full rounded-full px-5 py-2.5 text-sm font-semibold tracking-wide transition focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
     const variants = {
-        primary: 'bg-teal-700 text-white hover:bg-teal-800',
-        ghost: 'border border-gray-300 text-gray-700 hover:bg-gray-50',
+        primary: 'bg-[var(--accent)] text-white shadow-sm hover:brightness-95',
+        ghost: 'border border-[var(--border)] bg-white text-[var(--text)] hover:bg-[var(--surface-strong)]',
     };
 
     return (

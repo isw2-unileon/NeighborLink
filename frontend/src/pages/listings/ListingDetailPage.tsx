@@ -30,7 +30,7 @@ function PhotoCarousel({ photos, alt }: { photos: string[]; alt: string }) {
             <img
                 src={photos[current]}
                 alt={`${alt} - foto ${current + 1}`}
-                className="w-full max-h-96 object-contain rounded-xl bg-gray-50"
+                className="w-full max-h-96 object-contain rounded-3xl bg-[var(--surface-strong)]"
             />
 
             {/* Flechas — solo si hay más de una foto */}
@@ -39,14 +39,14 @@ function PhotoCarousel({ photos, alt }: { photos: string[]; alt: string }) {
                     <button
                         onClick={prev}
                         aria-label="Foto anterior"
-                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow rounded-full w-9 h-9 flex items-center justify-center text-gray-700 transition"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow rounded-full w-9 h-9 flex items-center justify-center text-gray-700 transition"
                     >
                         ←
                     </button>
                     <button
                         onClick={next}
                         aria-label="Foto siguiente"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white shadow rounded-full w-9 h-9 flex items-center justify-center text-gray-700 transition"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow rounded-full w-9 h-9 flex items-center justify-center text-gray-700 transition"
                     >
                         →
                     </button>
@@ -58,7 +58,7 @@ function PhotoCarousel({ photos, alt }: { photos: string[]; alt: string }) {
                                 key={i}
                                 onClick={() => setCurrent(i)}
                                 aria-label={`Ir a foto ${i + 1}`}
-                                className={`w-2 h-2 rounded-full transition-colors ${i === current ? 'bg-blue-600' : 'bg-gray-300'
+                                className={`w-2 h-2 rounded-full transition-colors ${i === current ? 'bg-[var(--accent)]' : 'bg-gray-300'
                                     }`}
                             />
                         ))}
@@ -178,12 +178,12 @@ export default function ListingDetailPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto p-6">
+        <div className="max-w-3xl mx-auto px-4 py-8">
             {!editing ? (
                 <>
                     <button
                         onClick={() => navigate(-1)}
-                        className="mb-4 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 transition">
+                        className="mb-4 text-sm text-[var(--muted)] hover:text-[var(--text)] flex items-center gap-1 transition">
                         ← Volver
                     </button>
                     {/* Carrusel */}
@@ -192,73 +192,75 @@ export default function ListingDetailPage() {
                         alt={listing.title}
                     />
 
-                    <div className="flex justify-between items-start">
-                        <h1 className="text-3xl font-bold">{listing.title}</h1>
-                        <span className={`text-sm px-3 py-1 rounded-full font-medium ${listing.status === 'available'
-                            ? 'bg-green-100 text-green-700'
-                            : listing.status === 'borrowed'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}>
-                            {listing.status}
-                        </span>
-                    </div>
-
-                    {/* Botón reservar — visible si no eres el owner y el listing está available */}
-                    {!isOwner && listing.status === 'available' && (
-                        <button
-                            onClick={() => setShowReserve(true)}
-                            className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium"
-                        >
-                            Reservar
-                        </button>
-                    )}
-
-                    <p className="mt-3 text-gray-600 leading-relaxed">{listing.description}</p>
-                    <div className="mt-3 flex items-center gap-2">
-                        <span className="text-sm text-gray-500">Categoría:</span>
-                        <span className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-medium capitalize">
-                            {listing.category?.replace(/_/g, ' ') ?? 'Sin categoría'}
-                        </span>
-                    </div>
-                    <div className="mt-4 space-y-1">
-                        <p className="text-sm text-gray-600">Depósito: {listing.deposit_amount} €</p>
-                        <p className="text-sm text-gray-600">Tarifa de gestión: 2 €</p>
-                        <p className="text-xl font-semibold text-blue-600">
-                            Total: {listing.deposit_amount + 2} €
-                        </p>
-                    </div>
-
-                    {isOwner && (
-                        <div className="mt-6 flex gap-3">
-                            <button
-                                onClick={() => setEditing(true)}
-                                className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
-                            >
-                                Editar
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
-                            >
-                                Borrar
-                            </button>
-                            <label className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium cursor-pointer">
-                                {uploading ? 'Subiendo...' : 'Subir foto'}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handlePhotoUpload}
-                                    disabled={uploading}
-                                />
-                            </label>
+                    <div className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <h1 className="text-3xl font-semibold">{listing.title}</h1>
+                            <span className={`text-sm px-3 py-1 rounded-full font-medium ${listing.status === 'available'
+                                ? 'bg-green-100 text-green-700'
+                                : listing.status === 'borrowed'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                {listing.status}
+                            </span>
                         </div>
-                    )}
+
+                        {/* Botón reservar — visible si no eres el owner y el listing está available */}
+                        {!isOwner && listing.status === 'available' && (
+                            <button
+                                onClick={() => setShowReserve(true)}
+                                className="w-full rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                            >
+                                Reservar
+                            </button>
+                        )}
+
+                        <p className="text-[var(--muted)] leading-relaxed">{listing.description}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-[var(--muted)]">Categoría:</span>
+                            <span className="text-xs bg-[var(--surface-strong)] text-[var(--text)] px-3 py-1 rounded-full font-semibold capitalize">
+                                {listing.category?.replace(/_/g, ' ') ?? 'Sin categoría'}
+                            </span>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm text-[var(--muted)]">Depósito: {listing.deposit_amount} €</p>
+                            <p className="text-sm text-[var(--muted)]">Tarifa de gestión: 2 €</p>
+                            <p className="text-xl font-semibold text-[var(--accent-2)]">
+                                Total: {listing.deposit_amount + 2} €
+                            </p>
+                        </div>
+
+                        {isOwner && (
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    onClick={() => setEditing(true)}
+                                    className="rounded-full bg-[var(--surface-strong)] px-4 py-2 text-sm font-semibold text-[var(--text)]"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    className="rounded-full bg-red-100 px-4 py-2 text-sm font-semibold text-red-700"
+                                >
+                                    Borrar
+                                </button>
+                                <label className="rounded-full bg-[var(--accent-3)]/10 px-4 py-2 text-sm font-semibold text-[var(--accent-3)] cursor-pointer">
+                                    {uploading ? 'Subiendo...' : 'Subir foto'}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handlePhotoUpload}
+                                        disabled={uploading}
+                                    />
+                                </label>
+                            </div>
+                        )}
+                    </div>
                 </>
             ) : (
-                <form onSubmit={handleUpdate} className="space-y-4">
-                    <h2 className="text-xl font-bold mb-4">Editar artículo</h2>
+                <form onSubmit={handleUpdate} className="space-y-4 rounded-3xl bg-white p-6 shadow-sm">
+                    <h2 className="text-xl font-semibold mb-2">Editar artículo</h2>
 
                     <label className="block">
                         <span className="text-sm font-medium text-gray-700">Título</span>
@@ -266,7 +268,7 @@ export default function ListingDetailPage() {
                             value={form.title}
                             onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                             required
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         />
                     </label>
 
@@ -277,7 +279,7 @@ export default function ListingDetailPage() {
                             onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                             required
                             rows={4}
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         />
                     </label>
                     <label className="block">
@@ -285,7 +287,7 @@ export default function ListingDetailPage() {
                         <select
                             value={form.status}
                             onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         >
                             <option value="available">Disponible</option>
                             <option value="borrowed">Prestado</option>
@@ -297,7 +299,7 @@ export default function ListingDetailPage() {
                         <select
                             value={form.category}
                             onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         >
                             <option value="herramientas">Herramientas</option>
                             <option value="material_deportivo">Material deportivo</option>
@@ -319,7 +321,7 @@ export default function ListingDetailPage() {
                             value={form.deposit_amount}
                             onChange={e => setForm(p => ({ ...p, deposit_amount: parseFloat(e.target.value) }))}
                             required
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         />
                     </label>
 
@@ -329,14 +331,14 @@ export default function ListingDetailPage() {
                         <button
                             type="submit"
                             disabled={saving}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                            className="rounded-full bg-[var(--accent-2)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
                         >
                             {saving ? 'Guardando...' : 'Guardar'}
                         </button>
                         <button
                             type="button"
                             onClick={() => setEditing(false)}
-                            className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
+                            className="rounded-full bg-[var(--surface-strong)] px-5 py-2 text-sm font-semibold text-[var(--text)]"
                         >
                             Cancelar
                         </button>
@@ -357,6 +359,6 @@ export default function ListingDetailPage() {
             )}
 
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-                    </div>
-                );
+        </div>
+    );
 }
