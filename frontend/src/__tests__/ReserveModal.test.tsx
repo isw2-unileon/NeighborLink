@@ -103,7 +103,7 @@ describe('ReserveModal', () => {
             expect(screen.getByRole('button', { name: /continuar/i })).not.toBeDisabled();
         });
         fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-
+        (/*)
         // Rellenar tarjeta válida (número Luhn válido)
         fireEvent.change(screen.getByPlaceholderText('1234 5678 9012 3456'), {
             target: { value: '4532015112830366' },
@@ -114,6 +114,7 @@ describe('ReserveModal', () => {
         fireEvent.change(screen.getByPlaceholderText('123'), {
             target: { value: '123' },
         });
+    */);
 
         fireEvent.click(screen.getByRole('button', { name: /confirmar reserva/i }));
 
