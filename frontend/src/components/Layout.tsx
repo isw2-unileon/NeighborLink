@@ -13,49 +13,54 @@ export default function Layout() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-                <Link to="/" className="text-xl font-bold text-teal-700">
-                    NeighborLink
-                </Link>
-                <div className="flex items-center gap-4">
-                    {user ? (
-                        <>
-                            <Link to="/listings" className="text-sm text-gray-600 hover:text-teal-700">
-                                Explorar
-                            </Link>
-                            <Link to="/chats" className="text-sm text-gray-600 hover:text-teal-700">
-                                Chats
-                            </Link>
-                            <Link to="/profile" className="text-sm text-gray-600 hover:text-teal-700">
-                                {user.name}
-                            </Link>
-                            <button
-                                onClick={handleLogout}
-                                className="text-sm text-red-500 hover:text-red-700"
-                            >
-                                Salir
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <Link to="/login" className="text-sm text-gray-600 hover:text-teal-700">
-                                Entrar
-                            </Link>
-                            <Link
-                                to="/register"
-                                className="text-sm bg-teal-700 text-white px-3 py-1 rounded hover:bg-teal-800"
-                            >
-                                Registrarse
-                            </Link>
-                        </>
-                    )}
+        <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+            <nav className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
+                <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+                    <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-white">N</span>
+                        <span className="font-editorial text-xl">NeighborLink</span>
+                    </Link>
+                    <div className="flex items-center gap-4">
+                        {user ? (
+                            <>
+                                <Link to="/listings" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    Explorar
+                                </Link>
+                                <Link to="/chats" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    Chats
+                                </Link>
+                                <Link to="/profile" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    {user.name}
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="text-sm text-[#b9382e] hover:text-[#8f2a23]"
+                                >
+                                    Salir
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/login" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    Entrar
+                                </Link>
+                                <Link
+                                    to="/register"
+                                    className="text-sm rounded-full bg-[var(--accent)] px-4 py-2 font-medium text-white shadow-sm hover:brightness-95"
+                                >
+                                    Registrarse
+                                </Link>
+                            </>
+                        )}
+                    </div>
                 </div>
             </nav>
 
             {/* Outlet renderiza la página hija activa */}
-            <main className="min-h-screen pl-4">
-                <Outlet />
+            <main className="min-h-screen px-4 py-6">
+                <div className="mx-auto w-full max-w-6xl">
+                    <Outlet />
+                </div>
             </main>
         </div>
     );

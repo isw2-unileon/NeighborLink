@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
+import drillThumb from '../assets/taladro-percutor-1200w-aicer.jpg';
 
 // Hook sencillo para animar elementos al entrar en el viewport
 function useScrollReveal() {
@@ -36,50 +37,79 @@ function RevealSection({ children, className = '' }: { children: React.ReactNode
 
 export default function HomePage() {
     return (
-        <div className="flex flex-col">
-
+        <div className="flex flex-col gap-20 pb-10">
             {/* HERO */}
-            <section className="flex flex-col items-center text-center py-24 px-4 gap-6">
-                <span className="text-xs font-semibold tracking-widest text-teal-700 uppercase bg-teal-50 px-3 py-1 rounded-full">
-                    Economía vecinal
-                </span>
-                <h1 className="text-5xl font-bold text-gray-900 max-w-2xl leading-tight">
-                    Lo que necesitas ya existe.{'  '}
-                    <span className="text-teal-700">A dos calles de ti.</span>
-                </h1>
-                <p className="text-lg text-gray-500 max-w-xl">
-                    Deja de comprar cosas que usarás dos veces. Pídelas prestadas a tus vecinos,
-                    o gana dinero con todo lo que tienes cogiendo polvo en el trastero.
-                </p>
-                <div className="flex gap-4 mt-4">
-                    <Link
-                        to="/register"
-                        className="bg-teal-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-teal-800 transition-colors shadow-sm"
-                    >
-                        Empieza gratis
-                    </Link>
-                    <Link
-                        to="/login"
-                        className="border border-gray-300 text-gray-700 px-8 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-                    >
-                        Iniciar sesión
-                    </Link>
+            <section className="section-wrap overflow-hidden rounded-[32px] px-6 py-20 md:px-12">
+                <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+                    <div className="flex flex-col gap-6">
+                        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--accent-3)]">
+                            Economía vecinal
+                        </span>
+                        <h1 className="font-editorial text-5xl font-semibold leading-[1.05] md:text-6xl md:leading-[1.05] max-w-2xl">
+                            <span className="block">Lo que necesitas ya existe.</span>
+                            <span className="block text-[var(--accent)] mt-2">A dos calles de ti.</span>
+                        </h1>
+                        <p className="text-lg text-[var(--muted)] md:text-xl">
+                            Deja de comprar cosas que usarás dos veces. Pídelas prestadas a tus vecinos,
+                            o gana dinero con todo lo que tienes cogiendo polvo en el trastero.
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                            <Link
+                                to="/register"
+                                className="rounded-full bg-[var(--accent)] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                            >
+                                Empieza gratis
+                            </Link>
+                            <Link
+                                to="/login"
+                                className="rounded-full border border-[var(--border)] bg-white px-8 py-3 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface-strong)]"
+                            >
+                                Iniciar sesión
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="glass-panel soft-shadow rounded-[28px] p-6">
+                        <div className="grid gap-4">
+                            <div className="rounded-2xl bg-[var(--surface-strong)] p-5">
+                                <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Cerca de ti</p>
+                                <p className="mt-2 font-editorial text-2xl">Comparte en tu barrio</p>
+                                <p className="mt-2 text-sm text-[var(--muted)]">
+                                    Encuentra objetos con confianza, con gente que vive a minutos.
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
+                                <div className="flex items-center justify-between text-sm text-[var(--muted)]">
+                                    <span>Hoy en tu zona</span>
+                                    <span className="font-semibold text-[var(--accent-2)]">12 nuevos objetos</span>
+                                </div>
+                                <div className="mt-4 flex items-center gap-3">
+                                    <img
+                                        src={drillThumb}
+                                        alt="Taladro Bosch"
+                                        className="h-12 w-12 rounded-xl border border-[var(--border)] object-cover"
+                                    />
+                                    <div>
+                                        <p className="text-sm font-semibold">Taladro Bosch</p>
+                                        <p className="text-xs text-[var(--muted)]">Disponible hoy</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-
-
             {/* POR QUÉ NOSOTROS */}
             <RevealSection>
-                <section className="py-20 px-4">
+                <section className="px-4">
                     <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold text-gray-900">¿Por qué NeighborLink?</h2>
-                        <p className="text-gray-500 mt-3 max-w-lg mx-auto">
+                        <h2 className="font-editorial text-4xl font-semibold">¿Por qué NeighborLink?</h2>
+                        <p className="text-[var(--muted)] mt-4 max-w-lg mx-auto">
                             Vivimos en una época de consumismo desenfrenado. Compramos cosas para usarlas
                             una vez y olvidarlas. Hay una forma mejor.
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                         {[
                             {
                                 emoji: '🌱',
@@ -99,11 +129,11 @@ export default function HomePage() {
                         ].map(({ emoji, title, desc }) => (
                             <div
                                 key={title}
-                                className="flex flex-col gap-3 p-6 bg-white rounded-xl border border-gray-100 shadow-sm"
+                                className="glass-panel rounded-3xl p-6 transition hover:-translate-y-1"
                             >
                                 <span className="text-3xl">{emoji}</span>
-                                <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-                                <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+                                <h3 className="mt-3 text-lg font-semibold text-[var(--text)]">{title}</h3>
+                                <p className="text-sm text-[var(--muted)] leading-relaxed mt-2">{desc}</p>
                             </div>
                         ))}
                     </div>
@@ -112,20 +142,20 @@ export default function HomePage() {
 
             {/* CÓMO FUNCIONA */}
             <RevealSection>
-                <section className="py-20 px-4 bg-gray-50 rounded-2xl">
+                <section className="section-wrap rounded-[32px] px-6 py-16">
                     <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold text-gray-900">Tan fácil como esto</h2>
+                        <h2 className="font-editorial text-4xl font-semibold">Tan fácil como esto</h2>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                         {[
                             { step: '01', title: 'Regístrate', desc: 'Crea tu cuenta en menos de un minuto con tu dirección y ya estás dentro.' },
                             { step: '02', title: 'Explora o publica', desc: 'Busca lo que necesitas cerca de ti o publica lo que tienes en casa sin usar.' },
                             { step: '03', title: 'Conéctate', desc: 'Habla con tu vecino, acordad los detalles y listo. Sin intermediarios.' },
                         ].map(({ step, title, desc }) => (
-                            <div key={step} className="flex flex-col gap-3 text-center">
-                                <span className="text-5xl font-bold text-teal-100 select-none">{step}</span>
-                                <h3 className="text-lg font-semibold text-gray-900 -mt-4">{title}</h3>
-                                <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+                            <div key={step} className="rounded-3xl bg-white px-6 py-8 text-center shadow-sm">
+                                <span className="text-5xl font-semibold text-[var(--accent-2)]">{step}</span>
+                                <h3 className="mt-3 text-lg font-semibold text-[var(--text)]">{title}</h3>
+                                <p className="text-sm text-[var(--muted)] leading-relaxed mt-2">{desc}</p>
                             </div>
                         ))}
                     </div>
@@ -134,23 +164,22 @@ export default function HomePage() {
 
             {/* CTA FINAL */}
             <RevealSection>
-                <section className="flex flex-col items-center text-center py-24 px-4 gap-6">
-                    <h2 className="text-3xl font-bold text-gray-900 max-w-lg">
+                <section className="flex flex-col items-center text-center gap-6 rounded-[32px] bg-white px-6 py-16 shadow-sm">
+                    <h2 className="font-editorial text-4xl font-semibold max-w-lg">
                         Tu trastero tiene más valor del que crees.
                     </h2>
-                    <p className="text-gray-500 max-w-md">
+                    <p className="text-[var(--muted)] max-w-md">
                         Únete a NeighborLink y empieza a compartir hoy. Es gratis, es local y
                         es exactamente lo que tu barrio necesita.
                     </p>
                     <Link
                         to="/register"
-                        className="bg-teal-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-teal-800 transition-colors shadow-sm"
+                        className="rounded-full bg-[var(--accent-2)] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:brightness-95"
                     >
                         Unirme ahora
                     </Link>
                 </section>
             </RevealSection>
-
         </div>
     );
 }

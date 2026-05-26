@@ -45,7 +45,7 @@ describe('LoginPage', () => {
             ok: true,
             json: async () => ({
                 token: 'jwt-token',
-                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '', address: ''},
+                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
             }),
         })
 
@@ -65,7 +65,7 @@ describe('LoginPage', () => {
             ok: true,
             json: async () => ({
                 token: 'jwt-token',
-                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '', address: ''},
+                user: { id: '1', email: 'a@a.com', name: 'Mario', avatar_url: '', reputation_score: 0, created_at: '', address: '' },
             }),
         })
 
@@ -99,7 +99,6 @@ describe('LoginPage', () => {
 
     it('el botón muestra "Cargando…" mientras la petición está en vuelo', async () => {
         const user = userEvent.setup()
-        // Promesa que nunca resuelve — simula petición lenta
         mockFetch.mockReturnValueOnce(new Promise(() => { }))
 
         renderLoginPage()
@@ -107,6 +106,8 @@ describe('LoginPage', () => {
         await user.type(screen.getByLabelText('Contraseña'), 'password123')
         await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
-        expect(screen.getByText('Cargando…')).toBeDefined()
+        await waitFor(() => {
+            expect(screen.getByText('Cargando…')).toBeDefined()
+        })
     })
 })

@@ -81,62 +81,62 @@ export default function CreateListingPage() {
     // --- RENDER PASO 1 ---
     if (step === 'info') {
         return (
-            <div className="max-w-lg mx-auto p-6">
+            <div className="max-w-2xl mx-auto px-4 py-8">
                 <button
                     onClick={() => navigate(-1)}
-                    className="text-sm text-gray-500 hover:text-gray-700 mb-6 flex items-center gap-1"
+                    className="text-sm text-[var(--muted)] hover:text-[var(--text)] mb-6 flex items-center gap-1"
                 >
                     ← Volver
                 </button>
 
                 {/* Indicador de progreso */}
                 <div className="flex items-center gap-2 mb-6">
-                    <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-medium">1</span>
-                    <span className="text-sm font-medium text-gray-700">Información básica</span>
-                    <span className="flex-1 h-px bg-gray-200 mx-2" />
-                    <span className="w-7 h-7 rounded-full bg-gray-200 text-gray-400 text-sm flex items-center justify-center font-medium">2</span>
-                    <span className="text-sm text-gray-400">Fotos</span>
+                    <span className="w-8 h-8 rounded-full bg-[var(--accent-2)] text-white text-sm flex items-center justify-center font-semibold">1</span>
+                    <span className="text-sm font-medium text-[var(--text)]">Información básica</span>
+                    <span className="flex-1 h-px bg-[var(--border)] mx-2" />
+                    <span className="w-8 h-8 rounded-full bg-[var(--surface-strong)] text-[var(--muted)] text-sm flex items-center justify-center font-semibold">2</span>
+                    <span className="text-sm text-[var(--muted)]">Fotos</span>
                 </div>
 
-                <h1 className="text-2xl font-bold mb-6">Publicar artículo</h1>
+                <h1 className="font-editorial text-3xl font-semibold mb-6">Publicar artículo</h1>
 
                 {error && (
-                    <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm">
+                    <p className="text-red-600 bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 text-sm">
                         {error}
                     </p>
                 )}
 
-                <form onSubmit={handleSubmitInfo} className="space-y-5">
+                <form onSubmit={handleSubmitInfo} className="space-y-5 rounded-3xl bg-white p-6 shadow-sm">
                     <label className="block">
-                        <span className="text-sm font-medium text-gray-700">Título *</span>
+                        <span className="text-sm font-medium text-[var(--muted)]">Título *</span>
                         <input
                             value={form.title}
                             onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                             placeholder="ej: Taladro Bosch"
                             required
                             maxLength={120}
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         />
                     </label>
 
                     <label className="block">
-                        <span className="text-sm font-medium text-gray-700">Descripción *</span>
+                        <span className="text-sm font-medium text-[var(--muted)]">Descripción *</span>
                         <textarea
                             value={form.description}
                             onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                             placeholder="Estado, accesorios incluidos, condiciones de préstamo..."
                             required
                             rows={4}
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         />
                     </label>
                     <label className="block">
-                        <span className="text-sm font-medium text-gray-700">Categoría *</span>
+                        <span className="text-sm font-medium text-[var(--muted)]">Categoría *</span>
                         <select
                             value={form.category}
                             onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
                             required
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
                             <option value="herramientas">Herramientas</option>
                             <option value="material_deportivo">Material deportivo</option>
                             <option value="material_educativo">Material educativo</option>
@@ -150,7 +150,7 @@ export default function CreateListingPage() {
                         </select>
                     </label>
                     <label className="block">
-                        <span className="text-sm font-medium text-gray-700">Depósito (€) *</span>
+                        <span className="text-sm font-medium text-[var(--muted)]">Depósito (€) *</span>
                         <input
                             type="number"
                             step="0.01"
@@ -159,14 +159,14 @@ export default function CreateListingPage() {
                             onChange={e => setForm(p => ({ ...p, deposit_amount: parseFloat(e.target.value) || 0 }))}
                             placeholder="ej: 50"
                             required
-                            className="mt-1 block w-full border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         />
                     </label>
 
                     <button
                         type="submit"
                         disabled={saving}
-                        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                        className="w-full rounded-full bg-[var(--accent-2)] py-2.5 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-50"
                     >
                         {saving ? 'Creando...' : 'Siguiente → Fotos'}
                     </button>
@@ -177,50 +177,50 @@ export default function CreateListingPage() {
 
     // --- RENDER PASO 2 ---
     return (
-        <div className="max-w-lg mx-auto p-6">
+        <div className="max-w-2xl mx-auto px-4 py-8">
             {/* Indicador de progreso */}
             <div className="flex items-center gap-2 mb-6">
-                <span className="w-7 h-7 rounded-full bg-green-500 text-white text-sm flex items-center justify-center font-medium">✓</span>
-                <span className="text-sm text-gray-400">Información básica</span>
-                <span className="flex-1 h-px bg-gray-200 mx-2" />
-                <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-medium">2</span>
-                <span className="text-sm font-medium text-gray-700">Fotos</span>
+                <span className="w-8 h-8 rounded-full bg-[var(--accent-2)] text-white text-sm flex items-center justify-center font-semibold">✓</span>
+                <span className="text-sm text-[var(--muted)]">Información básica</span>
+                <span className="flex-1 h-px bg-[var(--border)] mx-2" />
+                <span className="w-8 h-8 rounded-full bg-[var(--accent-2)] text-white text-sm flex items-center justify-center font-semibold">2</span>
+                <span className="text-sm font-medium text-[var(--text)]">Fotos</span>
             </div>
 
-            <h1 className="text-2xl font-bold mb-2">Añadir fotos</h1>
-            <p className="text-gray-500 text-sm mb-6">
+            <h1 className="font-editorial text-3xl font-semibold mb-2">Añadir fotos</h1>
+            <p className="text-[var(--muted)] text-sm mb-6">
                 Puedes subir varias fotos. Este paso es opcional — puedes saltarlo y añadirlas después.
             </p>
 
             {error && (
-                <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm">
+                <p className="text-red-600 bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 text-sm">
                     {error}
                 </p>
             )}
 
             {/* Fotos subidas */}
             {createdListing && createdListing.photos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="grid grid-cols-3 gap-3 mb-4">
                     {createdListing.photos.map((url, i) => (
                         <img
                             key={i}
                             src={url}
                             alt={`Foto ${i + 1}`}
-                            className="w-full h-24 object-cover rounded-lg border"
+                            className="w-full h-24 object-cover rounded-2xl border border-[var(--border)]"
                         />
                     ))}
                 </div>
             )}
 
             {/* Botón subir */}
-            <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors mb-6">
+            <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-[var(--border)] rounded-3xl cursor-pointer hover:border-[var(--accent-2)] hover:bg-[var(--surface-strong)] transition-colors mb-6">
                 <div className="text-center">
                     {uploading ? (
-                        <p className="text-sm text-gray-500">Subiendo...</p>
+                        <p className="text-sm text-[var(--muted)]">Subiendo...</p>
                     ) : (
                         <>
                             <p className="text-2xl mb-1">📷</p>
-                            <p className="text-sm text-gray-500">Haz clic para subir una foto</p>
+                            <p className="text-sm text-[var(--muted)]">Haz clic para subir una foto</p>
                         </>
                     )}
                 </div>
@@ -237,12 +237,12 @@ export default function CreateListingPage() {
                 <button
                     onClick={handleFinish}
                     disabled={!createdListing || createdListing.photos.length === 0}
-                    className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    className="w-full rounded-full bg-[var(--accent-2)] py-2.5 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Publicar artículo
                 </button>
                 {createdListing && createdListing.photos.length === 0 && (
-                    <p className="text-center text-sm text-gray-400 mt-2">
+                    <p className="text-center text-sm text-[var(--muted)] mt-2">
                         Sube al menos una foto para continuar
                     </p>
                 )}

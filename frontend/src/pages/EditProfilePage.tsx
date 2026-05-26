@@ -83,27 +83,27 @@ export default function EditProfilePage() {
     }
 
     return (
-        <div className="max-w-lg mx-auto p-6">
+        <div className="max-w-2xl mx-auto px-4 py-8">
             <div className="flex items-center gap-3 mb-6">
-                <button onClick={() => navigate('/profile')} className="text-sm text-gray-500 hover:text-gray-700">
+                <button onClick={() => navigate('/profile')} className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
                     ← Cancelar
                 </button>
-                <h1 className="text-xl font-bold text-gray-900">Editar perfil</h1>
+                <h1 className="font-editorial text-2xl font-semibold">Editar perfil</h1>
             </div>
 
             {error && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4">
                     {error}
                 </p>
             )}
 
-            <form onSubmit={handleSave} className="flex flex-col gap-4">
+            <form onSubmit={handleSave} className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm">
                 <Input label="Nombre" name="name" value={form.name}
                     onChange={handleChange} required maxLength={80} />
                 <Input label="Email" name="email" value={user.email} disabled />
 
                 <div className="flex flex-col gap-3">
-                    <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                    <p className="text-xs text-[var(--muted)] bg-[var(--surface-strong)] border border-[var(--border)] rounded-2xl px-4 py-3">
                         📍 No necesitamos tu dirección exacta. Con la calle y localidad es suficiente.
                     </p>
                     <Input label="Calle" name="street" value={form.street}
@@ -114,7 +114,7 @@ export default function EditProfilePage() {
                         onChange={handleChange} placeholder="Ej: León" error={fieldErrors.province} />
                 </div>
 
-                <div className="flex gap-3 mt-2">
+                <div className="flex flex-col gap-3 mt-2 sm:flex-row">
                     <Button type="button" onClick={() => navigate('/profile')}>Cancelar</Button>
                     <Button type="submit" loading={saving}>Guardar cambios</Button>
                 </div>

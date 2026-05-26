@@ -12,7 +12,7 @@ export default function Toast({ message, onClose }: Props) {
     }, [onClose]);
 
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg z-50 text-sm font-medium">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[var(--accent-2)] px-6 py-3 text-sm font-medium text-white shadow-lg">
             {message}
         </div>
     );

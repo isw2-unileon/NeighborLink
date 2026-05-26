@@ -122,19 +122,19 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
 
     return (
         <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
             onClick={e => e.target === e.currentTarget && onClose()}
         >
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="bg-white rounded-[28px] shadow-xl w-full max-w-md p-6">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">
+                    <h2 className="text-xl font-semibold">
                         {step === 'calendar' ? 'Elige las fechas' : 'Datos de pago'}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                 </div>
 
                 {error && (
-                    <p className="text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm">
+                    <p className="text-red-600 bg-red-50 border border-red-200 rounded-2xl p-3 mb-4 text-sm">
                         {error}
                     </p>
                 )}
@@ -150,9 +150,9 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                         />
 
                         {days > 0 && (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
+                            <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
                                 <div className="flex justify-between">
-                                    <span className="text-gray-600">{days} días × {depositAmount} €</span>
+                                    <span className="text-[var(--muted)]">{days} días × {depositAmount} €</span>
                                     <span className="font-semibold">{total} €</span>
                                 </div>
                             </div>
@@ -161,7 +161,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                         <button
                             onClick={() => setStep('payment')}
                             disabled={!range}
-                            className="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                            className="w-full mt-4 bg-[var(--accent)] text-white py-2.5 rounded-full hover:brightness-95 disabled:opacity-50 font-semibold"
                         >
                             Continuar
                         </button>
@@ -170,61 +170,61 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                     <>
                         <div className="space-y-4">
                             <label className="block">
-                                <span className="text-sm font-medium text-gray-700">Número de tarjeta</span>
+                                <span className="text-sm font-medium text-[var(--muted)]">Número de tarjeta</span>
                                 <input
                                     value={cardNumber}
                                     onChange={e => setCardNumber(formatCardNumber(e.target.value))}
                                     placeholder="1234 5678 9012 3456"
                                     maxLength={19}
-                                    className="mt-1 block w-full border rounded-lg p-2 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                                 />
                             </label>
 
                             <div className="flex gap-3">
                                 <label className="block flex-1">
-                                    <span className="text-sm font-medium text-gray-700">Caducidad</span>
+                                    <span className="text-sm font-medium text-[var(--muted)]">Caducidad</span>
                                     <input
                                         value={expiry}
                                         onChange={e => setExpiry(formatExpiry(e.target.value))}
                                         placeholder="MM/AA"
                                         maxLength={5}
-                                        className="mt-1 block w-full border rounded-lg p-2 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                                     />
                                 </label>
                                 <label className="block w-24">
-                                    <span className="text-sm font-medium text-gray-700">CVV</span>
+                                    <span className="text-sm font-medium text-[var(--muted)]">CVV</span>
                                     <input
                                         value={cvv}
                                         onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                                         placeholder="123"
                                         maxLength={4}
-                                        className="mt-1 block w-full border rounded-lg p-2 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                                     />
                                 </label>
                             </div>
 
                             {cardError && <p className="text-red-600 text-sm">{cardError}</p>}
 
-                            <div className="p-3 bg-blue-50 rounded-lg text-sm">
+                            <div className="p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
                                 <div className="flex justify-between font-semibold">
                                     <span>Total a pagar</span>
                                     <span>{total} €</span>
                                 </div>
-                                <p className="text-gray-500 text-xs mt-1">Pago simulado — no se realizará ningún cargo real</p>
+                                <p className="text-[var(--muted)] text-xs mt-1">Pago simulado — no se realizará ningún cargo real</p>
                             </div>
                         </div>
 
                         <div className="flex gap-3 mt-6">
                             <button
                                 onClick={() => setStep('calendar')}
-                                className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
+                                className="px-4 py-2 bg-[var(--surface-strong)] rounded-full font-semibold"
                             >
                                 Atrás
                             </button>
                             <button
                                 onClick={handleConfirm}
                                 disabled={submitting}
-                                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                                className="flex-1 bg-[var(--accent)] text-white py-2 rounded-full hover:brightness-95 disabled:opacity-50 font-semibold"
                             >
                                 {submitting ? 'Confirmando...' : 'Confirmar reserva'}
                             </button>
