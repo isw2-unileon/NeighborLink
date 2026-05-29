@@ -28,6 +28,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	auth := rg.Group("/", authMiddleware)
 	auth.POST("/transactions/:id/messages", h.createMessage)
 	auth.GET("/chats", h.listActiveChats)
+	auth.POST("/transactions/:id/decision", h.decideTransaction)
 }
 
 // listByTransaction returns all messages for a given transaction, ordered by time.
@@ -105,7 +106,7 @@ func (h *Handler) createMessage(c *gin.Context) {
 
 	// Only participants can send messages — prevent 3rd party writes.
 	uid := senderID.(string)
-	if uid != tx.BorrowerID && uid != tx.OwnerID {
+	if uid != tx.BorrowerID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "you are not a participant of this transaction"})
 		return
 	}
@@ -139,4 +140,78 @@ func (h *Handler) listActiveChats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": messages})
+}
+
+func (h *Handler) decideTransaction(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	transactionID := c.Param("id")
+
+	var body struct {
+		Decision string `json:"decision" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "decision is required"})
+		return
+	}
+
+	tx, err := h.txReader.FindByID(c.Request.Context(), transactionID)
+	if err != nil {
+		slog.Error("failed to find transaction", "transaction_id", transactionID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if tx == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+
+	uid := userID.(string)
+	_ = uid
+
+	if tx.Status != "pending" {
+		c.JSON(http.StatusConflict, gin.H{"error": "this transaction can no longer be decided"})
+		return
+	}
+
+	var nextStatus string
+	var systemMessage string
+
+	switch body.Decision {
+	case "accept":
+		nextStatus = "awaiting_payment"
+		systemMessage = "El prestador ha aceptado las condiciones propuestas, ahora mete los métodos de pago."
+	case "reject":
+		nextStatus = "cancelled"
+		systemMessage = "El prestador no ha aceptado las condiciones."
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "decision must be accept or reject"})
+		return
+	}
+
+	if err := h.txReader.UpdateStatus(c.Request.Context(), transactionID, nextStatus); err != nil {
+		slog.Error("failed to update transaction status", "transaction_id", transactionID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	_, err = h.repo.Create(c.Request.Context(), Message{
+		TransactionID: transactionID,
+		SenderID:      userID.(string),
+		Content:       systemMessage,
+	})
+	if err != nil {
+		slog.Error("failed to create system message", "transaction_id", transactionID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "decision saved",
+		"status":  nextStatus,
+	})
 }

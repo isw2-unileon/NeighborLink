@@ -32,8 +32,8 @@ type ReserveInput struct {
 
 // DateRange represents a blocked date range for availability checks.
 type DateRange struct {
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
+	StartDate *time.Time `json:"start_date"`
+	EndDate   *time.Time `json:"end_date"`
 }
 
 // BorrowerTransaction enriches a Transaction with listing display data

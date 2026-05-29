@@ -52,6 +52,8 @@ export interface Message {
     status?: string;
     listing_title?: string;
     listing_photo?: string;
+    borrower_id?: string;
+    owner_id?: string;
 }
 
 export interface Review {

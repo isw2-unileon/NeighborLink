@@ -69,6 +69,34 @@ func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transact
 	return &t, nil
 }
 
+func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status string) error {
+	var err error
+	switch status {
+	case "handed_over":
+		_, err = r.pool.Exec(ctx, `
+            UPDATE transactions
+            SET status = 'handed_over', handover_at = NOW()
+            WHERE id = $1
+        `, id)
+	case "returned":
+		_, err = r.pool.Exec(ctx, `
+            UPDATE transactions
+            SET status = 'returned', return_at = NOW()
+            WHERE id = $1
+        `, id)
+	default:
+		_, err = r.pool.Exec(ctx, `
+            UPDATE transactions
+            SET status = $1
+            WHERE id = $2
+        `, status, id)
+	}
+	if err != nil {
+		return fmt.Errorf("transactions: update status failed: %w", err)
+	}
+	return nil
+}
+
 // scanRows encapsulates the repetitive scan loop, following DRY.
 func (r *postgresRepository) scanRows(rows pgx.Rows) ([]Transaction, error) {
 	transactions := make([]Transaction, 0)
@@ -178,32 +206,6 @@ func (r *postgresRepository) FindListingOwnerByTransactionID(ctx context.Context
 		return "", fmt.Errorf("transactions: find listing owner failed: %w", err)
 	}
 	return ownerID, nil
-}
-
-func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status string) error {
-	var err error
-	switch status {
-	case "handed_over":
-		_, err = r.pool.Exec(ctx, `
-			UPDATE transactions
-			SET status = 'handed_over', handover_at = NOW()
-			WHERE id = $1
-		`, id)
-	case "returned":
-		_, err = r.pool.Exec(ctx, `
-			UPDATE transactions
-			SET status = 'returned', return_at = NOW()
-			WHERE id = $1
-		`, id)
-	default:
-		_, err = r.pool.Exec(ctx, `
-			UPDATE transactions SET status = $1 WHERE id = $2
-		`, status, id)
-	}
-	if err != nil {
-		return fmt.Errorf("transactions: update status failed: %w", err)
-	}
-	return nil
 }
 
 func (r *postgresRepository) Reserve(ctx context.Context, t Transaction) (*Transaction, error) {

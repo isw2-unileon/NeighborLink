@@ -344,9 +344,10 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 	for _, dr := range blocked {
-		bStart, _ := time.Parse("2006-01-02", dr.StartDate)
-		bEnd, _ := time.Parse("2006-01-02", dr.EndDate)
-		if startDate.Before(bEnd) && endDate.After(bStart) {
+		if dr.StartDate == nil || dr.EndDate == nil {
+			continue
+		}
+		if startDate.Before(*dr.EndDate) && endDate.After(*dr.StartDate) {
 			c.JSON(http.StatusConflict, gin.H{"error": "selected dates overlap with an existing reservation"})
 			return
 		}
