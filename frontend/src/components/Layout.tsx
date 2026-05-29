@@ -2,13 +2,33 @@ import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useRef, useState } from 'react';
 import notificacionIcon from '../assets/notificacion.jpg';
+import { notificationsApi } from '../lib/notifications';
+import type { Notification } from '../types';
+
+function formatNotificationText(notification: Notification): string {
+    switch (notification.type) {
+        case 'listing_created':
+            return `Se ha creado tu anuncio: ${String(notification.payload.listing_title ?? 'listing')}`;
+        case 'transaction_requested':
+            return `Tienes una nueva solicitud en ${String(notification.payload.listing_title ?? 'tu listing')}`;
+        case 'transaction_accepted':
+            return `Han aceptado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
+        case 'transaction_rejected':
+            return `Han rechazado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
+        case 'message_received':
+            return 'Tienes un nuevo mensaje';
+        default:
+            return 'Tienes una nueva notificación';
+    }
+}
 
 // Layout — componente estructural que envuelve todas las páginas
-// Patrón: Composite — el Layout compone Navbar + contenido dinámico (Outlet)
 export default function Layout() {
     const { user } = useAuth();
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-    const hasUnreadNotifications = false; // Cambia esto cuando tengas notificaciones nuevas/no vistas
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
     const notificationsRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -25,12 +45,92 @@ export default function Layout() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        if (!user) return;
+
+        async function loadNotifications() {
+            try {
+                setLoadingNotifications(true);
+                const [items, count] = await Promise.all([
+                    notificationsApi.list(20),
+                    notificationsApi.unreadCount(),
+                ]);
+                setNotifications(items);
+                setUnreadCount(count);
+            } catch (error) {
+                console.error('Error cargando notificaciones', error);
+            } finally {
+                setLoadingNotifications(false);
+            }
+        }
+
+        loadNotifications();
+    }, [user]);
+
+    const hasUnreadNotifications = unreadCount > 0;
+
+    async function loadNotifications() {
+        if (!user) return;
+
+        try {
+            setLoadingNotifications(true);
+            const [items, count] = await Promise.all([
+                notificationsApi.list(20),
+                notificationsApi.unreadCount(),
+            ]);
+            setNotifications(items);
+            setUnreadCount(count);
+        } catch (error) {
+            console.error('Error cargando notificaciones', error);
+        } finally {
+            setLoadingNotifications(false);
+        }
+    }
+
+    useEffect(() => {
+        loadNotifications();
+    }, [user]);
+
+    async function handleOpenNotifications() {
+        const nextOpen = !isNotificationsOpen;
+        setIsNotificationsOpen(nextOpen);
+
+        if (nextOpen) {
+            await loadNotifications();
+        }
+    }
+
+    async function handleMarkAsRead(id: string, alreadyRead: boolean) {
+        if (alreadyRead) return;
+
+        try {
+            await notificationsApi.markAsRead(id);
+            setNotifications((prev) =>
+                prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+            );
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+        } catch (error) {
+            console.error('Error marcando notificación como leída', error);
+        }
+    }
+
+    async function handleMarkAllAsRead() {
+        try {
+            await notificationsApi.markAllAsRead();
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+            setUnreadCount(0);
+        } catch (error) {
+            console.error('Error marcando todas como leídas', error);
+        }
+    }
+
     return (
         <div className="min-h-screen bg-gray-50">
             <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
                 <Link to="/" className="text-xl font-bold text-teal-700">
                     NeighborLink
                 </Link>
+
                 <div className="relative flex items-center gap-4" ref={notificationsRef}>
                     {user ? (
                         <>
@@ -40,17 +140,21 @@ export default function Layout() {
                             <Link to="/chats" className="text-sm text-gray-600 hover:text-teal-700">
                                 Chats
                             </Link>
+
                             <button
                                 type="button"
-                                onClick={() => setIsNotificationsOpen((prev) => !prev)}
+                                onClick={handleOpenNotifications}
                                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 aria-label="Ver notificaciones"
                             >
                                 <img src={notificacionIcon} alt="Notificaciones" className="h-5 w-5" />
                                 {hasUnreadNotifications && (
-                                    <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+                                    <span className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center ring-2 ring-white">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
                                 )}
                             </button>
+
                             <Link to="/profile" className="text-sm text-gray-600 hover:text-teal-700">
                                 {user.name}
                             </Link>
@@ -70,19 +174,62 @@ export default function Layout() {
                     )}
 
                     {user && isNotificationsOpen && (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-                            <div className="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">
-                                Notificaciones
+                        <div className="absolute right-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                                <div className="text-sm font-semibold text-gray-700">
+                                    Notificaciones
+                                </div>
+                                {notifications.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleMarkAllAsRead}
+                                        className="text-xs text-teal-600 hover:text-teal-700"
+                                    >
+                                        Marcar todas como leídas
+                                    </button>
+                                )}
                             </div>
-                            <div className="px-4 py-4 text-sm text-gray-500">
-                                No hay notificaciones nuevas.
+
+                            <div className="max-h-96 overflow-y-auto">
+                                {loadingNotifications ? (
+                                    <div className="px-4 py-4 text-sm text-gray-500">
+                                        Cargando notificaciones...
+                                    </div>
+                                ) : notifications.length === 0 ? (
+                                    <div className="px-4 py-4 text-sm text-gray-500">
+                                        No hay notificaciones nuevas.
+                                    </div>
+                                ) : (
+                                    <ul className="divide-y divide-gray-100">
+                                        {notifications.map((notification) => (
+                                            <li
+                                                key={notification.id}
+                                                className={notification.read ? 'bg-white' : 'bg-teal-50'}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleMarkAsRead(notification.id, notification.read)
+                                                    }
+                                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
+                                                >
+                                                    <p className="text-sm text-gray-800">
+                                                        {formatNotificationText(notification)}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-gray-400">
+                                                        {new Date(notification.created_at).toLocaleString('es-ES')}
+                                                    </p>
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                         </div>
                     )}
                 </div>
             </nav>
 
-            {/* Outlet renderiza la página hija activa */}
             <main className="min-h-screen pl-4">
                 <Outlet />
             </main>

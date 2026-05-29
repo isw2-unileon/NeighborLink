@@ -56,6 +56,15 @@ export interface Message {
     owner_id?: string;
 }
 
+export interface Notification {
+    id: string;
+    user_id: string;
+    type: string;
+    payload: Record<string, unknown>;
+    read: boolean;
+    created_at: string;
+}
+
 export interface Review {
     id: string;
     transaction_id: string;

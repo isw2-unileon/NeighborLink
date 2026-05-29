@@ -97,7 +97,7 @@ func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID
             JOIN transactions t ON t.id = m.transaction_id
             JOIN listings l     ON l.id = t.listing_id
             WHERE (t.borrower_id = $1 OR l.owner_id = $1)
-              AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over')
+              AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over', 'cancelled')
             ORDER BY m.transaction_id, m.created_at DESC
         ) AS with_messages
 
@@ -117,7 +117,7 @@ func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID
         FROM transactions t
         JOIN listings l ON l.id = t.listing_id
         WHERE (t.borrower_id = $1 OR l.owner_id = $1)
-          AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over')
+          AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over', 'cancelled')
           AND NOT EXISTS (
               SELECT 1 FROM messages m WHERE m.transaction_id = t.id
           )

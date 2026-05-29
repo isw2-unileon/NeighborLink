@@ -1,6 +1,7 @@
 package listings
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -8,15 +9,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler holds the HTTP handlers for the listings module.
-type Handler struct {
-	repo           Repository
-	storageService StorageService
+type NotificationCreator interface {
+	Create(ctx context.Context, userID, typ string, payload map[string]any) error
 }
 
-// NewHandler creates a new Handler injecting the Repository interface.
-func NewHandler(repo Repository, storageService StorageService) *Handler {
-	return &Handler{repo: repo, storageService: storageService}
+type Handler struct {
+	repo             Repository
+	storageSvc       StorageService
+	notificationsSvc NotificationCreator
+}
+
+func NewHandler(repo Repository, storageSvc StorageService, notificationsSvc NotificationCreator) *Handler {
+	return &Handler{
+		repo:             repo,
+		storageSvc:       storageSvc,
+		notificationsSvc: notificationsSvc,
+	}
 }
 
 // RegisterRoutes attaches the listings routes to a Gin router group.
@@ -117,6 +125,17 @@ func (h *Handler) createListing(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+
+	if h.notificationsSvc != nil {
+		err := h.notificationsSvc.Create(c.Request.Context(), ownerID.(string), "listing_created", map[string]any{
+			"listing_id":    listing.ID,
+			"listing_title": listing.Title,
+		})
+		if err != nil {
+			slog.Error("failed to create notification", "owner_id", ownerID, "listing_id", listing.ID, "error", err)
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"data": listing})
 }
 
@@ -221,7 +240,7 @@ func (h *Handler) uploadPhoto(c *gin.Context) {
 	slog.Info("photo received", "filename", header.Filename, "content-type", header.Header.Get("Content-Type"), "size", header.Size)
 	defer file.Close()
 
-	photoURL, err := h.storageService.UploadPhoto(id, header.Filename, file, header.Header.Get("Content-Type"))
+	photoURL, err := h.storageSvc.UploadPhoto(id, header.Filename, file, header.Header.Get("Content-Type"))
 	if err != nil {
 		slog.Error("failed to upload photo", "listing_id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upload photo"})
