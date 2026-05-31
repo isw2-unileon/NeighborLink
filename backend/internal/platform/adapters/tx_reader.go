@@ -26,10 +26,11 @@ func (a *TxReaderAdapter) FindByID(ctx context.Context, id string) (*messages.Tr
 	if tx == nil {
 		return nil, nil
 	}
-
+	OwnerID, _ := a.repo.FindListingOwnerByTransactionID(ctx, id)
 	return &messages.TransactionSummary{
 		ID:         tx.ID,
 		BorrowerID: tx.BorrowerID,
+		OwnerID:    OwnerID,
 		Status:     tx.Status,
 		ListingID:  tx.ListingID,
 	}, nil

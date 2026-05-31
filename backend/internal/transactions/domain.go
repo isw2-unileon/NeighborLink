@@ -1,7 +1,10 @@
 // Package transactions contains the domain logic for the transactions module.
 package transactions
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // PlatformFeeCents is the fixed management + insurance fee charged to the borrower on top of the deposit.
 const PlatformFeeCents int64 = 200
@@ -32,8 +35,24 @@ type ReserveInput struct {
 
 // DateRange represents a blocked date range for availability checks.
 type DateRange struct {
-	StartDate *time.Time `json:"start_date"`
-	EndDate   *time.Time `json:"end_date"`
+	StartDate *time.Time
+	EndDate   *time.Time
+}
+
+func (d DateRange) MarshalJSON() ([]byte, error) {
+	format := func(t *time.Time) string {
+		if t == nil {
+			return ""
+		}
+		return t.Format("2006-01-02")
+	}
+	return json.Marshal(struct {
+		StartDate string `json:"start_date"`
+		EndDate   string `json:"end_date"`
+	}{
+		StartDate: format(d.StartDate),
+		EndDate:   format(d.EndDate),
+	})
 }
 
 // BorrowerTransaction enriches a Transaction with listing display data

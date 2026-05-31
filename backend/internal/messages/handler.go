@@ -106,7 +106,7 @@ func (h *Handler) createMessage(c *gin.Context) {
 
 	// Only participants can send messages — prevent 3rd party writes.
 	uid := senderID.(string)
-	if uid != tx.BorrowerID {
+	if uid != tx.BorrowerID && uid != tx.OwnerID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "you are not a participant of this transaction"})
 		return
 	}
