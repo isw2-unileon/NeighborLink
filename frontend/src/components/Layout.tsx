@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useRef, useState } from 'react';
 import notificacionIcon from '../assets/notificacion.jpg';
@@ -24,12 +24,21 @@ function formatNotificationText(notification: Notification): string {
 
 // Layout — componente estructural que envuelve todas las páginas
 export default function Layout() {
-    const { user } = useAuth();
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
+
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const notificationsRef = useRef<HTMLDivElement>(null);
+
+    const hasUnreadNotifications = unreadCount > 0;
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login', { replace: true });
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -44,30 +53,6 @@ export default function Layout() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    useEffect(() => {
-        if (!user) return;
-
-        async function loadNotifications() {
-            try {
-                setLoadingNotifications(true);
-                const [items, count] = await Promise.all([
-                    notificationsApi.list(20),
-                    notificationsApi.unreadCount(),
-                ]);
-                setNotifications(items);
-                setUnreadCount(count);
-            } catch (error) {
-                console.error('Error cargando notificaciones', error);
-            } finally {
-                setLoadingNotifications(false);
-            }
-        }
-
-        loadNotifications();
-    }, [user]);
-
-    const hasUnreadNotifications = unreadCount > 0;
 
     async function loadNotifications() {
         if (!user) return;
@@ -88,6 +73,7 @@ export default function Layout() {
     }
 
     useEffect(() => {
+        if (!user) return;
         loadNotifications();
     }, [user]);
 
@@ -151,7 +137,7 @@ export default function Layout() {
                                 >
                                     <img src={notificacionIcon} alt="Notificaciones" className="h-5 w-5" />
                                     {hasUnreadNotifications && (
-                                        <span className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center ring-2 ring-white">
+                                        <span className="absolute top-2 right-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] text-white ring-2 ring-white">
                                             {unreadCount > 9 ? '9+' : unreadCount}
                                         </span>
                                     )}
@@ -160,7 +146,9 @@ export default function Layout() {
                                 <Link to="/profile" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
                                     {user.name}
                                 </Link>
+
                                 <button
+                                    type="button"
                                     onClick={handleLogout}
                                     className="text-sm text-[#b9382e] hover:text-[#8f2a23]"
                                 >
@@ -174,7 +162,7 @@ export default function Layout() {
                                 </Link>
                                 <Link
                                     to="/register"
-                                    className="text-sm rounded-full bg-[var(--accent)] px-4 py-2 font-medium text-white shadow-sm hover:brightness-95"
+                                    className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95"
                                 >
                                     Registrarse
                                 </Link>
@@ -219,7 +207,7 @@ export default function Layout() {
                                                         onClick={() =>
                                                             handleMarkAsRead(notification.id, notification.read)
                                                         }
-                                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
+                                                        className="w-full px-4 py-3 text-left transition hover:bg-gray-50"
                                                     >
                                                         <p className="text-sm text-gray-800">
                                                             {formatNotificationText(notification)}
@@ -239,7 +227,6 @@ export default function Layout() {
                 </div>
             </nav>
 
-            {/* Outlet renderiza la página hija activa */}
             <main className="min-h-screen px-4 py-6">
                 <div className="mx-auto w-full max-w-6xl">
                     <Outlet />

@@ -206,40 +206,19 @@ export default function ChatsPage() {
                 </div>
             )}
 
-            {!loading && !error && pending.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--muted)]">Pendientes</h2>
-                    {pending.map(msg => (
-                        <EmptyChatCard key={msg.transaction_id} message={msg} />
-                    ))}
+            {!loading && !error && chats.length === 0 && (
+                <div className="text-center py-16 text-[var(--muted)]">
+                    <p className="text-4xl mb-3">💬</p>
+                    <p className="text-sm">No tienes conversaciones activas.</p>
+                    <p className="text-xs mt-1">Los chats aparecen cuando haces o recibes una solicitud de préstamo.</p>
                 </div>
             )}
 
-            {!loading && !error && awaitingPayment.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-500">Pendiente de pago</h2>
-                    {awaitingPayment.map(msg => (
-                        <EmptyChatCard key={msg.transaction_id} message={msg} />
-                    ))}
-                </div>
-            )}
-
-            {!loading && !error && activeNoMsg.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--muted)]">Sin mensajes</h2>
-                    {activeNoMsg.map(msg => (
-                        <EmptyChatCard key={msg.transaction_id} message={msg} />
-                    ))}
-                </div>
-            )}
-
-            {!loading && !error && activeWithMsg.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--muted)]">Conversaciones</h2>
-                    {activeWithMsg.map(msg => (
-                        <ChatCard key={msg.id} message={msg} currentUserID={user.id} />
-                    ))}
-                </div>
+            {!loading && !error && chats.length > 0 && (
+                <ChatSection
+                    chats={activeTab === 'owner' ? ownerChats : borrowerChats}
+                    currentUserID={user.id}
+                />
             )}
         </div>
     );
