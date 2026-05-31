@@ -15,16 +15,22 @@ type pointsAdder interface {
 	AddPoints(ctx context.Context, userID string, points int) error
 }
 
+// notificationCreator is a narrow interface so transactions doesn't import notifications.
+type notificationCreator interface {
+	Create(ctx context.Context, userID, notifType string, payload map[string]any) error
+}
+
 // Handler holds the HTTP handlers for the transactions module.
 type Handler struct {
 	repo      Repository
 	service   *Service
 	walletSvc pointsAdder
+	notifSvc  notificationCreator
 }
 
 // NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
-func NewHandler(repo Repository, service *Service, walletSvc pointsAdder) *Handler {
-	return &Handler{repo: repo, service: service, walletSvc: walletSvc}
+func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator) *Handler {
+	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc}
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
@@ -325,7 +331,6 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	// Validar máximo 7 días
 	days := int(endDate.Sub(startDate).Hours() / 24)
 	if days < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
@@ -336,7 +341,6 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	// Validar que no hay solapamiento con reservas existentes
 	blocked, err := h.repo.FindBlockedDates(c.Request.Context(), listingID)
 	if err != nil {
 		slog.Error("failed to check availability", "listing_id", listingID, "error", err)
@@ -366,10 +370,23 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
+	// Notificar al owner del listing que alguien ha iniciado una reserva
+	if h.notifSvc != nil {
+		go func() {
+			ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
+			if notifErr != nil {
+				slog.Error("failed to fetch listing owner for notification", "listing_id", listingID, "error", notifErr)
+				return
+			}
+			_ = h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
+				"listing_title": listingTitle,
+				"borrower_id":   userID.(string),
+			})
+		}()
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
-
-// handler.go — reemplaza las dos funciones por esta:
 
 // generateCode handles code generation for both delivery and return codes.
 func (h *Handler) generateCode(c *gin.Context, codeType string) {

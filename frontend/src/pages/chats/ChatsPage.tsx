@@ -206,14 +206,6 @@ export default function ChatsPage() {
                 </div>
             )}
 
-            {!loading && !error && chats.length === 0 && (
-                <div className="text-center py-16 text-[var(--muted)]">
-                    <p className="text-4xl mb-3">💬</p>
-                    <p className="text-sm">No tienes conversaciones activas.</p>
-                    <p className="text-xs mt-1">Los chats aparecen cuando haces o recibes una solicitud de préstamo.</p>
-                </div>
-            )}
-
             {!loading && !error && chats.length > 0 && (
                 <ChatSection
                     chats={activeTab === 'owner' ? ownerChats : borrowerChats}

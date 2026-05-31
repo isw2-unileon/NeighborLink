@@ -19,8 +19,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	notifications := rg.Group("/", authMiddleware)
 	notifications.GET("/notifications", h.List)
 	notifications.GET("/notifications/unread-count", h.UnreadCount)
-	notifications.PATCH("/notifications/:id/read", h.MarkAsRead)
 	notifications.PATCH("/notifications/read-all", h.MarkAllAsRead)
+	notifications.PATCH("/notifications/:id/read", h.MarkAsRead)
 }
 
 func (h *Handler) List(c *gin.Context) {

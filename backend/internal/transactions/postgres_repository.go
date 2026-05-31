@@ -282,3 +282,15 @@ func (r *postgresRepository) ValidateCode(ctx context.Context, transactionID str
 	}
 	return stored == code, nil
 }
+
+func (r *postgresRepository) FindListingOwnerAndTitle(ctx context.Context, listingID string) (string, string, error) {
+	var ownerID, title string
+	err := r.pool.QueryRow(ctx,
+		`SELECT owner_id, title FROM listings WHERE id = $1`,
+		listingID,
+	).Scan(&ownerID, &title)
+	if err != nil {
+		return "", "", fmt.Errorf("transactions: find listing owner and title failed: %w", err)
+	}
+	return ownerID, title, nil
+}

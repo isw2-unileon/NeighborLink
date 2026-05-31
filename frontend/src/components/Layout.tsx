@@ -15,6 +15,8 @@ function formatNotificationText(notification: Notification): string {
             return `Han aceptado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
         case 'transaction_rejected':
             return `Han rechazado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
+        case 'chat_opened':
+            return `Se ha abierto un chat para reservar tu objeto: ${String(notification.payload.listing_title ?? 'tu listing')}`;
         case 'message_received':
             return 'Tienes un nuevo mensaje';
         default:
@@ -53,6 +55,24 @@ export default function Layout() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(async () => {
+            try {
+                const count = await notificationsApi.unreadCount();
+                setUnreadCount(count);
+            } catch {
+                // silencioso
+            }
+        }, 30_000);
+        return () => clearInterval(interval);
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        loadNotifications();
+    }, [user]);
 
     async function loadNotifications() {
         if (!user) return;
