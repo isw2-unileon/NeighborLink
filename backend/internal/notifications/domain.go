@@ -2,6 +2,7 @@ package notifications
 
 import "time"
 
+// Notification represents a user notification. This is pure business data with zero external dependencies.
 type Notification struct {
 	ID        string         `json:"id" db:"id"`
 	UserID    string         `json:"user_id" db:"user_id"`

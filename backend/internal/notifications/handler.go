@@ -7,14 +7,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Handler defines the HTTP handlers for notifications-related endpoints.
 type Handler struct {
 	repo Repository
 }
 
+// NewHandler creates a new Handler with the given Repository dependency.
 func NewHandler(repo Repository) *Handler {
 	return &Handler{repo: repo}
 }
 
+// RegisterRoutes attaches the notifications routes to a Gin router group.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	notifications := rg.Group("/", authMiddleware)
 	notifications.GET("/notifications", h.List)
@@ -23,6 +26,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	notifications.PATCH("/notifications/:id/read", h.MarkAsRead)
 }
 
+// List returns a list of notifications for the authenticated user, ordered by time.
 func (h *Handler) List(c *gin.Context) {
 	userID, ok := c.Get("userID")
 	if !ok {
@@ -46,6 +50,7 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": items})
 }
 
+// UnreadCount returns the number of unread notifications for the authenticated user.
 func (h *Handler) UnreadCount(c *gin.Context) {
 	userID, ok := c.Get("userID")
 	if !ok {
@@ -62,6 +67,7 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"count": count}})
 }
 
+// MarkAsRead marks a single notification as read for the authenticated user.
 func (h *Handler) MarkAsRead(c *gin.Context) {
 	userID, ok := c.Get("userID")
 	if !ok {
@@ -77,6 +83,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "notification marked as read"})
 }
 
+// MarkAllAsRead marks all notifications as read for the authenticated user.
 func (h *Handler) MarkAllAsRead(c *gin.Context) {
 	userID, ok := c.Get("userID")
 	if !ok {

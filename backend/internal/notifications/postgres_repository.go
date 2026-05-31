@@ -8,14 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// PostgresRepository implements the Repository interface using PostgreSQL as the data store.
 type PostgresRepository struct {
 	db *pgxpool.Pool
 }
 
+// NewRepository creates a new instance of PostgresRepository with the given database connection pool.
 func NewRepository(db *pgxpool.Pool) Repository {
 	return &PostgresRepository{db: db}
 }
 
+// Create inserts a new notification into the database and returns the created notification with its generated ID and timestamp.
 func (r *PostgresRepository) Create(ctx context.Context, n Notification) (*Notification, error) {
 	query := `
 		INSERT INTO notifications (user_id, type, payload, read)
@@ -33,6 +36,7 @@ func (r *PostgresRepository) Create(ctx context.Context, n Notification) (*Notif
 	return &created, nil
 }
 
+// ListByUser retrieves a list of notifications for a specific user, ordered by creation time in descending order.
 func (r *PostgresRepository) ListByUser(ctx context.Context, userID string, limit int) ([]Notification, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -67,6 +71,7 @@ func (r *PostgresRepository) ListByUser(ctx context.Context, userID string, limi
 	return items, nil
 }
 
+// CountUnreadByUser returns the number of unread notifications for a specific user.
 func (r *PostgresRepository) CountUnreadByUser(ctx context.Context, userID string) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx, `
@@ -81,6 +86,7 @@ func (r *PostgresRepository) CountUnreadByUser(ctx context.Context, userID strin
 	return count, nil
 }
 
+// MarkAsRead marks a single notification as read for a specific user. It returns an error if the notification does not exist or does not belong to the user.
 func (r *PostgresRepository) MarkAsRead(ctx context.Context, userID, notificationID string) error {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE notifications
@@ -98,6 +104,7 @@ func (r *PostgresRepository) MarkAsRead(ctx context.Context, userID, notificatio
 	return nil
 }
 
+// MarkAllAsRead marks all notifications as read for a specific user. It returns an error if the update operation fails.
 func (r *PostgresRepository) MarkAllAsRead(ctx context.Context, userID string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE notifications

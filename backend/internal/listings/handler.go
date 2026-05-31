@@ -9,16 +9,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// NotificationCreator defines the interface for creating notifications from the listings module.
 type NotificationCreator interface {
 	Create(ctx context.Context, userID, typ string, payload map[string]any) error
 }
 
+// Handler defines the HTTP handlers for listings-related endpoints.
 type Handler struct {
 	repo             Repository
 	storageSvc       StorageService
 	notificationsSvc NotificationCreator
 }
 
+// NewHandler creates a new Handler with the given dependencies.
 func NewHandler(repo Repository, storageSvc StorageService, notificationsSvc NotificationCreator) *Handler {
 	return &Handler{
 		repo:             repo,

@@ -320,27 +320,13 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	startDate, err := time.Parse("2006-01-02", input.StartDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_date format, use YYYY-MM-DD"})
-		return
-	}
-	endDate, err := time.Parse("2006-01-02", input.EndDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_date format, use YYYY-MM-DD"})
+	// ✅ Llamada al helper — sustituye TODO el bloque de parseo/validación
+	startDate, endDate, ok := h.validateReserveDates(c, input)
+	if !ok {
 		return
 	}
 
-	days := int(endDate.Sub(startDate).Hours() / 24)
-	if days < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
-		return
-	}
-	if days > 7 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "maximum loan period is 7 days"})
-		return
-	}
-
+	// ✅ A partir de aquí ya NO hay más código de fechas — solo la comprobación de solapamiento
 	blocked, err := h.repo.FindBlockedDates(c.Request.Context(), listingID)
 	if err != nil {
 		slog.Error("failed to check availability", "listing_id", listingID, "error", err)
@@ -370,7 +356,6 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	// Notificar al owner del listing que alguien ha iniciado una reserva
 	if h.notifSvc != nil {
 		go func() {
 			ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
@@ -386,6 +371,30 @@ func (h *Handler) reserveListing(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": t})
+}
+
+func (h *Handler) validateReserveDates(c *gin.Context, input ReserveInput) (start, end time.Time, ok bool) {
+	var err error
+	start, err = time.Parse("2006-01-02", input.StartDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_date format, use YYYY-MM-DD"})
+		return
+	}
+	end, err = time.Parse("2006-01-02", input.EndDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_date format, use YYYY-MM-DD"})
+		return
+	}
+	days := int(end.Sub(start).Hours() / 24)
+	if days < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
+		return
+	}
+	if days > 7 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maximum loan period is 7 days"})
+		return
+	}
+	return start, end, true
 }
 
 // generateCode handles code generation for both delivery and return codes.
