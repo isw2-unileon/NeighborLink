@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DayPicker, DateRange as DayPickerRange } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { reservationsApi, DateRange } from '../lib/reservations';
+import PaymentForm, { type PaymentFormHandle } from './PaymentForm';
 
 interface Props {
     listingId: string;
     depositAmount: number;
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (transactionId: string) => void;
 }
 
 interface DefinedRange {
@@ -15,37 +16,13 @@ interface DefinedRange {
     to: Date;
 }
 
-function luhnCheck(num: string): boolean {
-    const digits = num.replace(/\s/g, '').split('').reverse().map(Number);
-    const sum = digits.reduce((acc, d, i) => {
-        if (i % 2 === 1) {
-            d *= 2;
-            if (d > 9) d -= 9;
-        }
-        return acc + d;
-    }, 0);
-    return sum % 10 === 0;
-}
-
-function formatCardNumber(value: string): string {
-    return value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
-}
-
-function formatExpiry(value: string): string {
-    const clean = value.replace(/\D/g, '').slice(0, 4);
-    return clean.length > 2 ? `${clean.slice(0, 2)}/${clean.slice(2)}` : clean;
-}
-
 export default function ReserveModal({ listingId, depositAmount, onClose, onSuccess }: Props) {
     const [step, setStep] = useState<'calendar' | 'payment'>('calendar');
-    const [range, setRange] = useState<DefinedRange | undefined>();  // ← tipo DefinedRange
+    const [range, setRange] = useState<DefinedRange | undefined>();
     const [blockedDates, setBlockedDates] = useState<DateRange[]>([]);
-    const [cardNumber, setCardNumber] = useState('');
-    const [expiry, setExpiry] = useState('');
-    const [cvv, setCvv] = useState('');
-    const [cardError, setCardError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const paymentFormRef = useRef<PaymentFormHandle>(null);
 
     useEffect(() => {
         reservationsApi.getAvailability(listingId).then(setBlockedDates).catch(console.error);
@@ -76,43 +53,23 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
             return;
         }
         setError(null);
-        setRange({ from: r.from, to: r.to });  // ← siempre Date, nunca undefined
-    }
-
-    function validateCard(): boolean {
-        const clean = cardNumber.replace(/\s/g, '');
-        if (!luhnCheck(clean)) {
-            setCardError('Número de tarjeta inválido');
-            return false;
-        }
-        const [month, year] = expiry.split('/').map(Number);
-        const now = new Date();
-        if (!month || !year || month < 1 || month > 12 ||
-            new Date(2000 + year, month - 1) < now) {
-            setCardError('Fecha de caducidad inválida');
-            return false;
-        }
-        if (cvv.length < 3) {
-            setCardError('CVV inválido');
-            return false;
-        }
-        setCardError(null);
-        return true;
+        setRange({ from: r.from, to: r.to });
     }
 
     async function handleConfirm() {
-        if (!validateCard() || !range) return;
+        if (!paymentFormRef.current || !range) return;
         const startDate = range.from.toISOString().split('T')[0] ?? '';
         const endDate = range.to.toISOString().split('T')[0] ?? '';
         setSubmitting(true);
         setError(null);
         try {
-            await reservationsApi.reserve(listingId, {
+            const pmId = await paymentFormRef.current.createPaymentMethod();
+            const result = await reservationsApi.reserve(listingId, {
                 start_date: startDate,
                 end_date: endDate,
-                payment_method_id: 'simulated',
+                payment_method_id: pmId,
             });
-            onSuccess();
+            onSuccess(result.id);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Error al reservar');
         } finally {
@@ -168,51 +125,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                     </>
                 ) : (
                     <>
-                        <div className="space-y-4">
-                            <label className="block">
-                                <span className="text-sm font-medium text-[var(--muted)]">Número de tarjeta</span>
-                                <input
-                                    value={cardNumber}
-                                    onChange={e => setCardNumber(formatCardNumber(e.target.value))}
-                                    placeholder="1234 5678 9012 3456"
-                                    maxLength={19}
-                                    className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                                />
-                            </label>
-
-                            <div className="flex gap-3">
-                                <label className="block flex-1">
-                                    <span className="text-sm font-medium text-[var(--muted)]">Caducidad</span>
-                                    <input
-                                        value={expiry}
-                                        onChange={e => setExpiry(formatExpiry(e.target.value))}
-                                        placeholder="MM/AA"
-                                        maxLength={5}
-                                        className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                                    />
-                                </label>
-                                <label className="block w-24">
-                                    <span className="text-sm font-medium text-[var(--muted)]">CVV</span>
-                                    <input
-                                        value={cvv}
-                                        onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                        placeholder="123"
-                                        maxLength={4}
-                                        className="mt-1 block w-full border border-[var(--border)] rounded-2xl p-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                                    />
-                                </label>
-                            </div>
-
-                            {cardError && <p className="text-red-600 text-sm">{cardError}</p>}
-
-                            <div className="p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
-                                <div className="flex justify-between font-semibold">
-                                    <span>Total a pagar</span>
-                                    <span>{total} €</span>
-                                </div>
-                                <p className="text-[var(--muted)] text-xs mt-1">Pago simulado — no se realizará ningún cargo real</p>
-                            </div>
-                        </div>
+                        <PaymentForm ref={paymentFormRef} totalEuros={total} />
 
                         <div className="flex gap-3 mt-6">
                             <button

@@ -1,10 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { listingsApi } from '../../lib/listings';
+import { transactionsApi } from '../../lib/transactions';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Listing } from '../../types';
+import type { Listing, Transaction } from '../../types';
 import ReserveModal from '../../components/ReserveModal';
 import Toast from '../../components/Toast';
+
+const STATUS_LABELS: Record<string, string> = {
+    pending: 'Pendiente de confirmación',
+    agreed: 'Pendiente de entrega',
+    handed_over: 'Pendiente de devolución',
+    returned: 'Completada',
+    cancelled: 'Cancelada',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-700',
+    agreed: 'bg-blue-100 text-blue-700',
+    handed_over: 'bg-purple-100 text-purple-700',
+    returned: 'bg-green-100 text-green-700',
+    cancelled: 'bg-red-100 text-red-700',
+};
 
 interface ListingInput {
     title: string;
@@ -92,6 +109,7 @@ export default function ListingDetailPage() {
 
     const [showReserve, setShowReserve] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
+    const [activeTransaction, setActiveTransaction] = useState<Transaction | null>(null);
 
     const isOwner = user?.id === listing?.owner_id;
 
@@ -213,6 +231,24 @@ export default function ListingDetailPage() {
                             >
                                 Reservar
                             </button>
+                        )}
+
+                        {!isOwner && activeTransaction && (
+                            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm">
+                                <p className="font-semibold text-[var(--text)]">Tu reserva</p>
+                                <p className="mt-1 text-[var(--muted)]">
+                                    Estado:{' '}
+                                    <span className={`rounded-full px-2 py-0.5 font-medium text-xs ${STATUS_COLORS[activeTransaction.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        {STATUS_LABELS[activeTransaction.status] ?? activeTransaction.status}
+                                    </span>
+                                </p>
+                                {activeTransaction.start_date && activeTransaction.end_date && (
+                                    <p className="mt-0.5 text-[var(--muted)]">
+                                        {new Date(activeTransaction.start_date).toLocaleDateString('es-ES')} –{' '}
+                                        {new Date(activeTransaction.end_date).toLocaleDateString('es-ES')}
+                                    </p>
+                                )}
+                            </div>
                         )}
 
                         <p className="text-[var(--muted)] leading-relaxed">{listing.description}</p>
@@ -351,9 +387,15 @@ export default function ListingDetailPage() {
                     listingId={listing.id}
                     depositAmount={listing.deposit_amount}
                     onClose={() => setShowReserve(false)}
-                    onSuccess={() => {
+                    onSuccess={async (transactionId: string) => {
                         setShowReserve(false);
                         setToast('¡Reserva confirmada! El propietario revisará tu solicitud.');
+                        try {
+                            const tx = await transactionsApi.getById(transactionId);
+                            setActiveTransaction(tx);
+                        } catch {
+                            // best-effort — status banner is optional
+                        }
                     }}
                 />
             )}
