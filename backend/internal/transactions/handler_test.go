@@ -439,6 +439,33 @@ func TestRejectTransaction_AllowsOwner(t *testing.T) {
 	assert.NotEqual(t, http.StatusForbidden, w.Code)
 }
 
+func TestPayTransaction_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestPayTransaction_ForbidsNonBorrower(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1"}},
+	})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
 func TestHandoverTransaction_RequiresAuth(t *testing.T) {
 	router := setupRouter(&fakeRepository{
 		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
