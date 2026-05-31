@@ -19,6 +19,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// mustDate parsea "YYYY-MM-DD" y devuelve *time.Time (panic si es inválido)
+func mustDate(s string) *time.Time {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		panic(err)
+	}
+	return &t
+}
+
 type noopPointsAdder struct{}
 
 func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
@@ -548,7 +557,7 @@ func TestReturnTransaction_AllowsOwner(t *testing.T) {
 func TestGetAvailability_ReturnsBlockedDates(t *testing.T) {
 	repo := &fakeRepository{
 		blockedDates: []transactions.DateRange{
-			{StartDate: "2026-06-01", EndDate: "2026-06-03"},
+			{StartDate: mustDate("2026-06-01"), EndDate: mustDate("2026-06-03")},
 		},
 	}
 	router := setupRouter(repo)
@@ -636,7 +645,7 @@ func TestReserveListing_EndBeforeStart_Returns400(t *testing.T) {
 func TestReserveListing_OverlapWithExisting_Returns409(t *testing.T) {
 	router := setupRouter(&fakeRepository{
 		blockedDates: []transactions.DateRange{
-			{StartDate: "2026-06-08", EndDate: "2026-06-12"},
+			{StartDate: mustDate("2026-06-08"), EndDate: mustDate("2026-06-12")},
 		},
 	})
 
