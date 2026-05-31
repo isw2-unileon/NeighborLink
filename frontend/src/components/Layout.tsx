@@ -125,113 +125,125 @@ export default function Layout() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-                <Link to="/" className="text-xl font-bold text-teal-700">
-                    NeighborLink
-                </Link>
+        <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+            <nav className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
+                <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+                    <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-white">N</span>
+                        <span className="font-editorial text-xl">NeighborLink</span>
+                    </Link>
 
-                <div className="relative flex items-center gap-4" ref={notificationsRef}>
-                    {user ? (
-                        <>
-                            <Link to="/listings" className="text-sm text-gray-600 hover:text-teal-700">
-                                Explorar
-                            </Link>
-                            <Link to="/chats" className="text-sm text-gray-600 hover:text-teal-700">
-                                Chats
-                            </Link>
+                    <div className="relative flex items-center gap-4" ref={notificationsRef}>
+                        {user ? (
+                            <>
+                                <Link to="/listings" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    Explorar
+                                </Link>
+                                <Link to="/chats" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    Chats
+                                </Link>
 
-                            <button
-                                type="button"
-                                onClick={handleOpenNotifications}
-                                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                aria-label="Ver notificaciones"
-                            >
-                                <img src={notificacionIcon} alt="Notificaciones" className="h-5 w-5" />
-                                {hasUnreadNotifications && (
-                                    <span className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center ring-2 ring-white">
-                                        {unreadCount > 9 ? '9+' : unreadCount}
-                                    </span>
-                                )}
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={handleOpenNotifications}
+                                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--muted)] hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                    aria-label="Ver notificaciones"
+                                >
+                                    <img src={notificacionIcon} alt="Notificaciones" className="h-5 w-5" />
+                                    {hasUnreadNotifications && (
+                                        <span className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center ring-2 ring-white">
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
 
-                            <Link to="/profile" className="text-sm text-gray-600 hover:text-teal-700">
-                                {user.name}
-                            </Link>
-                        </>
-                    ) : (
-                        <>
-                            <Link to="/login" className="text-sm text-gray-600 hover:text-teal-700">
-                                Entrar
-                            </Link>
-                            <Link
-                                to="/register"
-                                className="text-sm bg-teal-700 text-white px-3 py-1 rounded hover:bg-teal-800"
-                            >
-                                Registrarse
-                            </Link>
-                        </>
-                    )}
+                                <Link to="/profile" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    {user.name}
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="text-sm text-[#b9382e] hover:text-[#8f2a23]"
+                                >
+                                    Salir
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/login" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
+                                    Entrar
+                                </Link>
+                                <Link
+                                    to="/register"
+                                    className="text-sm rounded-full bg-[var(--accent)] px-4 py-2 font-medium text-white shadow-sm hover:brightness-95"
+                                >
+                                    Registrarse
+                                </Link>
+                            </>
+                        )}
 
-                    {user && isNotificationsOpen && (
-                        <div className="absolute right-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-                            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-                                <div className="text-sm font-semibold text-gray-700">
-                                    Notificaciones
+                        {user && isNotificationsOpen && (
+                            <div className="absolute right-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-lg">
+                                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                                    <div className="text-sm font-semibold text-gray-700">
+                                        Notificaciones
+                                    </div>
+                                    {notifications.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleMarkAllAsRead}
+                                            className="text-xs text-[var(--accent)] hover:brightness-75"
+                                        >
+                                            Marcar todas como leídas
+                                        </button>
+                                    )}
                                 </div>
-                                {notifications.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={handleMarkAllAsRead}
-                                        className="text-xs text-teal-600 hover:text-teal-700"
-                                    >
-                                        Marcar todas como leídas
-                                    </button>
-                                )}
-                            </div>
 
-                            <div className="max-h-96 overflow-y-auto">
-                                {loadingNotifications ? (
-                                    <div className="px-4 py-4 text-sm text-gray-500">
-                                        Cargando notificaciones...
-                                    </div>
-                                ) : notifications.length === 0 ? (
-                                    <div className="px-4 py-4 text-sm text-gray-500">
-                                        No hay notificaciones nuevas.
-                                    </div>
-                                ) : (
-                                    <ul className="divide-y divide-gray-100">
-                                        {notifications.map((notification) => (
-                                            <li
-                                                key={notification.id}
-                                                className={notification.read ? 'bg-white' : 'bg-teal-50'}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleMarkAsRead(notification.id, notification.read)
-                                                    }
-                                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
+                                <div className="max-h-96 overflow-y-auto">
+                                    {loadingNotifications ? (
+                                        <div className="px-4 py-4 text-sm text-gray-500">
+                                            Cargando notificaciones...
+                                        </div>
+                                    ) : notifications.length === 0 ? (
+                                        <div className="px-4 py-4 text-sm text-gray-500">
+                                            No hay notificaciones nuevas.
+                                        </div>
+                                    ) : (
+                                        <ul className="divide-y divide-gray-100">
+                                            {notifications.map((notification) => (
+                                                <li
+                                                    key={notification.id}
+                                                    className={notification.read ? 'bg-white' : 'bg-teal-50'}
                                                 >
-                                                    <p className="text-sm text-gray-800">
-                                                        {formatNotificationText(notification)}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-gray-400">
-                                                        {new Date(notification.created_at).toLocaleString('es-ES')}
-                                                    </p>
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleMarkAsRead(notification.id, notification.read)
+                                                        }
+                                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition"
+                                                    >
+                                                        <p className="text-sm text-gray-800">
+                                                            {formatNotificationText(notification)}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-400">
+                                                            {new Date(notification.created_at).toLocaleString('es-ES')}
+                                                        </p>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </nav>
 
-            <main className="min-h-screen pl-4">
-                <Outlet />
+            {/* Outlet renderiza la página hija activa */}
+            <main className="min-h-screen px-4 py-6">
+                <div className="mx-auto w-full max-w-6xl">
+                    <Outlet />
+                </div>
             </main>
         </div>
     );

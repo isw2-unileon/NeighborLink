@@ -24,11 +24,11 @@ function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
     return (
         <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${isMe
-                ? 'bg-teal-600 text-white rounded-br-sm'
-                : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
+                ? 'bg-[var(--accent-2)] text-white rounded-br-sm'
+                : 'bg-white border border-[var(--border)] text-gray-800 rounded-bl-sm'
                 }`}>
                 <p>{message.content}</p>
-                <p className={`text-xs mt-1 ${isMe ? 'text-teal-200' : 'text-gray-400'}`}>
+                <p className={`text-xs mt-1 ${isMe ? 'text-white/70' : 'text-[var(--muted)]'}`}>
                     {new Date(message.created_at).toLocaleTimeString('es-ES', {
                         hour: '2-digit', minute: '2-digit'
                     })}
@@ -219,23 +219,33 @@ export default function ChatDetailPage() {
                 />
             )}
 
-            <div className="max-w-2xl mx-auto flex flex-col fixed inset-x-0 bottom-0" style={{ top: '4rem' }}>
+            <div className="max-w-3xl mx-auto flex flex-col fixed inset-x-0 bottom-0" style={{ top: '4rem' }}>
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center gap-3">
-                    <button onClick={() => navigate('/chats')}
-                        className="text-sm text-gray-500 hover:text-gray-700 mr-1">
+                <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/chats')}
+                        className="text-sm text-[var(--muted)] hover:text-[var(--text)] mr-1"
+                    >
                         ←
                     </button>
-                    {listing?.photos?.[0]
-                        ? <img src={listing.photos[0]} alt={listing.title}
-                            className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
-                        : <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-xl flex-shrink-0">📦</div>
-                    }
-                    <div className="flex-1">
-                        <h1 className="text-base font-semibold text-gray-900">
+
+                    {listing?.photos?.[0] ? (
+                        <img
+                            src={listing.photos[0]}
+                            alt={listing.title}
+                            className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                        />
+                    ) : (
+                        <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-xl flex-shrink-0">
+                            📦
+                        </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-base font-semibold text-[var(--text)]">
                             {listing?.title ?? 'Chat'}
                         </h1>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-[var(--muted)]">
                             Transacción {transactionId?.slice(0, 8)}…
                         </p>
                     </div>
@@ -243,62 +253,68 @@ export default function ChatDetailPage() {
                     {isOwner && transactionStatus === 'pending' && (
                         <button
                             onClick={() => setShowEleccion(true)}
-                            className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition"
+                            className="flex-shrink-0 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:brightness-95 transition"
                         >
                             Elección
                         </button>
                     )}
 
                     {transactionStatus === 'awaiting_payment' && (
-                        <div className="flex-shrink-0 bg-green-100 text-green-700 text-xs font-bold px-3 py-2 rounded-lg border border-green-300">
+                        <div className="flex-shrink-0 rounded-full border border-green-300 bg-green-100 px-3 py-2 text-xs font-bold text-green-700">
                             ACEPTADO
                         </div>
                     )}
 
                     {transactionStatus === 'cancelled' && (
-                        <div className="flex-shrink-0 bg-red-100 text-red-700 text-xs font-bold px-3 py-2 rounded-lg border border-red-300">
+                        <div className="flex-shrink-0 rounded-full border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">
                             DENEGADO
                         </div>
                     )}
-
                 </div>
 
                 {/* Mensajes */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 bg-gray-50">
+                <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 bg-[var(--surface-strong)]">
                     {messages.length === 0 && (
-                        <p className="text-sm text-gray-400 text-center mt-8">
+                        <p className="text-sm text-[var(--muted)] text-center mt-8">
                             No hay mensajes aún. ¡Empieza la conversación!
                         </p>
                     )}
-                    {messages.map(msg => (
+
+                    {messages.map((msg) => (
                         <MessageBubble
                             key={msg.id}
                             message={msg}
                             isMe={msg.sender_id === user.id}
                         />
                     ))}
+
                     <div ref={bottomRef} />
                 </div>
 
                 {error && (
-                    <p className="text-xs text-red-500 text-center py-1 bg-red-50">{error}</p>
+                    <p className="bg-red-50 py-1 text-center text-xs text-red-500">
+                        {error}
+                    </p>
                 )}
 
                 {/* Input */}
-                <form onSubmit={handleSend}
-                    className="px-6 py-4 border-t border-gray-200 bg-white flex gap-3 items-center">
+                <form
+                    onSubmit={handleSend}
+                    className="px-6 py-4 border-t border-[var(--border)] bg-white flex gap-3 items-center"
+                >
                     <input
                         type="text"
                         value={content}
-                        onChange={e => setContent(e.target.value)}
+                        onChange={(e) => setContent(e.target.value)}
                         placeholder="Escribe un mensaje…"
-                        className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                        className="flex-1 rounded-2xl border border-[var(--border)] px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                         disabled={sending}
                     />
                     <button
                         type="submit"
                         disabled={sending || !content.trim()}
-                        className="bg-teal-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-700 transition disabled:opacity-50">
+                        className="rounded-full bg-[var(--accent-2)] px-5 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-50"
+                    >
                         {sending ? '…' : 'Enviar'}
                     </button>
                 </form>

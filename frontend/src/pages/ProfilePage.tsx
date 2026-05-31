@@ -72,17 +72,17 @@ function MyListings({ userID }: { userID: string }) {
     }, {});
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-6">
+        <div className="glass-panel rounded-3xl p-6 flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-gray-900">Mis objetos</h2>
+                <h2 className="text-base font-semibold text-[var(--text)]">Mis objetos</h2>
                 <Link to="/listings/new"
-                    className="text-sm font-medium text-teal-700 border border-teal-200 rounded-lg px-4 py-2 hover:bg-teal-50 transition">
+                    className="text-sm font-medium text-[var(--accent-2)] border border-[var(--accent-2)]/20 rounded-full px-4 py-2 hover:bg-[var(--surface-strong)] transition">
                     + Publicar objeto
                 </Link>
             </div>
 
             {loading && (
-                <p className="text-sm text-gray-400 text-center">Cargando tus objetos…</p>
+                <p className="text-sm text-[var(--muted)] text-center">Cargando tus objetos…</p>
             )}
             {error && (
                 <p className="text-sm text-red-500 text-center">{error}</p>
@@ -92,24 +92,24 @@ function MyListings({ userID }: { userID: string }) {
                 const items = grouped[status] ?? [];
                 return (
                     <div key={status} className="flex flex-col gap-2">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
                             {STATUS_LABELS[status]}
                         </h3>
                         {items.length === 0 ? (
-                            <p className="text-sm text-gray-400 py-2">{EMPTY_MESSAGES[status]}</p>
+                            <p className="text-sm text-[var(--muted)] py-2">{EMPTY_MESSAGES[status]}</p>
                         ) : (
                             items.map(listing => (
                                 <Link key={listing.id} to={getListingTo(listing)}
-                                    className="flex items-center gap-4 py-3 border-t border-gray-100 first:border-0 hover:bg-gray-50 rounded-lg px-2 transition">
-                                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                    className="flex items-center gap-4 rounded-2xl px-3 py-3 transition hover:bg-white/80">
+                                    <div className="w-14 h-14 rounded-xl bg-[var(--surface-strong)] flex-shrink-0 overflow-hidden">
                                         {listing.photos?.[0]
                                             ? <img src={listing.photos[0]} alt={listing.title} className="w-full h-full object-cover" />
                                             : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">📦</div>
                                         }
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{listing.title}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">Depósito: {listing.deposit_amount}€</p>
+                                        <p className="text-sm font-medium text-[var(--text)] truncate">{listing.title}</p>
+                                        <p className="text-xs text-[var(--muted)] mt-0.5">Depósito: {listing.deposit_amount}€</p>
                                     </div>
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[status]}`}>
                                         {STATUS_LABELS[status]}
@@ -160,24 +160,24 @@ function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void 
     const canRedeem = points >= 1000;
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-6">
+        <div className="glass-panel rounded-3xl p-6 flex flex-col gap-6">
             <div>
-                <h2 className="text-base font-semibold text-gray-900 mb-4">Mi cartera</h2>
-                <div className="flex items-center justify-between bg-teal-50 border border-teal-100 rounded-xl px-5 py-4">
+                <h2 className="text-base font-semibold text-[var(--text)] mb-4">Mi cartera</h2>
+                <div className="flex items-center justify-between bg-[var(--surface-strong)] border border-[var(--border)] rounded-2xl px-5 py-4">
                     <div>
-                        <p className="text-2xl font-bold text-teal-800">{displayPoints} puntos</p>
-                        <p className="text-sm text-teal-600 mt-0.5">{displayPoints} €</p>
+                        <p className="text-2xl font-bold text-[var(--accent-2)]">{displayPoints} puntos</p>
+                        <p className="text-sm text-[var(--muted)] mt-0.5">{displayPoints} €</p>
                     </div>
                     <button
                         onClick={handleRedeem}
                         disabled={!canRedeem || redeeming}
-                        className="text-sm font-medium px-4 py-2 rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed bg-teal-700 text-white border-teal-700 hover:bg-teal-800 disabled:bg-teal-700"
+                        className="text-sm font-semibold px-4 py-2 rounded-full border transition disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--accent-2)] text-white border-[var(--accent-2)] hover:brightness-95"
                     >
                         {redeeming ? 'Procesando…' : 'Canjear puntos'}
                     </button>
                 </div>
                 {!canRedeem && (
-                    <p className="text-xs text-gray-400 mt-2">
+                    <p className="text-xs text-[var(--muted)] mt-2">
                         Necesitas al menos 10,00 puntos para canjear.
                     </p>
                 )}
@@ -194,23 +194,23 @@ function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void 
             </div>
 
             <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)] mb-3">
                     Historial de préstamos completados
                 </h3>
-                {loading && <p className="text-sm text-gray-400">Cargando historial…</p>}
+                {loading && <p className="text-sm text-[var(--muted)]">Cargando historial…</p>}
                 {!loading && history.length === 0 && (
-                    <p className="text-sm text-gray-400 py-2">Aún no tienes préstamos completados.</p>
+                    <p className="text-sm text-[var(--muted)] py-2">Aún no tienes préstamos completados.</p>
                 )}
                 {!loading && history.map(entry => (
                     <div key={entry.transaction_id}
-                        className="flex items-center justify-between py-3 border-t border-gray-100 first:border-0">
+                        className="flex items-center justify-between py-3 border-t border-[var(--border)] first:border-0">
                         <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{entry.listing_title}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">
+                            <p className="text-sm font-medium text-[var(--text)] truncate">{entry.listing_title}</p>
+                            <p className="text-xs text-[var(--muted)] mt-0.5">
                                 {new Date(entry.completed_at).toLocaleDateString('es-ES')}
                             </p>
                         </div>
-                        <span className="text-sm font-semibold text-teal-700 ml-4 flex-shrink-0">
+                        <span className="text-sm font-semibold text-[var(--accent-2)] ml-4 flex-shrink-0">
                             +{(entry.points_earned / 100).toFixed(2)} pts
                         </span>
                     </div>
@@ -237,31 +237,31 @@ function MyReservations({ userID }: { userID: string }) {
     const past = transactions.filter(t => ['returned', 'rejected'].includes(t.status));
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-6">
-            <h2 className="text-base font-semibold text-gray-900">Mis reservas</h2>
+        <div className="glass-panel rounded-3xl p-6 flex flex-col gap-6">
+            <h2 className="text-base font-semibold text-[var(--text)]">Mis reservas</h2>
 
-            {loading && <p className="text-sm text-gray-400 text-center">Cargando reservas…</p>}
+            {loading && <p className="text-sm text-[var(--muted)] text-center">Cargando reservas…</p>}
             {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
             {!loading && !error && (
                 <>
                     <div className="flex flex-col gap-2">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Activas</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Activas</h3>
                         {active.length === 0
-                            ? <p className="text-sm text-gray-400 py-2">No tienes reservas activas.</p>
+                            ? <p className="text-sm text-[var(--muted)] py-2">No tienes reservas activas.</p>
                             : active.map(t => (
                                 <Link key={t.id}
                                     to={t.status === 'agreed' ? `/reservations/${t.id}/handover` : t.status === 'handed_over' ? `/reservations/${t.id}/return` : '#'}
-                                    className="flex items-center gap-4 py-3 border-t border-gray-100 first:border-0 hover:bg-gray-50 rounded-lg px-2 transition">
-                                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                    className="flex items-center gap-4 rounded-2xl px-3 py-3 transition hover:bg-white/80">
+                                    <div className="w-14 h-14 rounded-xl bg-[var(--surface-strong)] flex-shrink-0 overflow-hidden">
                                         {t.listing_photo
                                             ? <img src={t.listing_photo} alt={t.listing_title ?? ''} className="w-full h-full object-cover" />
                                             : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">📦</div>
                                         }
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{t.listing_title ?? t.listing_id}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">
+                                        <p className="text-sm font-medium text-[var(--text)] truncate">{t.listing_title ?? t.listing_id}</p>
+                                        <p className="text-xs text-[var(--muted)] mt-0.5">
                                             {t.start_date && t.end_date
                                                 ? `${new Date(t.start_date).toLocaleDateString('es-ES')} – ${new Date(t.end_date).toLocaleDateString('es-ES')}`
                                                 : 'Sin fechas'}
@@ -275,20 +275,20 @@ function MyReservations({ userID }: { userID: string }) {
                         }
                     </div>
                     <div className="flex flex-col gap-2">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Historial</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Historial</h3>
                         {past.length === 0
-                            ? <p className="text-sm text-gray-400 py-2">Aún no tienes reservas completadas.</p>
+                            ? <p className="text-sm text-[var(--muted)] py-2">Aún no tienes reservas completadas.</p>
                             : past.map(t => (
-                                <div key={t.id} className="flex items-center gap-4 py-3 border-t border-gray-100 first:border-0 px-2">
-                                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                <div key={t.id} className="flex items-center gap-4 rounded-2xl px-3 py-3">
+                                    <div className="w-14 h-14 rounded-xl bg-[var(--surface-strong)] flex-shrink-0 overflow-hidden">
                                         {t.listing_photo
                                             ? <img src={t.listing_photo} alt={t.listing_title ?? ''} className="w-full h-full object-cover" />
                                             : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">📦</div>
                                         }
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{t.listing_title ?? t.listing_id}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">
+                                        <p className="text-sm font-medium text-[var(--text)] truncate">{t.listing_title ?? t.listing_id}</p>
+                                        <p className="text-xs text-[var(--muted)] mt-0.5">
                                             {t.return_at ? new Date(t.return_at).toLocaleDateString('es-ES') : ''}
                                         </p>
                                     </div>
@@ -343,22 +343,22 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6">
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-                <div className="flex items-center gap-6">
+        <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col gap-6">
+            <div className="glass-panel rounded-3xl p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center">
                     {/* Avatar */}
                     <div className="relative flex-shrink-0">
                         {user.avatar_url ? (
                             <img src={user.avatar_url} alt={user.name}
-                                className="w-24 h-24 rounded-full object-cover border-2 border-gray-100" />
+                                className="w-24 h-24 rounded-full object-cover border-2 border-white" />
                         ) : (
-                            <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center text-3xl font-bold text-teal-700">
+                            <div className="w-24 h-24 rounded-full bg-[var(--surface-strong)] flex items-center justify-center text-3xl font-bold text-[var(--accent-2)]">
                                 {user.name.charAt(0).toUpperCase()}
                             </div>
                         )}
                         <button type="button" disabled={uploading}
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white border border-gray-200 shadow flex items-center justify-center text-gray-500 hover:text-teal-700 hover:border-teal-400 transition disabled:opacity-50"
+                            className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-white border border-[var(--border)] shadow flex items-center justify-center text-[var(--muted)] hover:text-[var(--accent-2)] transition disabled:opacity-50"
                             title="Cambiar foto">
                             {uploading ? '…' : '📷'}
                         </button>
@@ -368,22 +368,26 @@ export default function ProfilePage() {
 
                     {/* Datos */}
                     <div className="flex-1 min-w-0">
-                        <h1 className="text-2xl font-bold text-gray-900 truncate">{user.name}</h1>
-                        <p className="text-sm text-gray-500 mt-0.5">{user.email}</p>
+                        <h1 className="font-editorial text-3xl font-semibold truncate">{user.name}</h1>
+                        <p className="text-sm text-[var(--muted)] mt-0.5">{user.email}</p>
                         {user.address && (
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-sm text-[var(--muted)] mt-1">
                                 📍 {user.address.replace(', España', '')}
                             </p>
                         )}
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <button onClick={() => navigate('/profile/edit')}
-                            className="flex-shrink-0 text-sm font-medium text-teal-700 border border-teal-200 rounded-lg px-4 py-2 hover:bg-teal-50 transition">
+                        <button
+                            onClick={() => navigate('/profile/edit')}
+                            className="flex-shrink-0 rounded-full border border-[var(--accent-2)]/20 px-4 py-2 text-sm font-semibold text-[var(--accent-2)] transition hover:bg-[var(--surface-strong)]"
+                        >
                             Editar perfil
                         </button>
-                        <button onClick={handleLogout}
-                            className="flex-shrink-0 text-sm font-medium text-red-500 border border-red-200 rounded-lg px-4 py-2 hover:bg-red-50 transition">
+                        <button
+                            onClick={handleLogout}
+                            className="flex-shrink-0 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-500 transition hover:bg-red-50"
+                        >
                             Salir
                         </button>
                     </div>
@@ -401,14 +405,14 @@ export default function ProfilePage() {
                 )}
             </div>
 
-            <div className="flex border-b border-gray-200">
+            <div className="flex flex-wrap gap-2">
                 {(['listings', 'reservations', 'wallet'] as const).map(t => (
                     <button
                         key={t}
                         onClick={() => setTab(t)}
-                        className={`px-5 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${tab === t
-                                ? 'border-teal-700 text-teal-700'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${tab === t
+                            ? 'bg-[var(--accent-2)] text-white'
+                            : 'bg-white text-[var(--muted)] hover:text-[var(--text)]'
                             }`}
                     >
                         {t === 'listings' ? 'Mis Objetos' : t === 'reservations' ? 'Mis Reservas' : 'Cartera'}

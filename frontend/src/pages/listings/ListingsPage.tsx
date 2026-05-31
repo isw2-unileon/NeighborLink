@@ -4,7 +4,10 @@ import { listingsApi } from '../../lib/listings';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Listing } from '../../types';
 
-interface Coords { lat: number; lon: number; }
+interface Coords {
+    lat: number;
+    lon: number;
+}
 
 interface Filters {
     search: string;
@@ -49,12 +52,13 @@ export default function ListingsPage() {
     useEffect(() => {
         setLoading(true);
         setError(null);
+
         listingsApi.getAll({
             category: filters.category || undefined,
             deposit_min: filters.depositMin || undefined,
             deposit_max: filters.depositMax || undefined,
             status: filters.status || undefined,
-            //exclude_owner_id: user?.id || undefined, esto es para que no vea sus propios artículos en el apartado de listings
+            // exclude_owner_id: user?.id || undefined, esto es para que no vea sus propios artículos en el apartado de listings
             lat: coords ? String(coords.lat) : undefined,
             lon: coords ? String(coords.lon) : undefined,
         })
@@ -77,10 +81,12 @@ export default function ListingsPage() {
 
     const listings = useMemo(() => {
         if (!filters.search.trim()) return allListings;
+
         const q = filters.search.toLowerCase();
-        return allListings.filter(l =>
-            l.title.toLowerCase().includes(q) ||
-            l.description.toLowerCase().includes(q)
+        return allListings.filter(
+            l =>
+                l.title.toLowerCase().includes(q) ||
+                l.description.toLowerCase().includes(q)
         );
     }, [allListings, filters.search]);
 
@@ -88,9 +94,15 @@ export default function ListingsPage() {
         setFilters(prev => ({ ...prev, [key]: value }));
     }
 
+    function handleResetFilters() {
+        setFilters(INITIAL_FILTERS);
+        setDepositMinInput('');
+        setDepositMaxInput('');
+    }
+
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-64">
+            <div className="flex min-h-64 items-center justify-center">
                 <p className="text-gray-500">Cargando artículos...</p>
             </div>
         );
@@ -98,203 +110,198 @@ export default function ListingsPage() {
 
     if (error) {
         return (
-            <div className="p-6">
+            <div className="rounded-2xl bg-white px-6 py-6 shadow-sm">
                 <p className="text-red-600">Error: {error}</p>
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-screen w-full">
+        <div className="flex w-full flex-col gap-6 lg:flex-row">
+            <aside className="w-full shrink-0 lg:w-72">
+                <div className="glass-panel flex flex-col gap-4 rounded-3xl p-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                        Filtros
+                    </h2>
 
-            {/* ── Panel de filtros lateral ── */}
-            <aside className="w-52 shrink-0 flex flex-col gap-4 border-r border-gray-200 p-4 bg-white">
-                <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Filtros</h2>
-
-                {/* Búsqueda */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-600">Buscar</label>
-                    <input
-                        type="text"
-                        placeholder="Nombre del artículo..."
-                        value={filters.search}
-                        onChange={e => handleFilter('search', e.target.value)}
-                        className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    />
-                </div>
-
-                {/* Categoría */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-600">Categoría</label>
-                    <select
-                        value={filters.category}
-                        onChange={e => handleFilter('category', e.target.value)}
-                        className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                    >
-                        <option value="">Todas</option>
-                        <option value="herramientas">Herramientas</option>
-                        <option value="material_deportivo">Material deportivo</option>
-                        <option value="material_educativo">Material educativo</option>
-                        <option value="informatico">Informático</option>
-                        <option value="electrodomesticos">Electrodomésticos</option>
-                        <option value="jardineria">Jardinería</option>
-                        <option value="vehiculos">Vehículos</option>
-                        <option value="ocio_y_juegos">Ocio y juegos</option>
-                        <option value="ropa_y_accesorios">Ropa y accesorios</option>
-                        <option value="otros">Otros</option>
-                    </select>
-                </div>
-
-                {/* Rango de depósito */}
-                <div className="flex flex-col gap-3">
-                    <label className="text-sm font-medium text-gray-600">Depósito</label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs text-gray-500">Mín.</span>
-                            <input
-                                type="number"
-                                min={0}
-                                step={5}
-                                placeholder="Sin mínimo"
-                                value={depositMinInput}
-                                onChange={e => setDepositMinInput(e.target.value)}
-                                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs text-gray-500">Máx.</span>
-                            <input
-                                type="number"
-                                min={0}
-                                step={5}
-                                placeholder="Sin máximo"
-                                value={depositMaxInput}
-                                onChange={e => setDepositMaxInput(e.target.value)}
-                                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            />
-                        </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-[var(--muted)]">Buscar</label>
+                        <input
+                            type="text"
+                            placeholder="Nombre del artículo..."
+                            value={filters.search}
+                            onChange={e => handleFilter('search', e.target.value)}
+                            className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                        />
                     </div>
-                    <p className="text-sm text-gray-500">
-                        {depositMinInput || depositMaxInput
-                            ? `Depósito: ${depositMinInput || '0'} € - ${depositMaxInput || 'sin límite'} €`
-                            : 'Todos los listings'}
-                    </p>
-                </div>
 
-                {/* Estado */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-600">Estado</label>
-                    <select
-                        value={filters.status}
-                        onChange={e => handleFilter('status', e.target.value)}
-                        className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-[var(--muted)]">Categoría</label>
+                        <select
+                            value={filters.category}
+                            onChange={e => handleFilter('category', e.target.value)}
+                            className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm"
+                        >
+                            <option value="">Todas</option>
+                            <option value="herramientas">Herramientas</option>
+                            <option value="material_deportivo">Material deportivo</option>
+                            <option value="material_educativo">Material educativo</option>
+                            <option value="informatico">Informático</option>
+                            <option value="electrodomesticos">Electrodomésticos</option>
+                            <option value="jardineria">Jardinería</option>
+                            <option value="vehiculos">Vehículos</option>
+                            <option value="ocio_y_juegos">Ocio y juegos</option>
+                            <option value="ropa_y_accesorios">Ropa y accesorios</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <label className="text-sm font-medium text-[var(--muted)]">Depósito</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-[var(--muted)]">Mín.</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step={5}
+                                    placeholder="Sin mínimo"
+                                    value={depositMinInput}
+                                    onChange={e => setDepositMinInput(e.target.value)}
+                                    className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-[var(--muted)]">Máx.</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step={5}
+                                    placeholder="Sin máximo"
+                                    value={depositMaxInput}
+                                    onChange={e => setDepositMaxInput(e.target.value)}
+                                    className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                                />
+                            </div>
+                        </div>
+
+                        <p className="text-sm text-[var(--muted)]">
+                            {depositMinInput || depositMaxInput
+                                ? `Depósito: ${depositMinInput || '0'} € - ${depositMaxInput || 'sin límite'} €`
+                                : 'Todos los listings'}
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-[var(--muted)]">Estado</label>
+                        <select
+                            value={filters.status}
+                            onChange={e => handleFilter('status', e.target.value)}
+                            className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm"
+                        >
+                            <option value="">Todos</option>
+                            <option value="available">Disponible</option>
+                            <option value="borrowed">Prestado</option>
+                            <option value="inactive">Inactivo</option>
+                        </select>
+                    </div>
+
+                    {!coords && (
+                        <p className="text-xs italic text-[var(--muted)]">
+                            Activa la ubicación para filtrar por distancia.
+                        </p>
+                    )}
+
+                    <button
+                        onClick={handleResetFilters}
+                        className="text-left text-sm text-[var(--muted)] underline hover:text-[var(--text)]"
                     >
-                        <option value="">Todos</option>
-                        <option value="available">Disponible</option>
-                        <option value="borrowed">Prestado</option>
-                        <option value="inactive">Inactivo</option>
-                    </select>
+                        Limpiar filtros
+                    </button>
                 </div>
-
-                {!coords && (
-                    <p className="text-xs text-gray-400 italic">
-                        Activa la ubicación para filtrar por distancia.
-                    </p>
-                )}
-
-                <button
-                    onClick={() => {
-                        setFilters(INITIAL_FILTERS);
-                        setDepositMinInput('');
-                        setDepositMaxInput('');
-                    }}
-                    className="text-sm text-gray-500 hover:text-gray-700 underline text-left"
-                >
-                    Limpiar filtros
-                </button>
             </aside>
 
-            {/* ── Contenido principal ── */}
-            <div className="flex-1 px-6 py-6">
-                <div className="flex justify-between items-center mb-5">
-                    <h1 className="text-xl font-bold">
-                        Explorar artículos
-                        {listings.length > 0 && (
-                            <span className="ml-2 text-sm font-normal text-gray-400">
-                                ({listings.length} resultado{listings.length !== 1 ? 's' : ''})
-                            </span>
+            <div className="flex-1">
+                <div className="glass-panel rounded-3xl px-6 py-6">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <h1 className="text-2xl font-semibold">
+                            Explorar artículos
+                            {listings.length > 0 && (
+                                <span className="ml-2 text-sm font-normal text-[var(--muted)]">
+                                    ({listings.length} resultado{listings.length !== 1 ? 's' : ''})
+                                </span>
+                            )}
+                        </h1>
+
+                        {user && (
+                            <button
+                                onClick={() => navigate('/listings/new')}
+                                className="rounded-full bg-[var(--accent-2)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                            >
+                                + Publicar artículo
+                            </button>
                         )}
-                    </h1>
-                    {user && (
-                        <button
-                            onClick={() => navigate('/listings/new')}
-                            className="bg-teal-700 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-teal-800"
-                        >
-                            + Publicar artículo
-                        </button>
+                    </div>
+
+                    {listings.length === 0 ? (
+                        <div className="py-16 text-center">
+                            <p className="mb-3 text-4xl">🔍</p>
+                            <p className="text-[var(--muted)]">No hay artículos disponibles todavía.</p>
+                            <button
+                                onClick={handleResetFilters}
+                                className="mt-4 text-sm text-[var(--accent-2)] hover:underline"
+                            >
+                                Limpiar filtros
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                            {listings.map(listing => (
+                                <Link
+                                    key={listing.id}
+                                    to={`/listings/${listing.id}`}
+                                    className="group flex flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white transition hover:-translate-y-1 hover:shadow-lg"
+                                >
+                                    {listing.photos?.length > 0 ? (
+                                        <div className="aspect-square w-full overflow-hidden bg-[var(--surface-strong)]">
+                                            <img
+                                                src={listing.photos[0]}
+                                                alt={listing.title}
+                                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="flex aspect-square w-full items-center justify-center bg-[var(--surface-strong)]">
+                                            <span className="text-3xl">📦</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-1 flex-col gap-2 p-4">
+                                        <h2 className="text-base font-semibold leading-tight">{listing.title}</h2>
+                                        <p className="line-clamp-2 flex-1 text-xs text-[var(--muted)]">
+                                            {listing.description}
+                                        </p>
+                                        <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+                                            {listing.category?.replace(/_/g, ' ')}
+                                        </p>
+                                        <p className="text-sm font-semibold text-[var(--accent-2)]">
+                                            {listing.deposit_amount} € depósito
+                                        </p>
+                                        <span
+                                            className={`mt-1 w-fit rounded-full px-3 py-1 text-xs font-semibold ${listing.status === 'available'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-orange-100 text-orange-700'
+                                                }`}
+                                        >
+                                            {listing.status === 'available' ? 'Disponible' : 'No disponible'}
+                                        </span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
                     )}
                 </div>
-
-                {listings.length === 0 ? (
-                    <div className="text-center py-16">
-                        <p className="text-4xl mb-3">🔍</p>
-                        <p className="text-gray-500">No hay artículos disponibles todavía.</p>
-                        <button
-                            onClick={() => {
-                                setFilters(INITIAL_FILTERS);
-                                setDepositMinInput('');
-                                setDepositMaxInput('');
-                            }}
-                            className="mt-4 text-teal-700 hover:underline text-sm"
-                        >
-                            Limpiar filtros
-                        </button>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                        {listings.map(listing => (
-                            <Link
-                                key={listing.id}
-                                to={`/listings/${listing.id}`}
-                                className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white flex flex-col"
-                            >
-                                {/* Imagen cuadrada — más compacta que aspect-video */}
-                                {listing.photos?.length > 0 ? (
-                                    <div className="w-full aspect-square overflow-hidden bg-gray-100">
-                                        <img
-                                            src={listing.photos[0]}
-                                            alt={listing.title}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="w-full aspect-square bg-gray-100 flex items-center justify-center">
-                                        <span className="text-2xl">📦</span>
-                                    </div>
-                                )}
-
-                                <div className="p-2 flex flex-col flex-1">
-                                    <h2 className="font-semibold text-sm leading-tight">{listing.title}</h2>
-                                    <p className="text-gray-500 text-xs mt-1 line-clamp-2 flex-1">
-                                        {listing.description}
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-1 capitalize">
-                                        {listing.category?.replace(/_/g, ' ')}
-                                    </p>
-                                    <p className="text-teal-700 font-semibold text-sm mt-1">
-                                        {listing.deposit_amount} € depósito
-                                    </p>
-                                    <span className={`mt-1 self-start text-xs px-2 py-0.5 rounded-full font-medium ${listing.status === 'available'
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-orange-100 text-orange-700'
-                                        }`}>
-                                        {listing.status === 'available' ? 'Disponible' : 'No disponible'}
-                                    </span>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                )}
             </div>
         </div>
     );
