@@ -12,6 +12,7 @@ import (
 type fakeStripe struct {
 	capturedAmount int64
 	releasedAmount int64
+	captureCalled  bool
 }
 
 func (f *fakeStripe) AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error) {
@@ -19,7 +20,10 @@ func (f *fakeStripe) AuthorizeDeposit(amountCents int64, currency, paymentMethod
 	return "pi_fake", nil
 }
 
-func (f *fakeStripe) CaptureDeposit(_ string) error { return nil }
+func (f *fakeStripe) CaptureDeposit(_ string) error {
+	f.captureCalled = true
+	return nil
+}
 func (f *fakeStripe) ReleaseDeposit(_ string, amount int64) error {
 	f.releasedAmount = amount
 	return nil
@@ -28,6 +32,51 @@ func (f *fakeStripe) ReleaseDeposit(_ string, amount int64) error {
 type fakeListingSvc struct{}
 
 func (f *fakeListingSvc) UpdateStatus(_ context.Context, _ string, _ string) error { return nil }
+
+// --- Handover ---
+
+func TestHandover_CapturesDeposit(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "agreed", StripePaymentIntentID: "pi_real", ListingID: "lst-1"},
+		},
+	}
+	fs := &fakeStripe{}
+	svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+
+	err := svc.Handover(context.Background(), "tx-1")
+
+	assert.NoError(t, err)
+	assert.True(t, fs.captureCalled)
+	assert.Equal(t, "handed_over", repo.transactions[0].Status)
+}
+
+func TestHandover_FailsIfNotAgreed(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "returned"},
+		},
+	}
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+
+	err := svc.Handover(context.Background(), "tx-1")
+
+	assert.Error(t, err)
+}
+
+func TestHandover_SkipsStripeForDevPaymentIntent(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "agreed", StripePaymentIntentID: "", ListingID: "lst-1"},
+		},
+	}
+	svc := transactions.NewService(repo, nil, &fakeListingSvc{})
+
+	err := svc.Handover(context.Background(), "tx-1")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "handed_over", repo.transactions[0].Status)
+}
 
 // --- AcceptRequest ---
 
