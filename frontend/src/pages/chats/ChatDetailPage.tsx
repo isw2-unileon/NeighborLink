@@ -207,6 +207,7 @@ export default function ChatDetailPage() {
 
     if (!user) return null;
     const isOwner = listing?.owner_id === user.id;
+    const isBorrowerAwaitingPayment = !isOwner && transactionStatus === 'awaiting_payment';
 
     return (
         <>
@@ -217,6 +218,21 @@ export default function ChatDetailPage() {
                     onReject={() => handleDecision('reject')}
                     loading={decisionLoading}
                 />
+            )}
+
+            {/* Panel lateral izquierdo — solo para el borrower cuando awaiting_payment */}
+            {isBorrowerAwaitingPayment && (
+                <div
+                    className="fixed top-16 bottom-0 flex items-start justify-end pt-10 pr-4"
+                    style={{ left: 0, width: 'calc((100vw - 48rem) / 2)' }}
+                >
+                    <button
+                        onClick={() => navigate(`/transactions/${transactionId}/pay`)}
+                        className="w-40 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white shadow-md hover:brightness-95 transition text-center"
+                    >
+                        💳 Método de pago
+                    </button>
+                </div>
             )}
 
             <div className="max-w-3xl mx-auto flex flex-col fixed inset-x-0 bottom-0" style={{ top: '4rem' }}>
