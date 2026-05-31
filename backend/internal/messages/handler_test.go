@@ -17,8 +17,9 @@ import (
 // --- Fakes ---
 
 type fakeRepository struct {
-	messages []messages.Message
-	err      error
+	messages        []messages.Message
+	err             error
+	updateStatusErr error
 }
 
 func (f *fakeRepository) FindByTransaction(_ context.Context, transactionID string) ([]messages.Message, error) {
@@ -64,6 +65,10 @@ func (f *fakeRepository) FindActiveByParticipant(_ context.Context, _ string) ([
 type fakeTxReader struct {
 	summary *messages.TransactionSummary
 	err     error
+}
+R
+func (f *fakeTxReader) UpdateStatus(_ context.Context, _ string, _ string) error {
+	return f.updateStatusErr
 }
 
 func (f *fakeTxReader) FindByID(_ context.Context, _ string) (*messages.TransactionSummary, error) {

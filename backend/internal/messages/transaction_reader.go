@@ -5,6 +5,7 @@ import "context"
 type TransactionSummary struct {
 	ID         string
 	BorrowerID string
+	OwnerID    string
 	Status     string
 	ListingID  string
 }

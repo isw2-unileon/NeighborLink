@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ChatDetailPage from '../pages/chats/ChatDetailPage';
+import type { Listing } from '../types';
 import * as messagesLib from '../lib/messages';
 import * as listingsLib from '../lib/listings';
 import { api } from '../lib/api';
@@ -26,8 +27,13 @@ const mockListing = {
     id: 'listing-1',
     owner_id: OWNER_ID,
     title: 'Taladro Bosch',
+    description: 'Taladro profesional',
+    deposit_amount: 50,
+    status: 'available',
+    category: 'tools',
+    created_at: new Date().toISOString(),
     photos: [],
-};
+} as Listing;
 
 function renderPage() {
     return render(
