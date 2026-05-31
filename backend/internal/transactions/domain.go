@@ -39,6 +39,7 @@ type DateRange struct {
 	EndDate   *time.Time
 }
 
+// MarshalJSON implements custom JSON marshalling for DateRange to format dates as "YYYY-MM-DD" strings. Nil dates are marshalled as empty strings.
 func (d DateRange) MarshalJSON() ([]byte, error) {
 	format := func(t *time.Time) string {
 		if t == nil {
