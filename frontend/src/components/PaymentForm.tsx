@@ -11,6 +11,20 @@ import {
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '');
 
+const STRIPE_ERROR_MESSAGES: Record<string, string> = {
+    card_declined: 'Tu tarjeta fue rechazada. Por favor, usa otra tarjeta.',
+    do_not_honor: 'Tu tarjeta fue rechazada. Por favor, usa otra tarjeta.',
+    insufficient_funds: 'Fondos insuficientes en tu tarjeta.',
+    incorrect_cvc: 'El CVV de la tarjeta es incorrecto.',
+    expired_card: 'Tu tarjeta ha caducado.',
+    processing_error: 'Error al procesar el pago. Inténtalo de nuevo.',
+    card_velocity_exceeded: 'Has superado el límite de intentos. Espera un momento.',
+};
+
+function mapStripeError(err: { code?: string; message?: string }): string {
+    return (err.code && STRIPE_ERROR_MESSAGES[err.code]) ?? err.message ?? 'Error al procesar el pago.';
+}
+
 export interface PaymentFormHandle {
     createPaymentMethod(): Promise<string>;
 }
@@ -46,12 +60,17 @@ const PaymentFormInner = forwardRef<PaymentFormHandle, Props>(({ totalEuros }, r
             const cardElement = elements.getElement(CardNumberElement);
             if (!cardElement) throw new Error('Stripe no está disponible.');
 
-            const { error, paymentMethod } = await stripe.createPaymentMethod({
-                type: 'card',
-                card: cardElement,
-            });
+            const pmPromise = stripe.createPaymentMethod({ type: 'card', card: cardElement });
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(
+                    () => reject(new Error('Error de conexión. Comprueba tu red e inténtalo de nuevo.')),
+                    15000
+                )
+            );
 
-            if (error) throw new Error(error.message);
+            const { error, paymentMethod } = await Promise.race([pmPromise, timeoutPromise]);
+
+            if (error) throw new Error(mapStripeError(error));
             return paymentMethod!.id;
         },
     }));
