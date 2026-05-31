@@ -12,7 +12,6 @@ import (
 type fakeStripe struct {
 	capturedAmount int64
 	releasedAmount int64
-	releasedDays   int
 }
 
 func (f *fakeStripe) AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error) {
@@ -21,9 +20,8 @@ func (f *fakeStripe) AuthorizeDeposit(amountCents int64, currency, paymentMethod
 }
 
 func (f *fakeStripe) CaptureDeposit(_ string) error { return nil }
-func (f *fakeStripe) ReleaseDeposit(_ string, amount int64, days int) error {
+func (f *fakeStripe) ReleaseDeposit(_ string, amount int64) error {
 	f.releasedAmount = amount
-	f.releasedDays = days
 	return nil
 }
 
@@ -159,7 +157,6 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantDayReturned, daysBorrowed)
 			assert.Equal(t, tc.wantRefund, fs.releasedAmount)
-			assert.Equal(t, tc.days, fs.releasedDays)
 		})
 	}
 }

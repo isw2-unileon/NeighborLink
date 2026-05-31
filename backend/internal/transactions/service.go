@@ -9,7 +9,7 @@ import (
 type stripeDepositor interface {
 	AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error)
 	CaptureDeposit(paymentIntentID string) error
-	ReleaseDeposit(paymentIntentID string, depositAmountCents int64, daysBorrowed int) error
+	ReleaseDeposit(paymentIntentID string, refundAmountCents int64) error
 }
 
 type listingStatusUpdater interface {
@@ -137,9 +137,10 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 	}
 
 	daysBorrowed := calcDaysBorrowed(*t.HandoverAt, time.Now())
+	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
 
 	if !isDevPaymentIntent(t.StripePaymentIntentID) {
-		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, depositAmountCents, daysBorrowed); err != nil {
+		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {
 			return 0, fmt.Errorf("service: release deposit: %w", err)
 		}
 	}
