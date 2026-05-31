@@ -83,6 +83,18 @@ func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) 
 	return result, nil
 }
 
+func (f *fakeRepository) FindListingOwnerByTransactionID(ctx context.Context, id string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	if f.ownerByTransactionID != nil {
+		if ownerID, ok := f.ownerByTransactionID[id]; ok {
+			return ownerID, nil
+		}
+	}
+	return "", fmt.Errorf("transaction %s not found", id)
+}
+
 func (f *fakeRepository) FindListingOwnerAndTitle(ctx context.Context, id string) (string, string, error) {
 	if f.err != nil {
 		return "", "", f.err
