@@ -68,7 +68,11 @@ func (r *postgresRepository) CreateRedemption(ctx context.Context, userID string
 func (r *postgresRepository) GetPointsHistory(ctx context.Context, userID string) ([]PointsHistoryEntry, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, l.title, t.return_at,
-		       (t.total_charged_cents - 200) * 5 / 100 AS points_earned
+		       FLOOR(
+		         (t.total_charged_cents - 200) *
+		         (GREATEST(1, LEAST(7, (t.return_at::date - t.handover_at::date))) + 4)
+		         / 100.0
+		       ) AS points_earned
 		FROM transactions t
 		JOIN listings l ON t.listing_id = l.id
 		WHERE l.owner_id = $1 AND t.status = 'returned'
