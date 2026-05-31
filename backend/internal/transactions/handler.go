@@ -273,14 +273,14 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Return(c.Request.Context(), id, depositAmountCents); err != nil {
+	daysBorrowed, err := h.service.Return(c.Request.Context(), id, depositAmountCents)
+	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
 
-	// requireOwner already validated that the caller IS the listing owner.
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(depositAmountCents * 5 / 100)
+	pointsEarned := int(depositAmountCents * int64(daysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
 	}
@@ -454,12 +454,13 @@ func (h *Handler) confirmReturn(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid return code"})
 		return
 	}
-	if err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents); err != nil {
+	daysBorrowed, err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents)
+	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(body.DepositAmountCents * 5 / 100)
+	pointsEarned := int(body.DepositAmountCents * int64(daysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
 	}

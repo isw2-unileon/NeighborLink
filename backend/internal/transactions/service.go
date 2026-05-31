@@ -3,12 +3,13 @@ package transactions
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 type stripeDepositor interface {
 	AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error)
 	CaptureDeposit(paymentIntentID string) error
-	ReleaseDeposit(paymentIntentID string, totalAmountCents int64) error
+	ReleaseDeposit(paymentIntentID string, refundAmountCents int64) error
 }
 
 type listingStatusUpdater interface {
@@ -81,6 +82,21 @@ func isDevPaymentIntent(id string) bool {
 	return id == "" || id == "pi_test_fake_for_dev"
 }
 
+// calcDaysBorrowed returns the number of calendar days between handoverAt and returnAt,
+// clamped to [1, 7] as per the loan policy.
+func calcDaysBorrowed(handoverAt, returnAt time.Time) int {
+	handoverDay := handoverAt.UTC().Truncate(24 * time.Hour)
+	returnDay := returnAt.UTC().Truncate(24 * time.Hour)
+	days := int(returnDay.Sub(handoverDay).Hours() / 24)
+	if days < 1 {
+		return 1
+	}
+	if days > 7 {
+		return 7
+	}
+	return days
+}
+
 // Handover captures the authorized deposit, marks the transaction as handed_over
 // and updates the listing status to pending_return.
 func (s *Service) Handover(ctx context.Context, transactionID string) error {
@@ -108,29 +124,33 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 	return nil
 }
 
-// Return refunds 95% of the deposit to the borrower, marks the transaction as returned
-// and updates the listing status back to available.
-func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) error {
+// Return refunds a variable percentage of the deposit to the borrower based on days borrowed,
+// marks the transaction as returned, and updates the listing status back to available.
+// Returns the number of days borrowed so the caller can compute the lender's points.
+func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) (int, error) {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
-		return fmt.Errorf("service: find transaction: %w", err)
+		return 0, fmt.Errorf("service: find transaction: %w", err)
 	}
 	if t == nil || t.Status != "handed_over" {
-		return fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
+		return 0, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
 	}
 
+	daysBorrowed := calcDaysBorrowed(*t.HandoverAt, time.Now())
+	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
+
 	if !isDevPaymentIntent(t.StripePaymentIntentID) {
-		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, depositAmountCents); err != nil {
-			return fmt.Errorf("service: release deposit: %w", err)
+		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {
+			return 0, fmt.Errorf("service: release deposit: %w", err)
 		}
 	}
 
 	if err := s.repo.UpdateStatus(ctx, transactionID, "returned"); err != nil {
-		return fmt.Errorf("service: update status: %w", err)
+		return 0, fmt.Errorf("service: update status: %w", err)
 	}
 
 	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil {
-		return fmt.Errorf("service: update listing status: %w", err)
+		return 0, fmt.Errorf("service: update listing status: %w", err)
 	}
-	return nil
+	return daysBorrowed, nil
 }
