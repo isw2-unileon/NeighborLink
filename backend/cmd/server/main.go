@@ -15,6 +15,7 @@ import (
 	"github.com/isw2-unileon/neighborlink/backend/internal/config"
 	listingsModule "github.com/isw2-unileon/neighborlink/backend/internal/listings"
 	messagesModule "github.com/isw2-unileon/neighborlink/backend/internal/messages"
+	notificationsModule "github.com/isw2-unileon/neighborlink/backend/internal/notifications"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/adapters"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/middleware"
@@ -80,10 +81,15 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	// Auth
 	authModule.NewHandler(authModule.NewService(pool, cfg.JWTSecret)).RegisterRoutes(api)
 
+	// Notifications
+	notificationsRepo := notificationsModule.NewRepository(pool)
+	notificationsSvc := notificationsModule.NewService(notificationsRepo)
+	notificationsHandler := notificationsModule.NewHandler(notificationsRepo)
+	notificationsHandler.RegisterRoutes(api, authMiddleware)
 	// Listings
 	listingRepo := listingsModule.NewPostgresRepository(pool)
 	storageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
-	listingsModule.NewHandler(listingRepo, storageSvc).RegisterRoutes(api, authMiddleware)
+	listingsModule.NewHandler(listingRepo, storageSvc, notificationsSvc).RegisterRoutes(api, authMiddleware)
 
 	// Wallet (init before transactions so walletSvc can be injected there)
 	walletRepo := walletModule.NewPostgresRepository(pool)
@@ -94,7 +100,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
 	transactionRepo := transactionsModule.NewPostgresRepository(pool)
 	transactionSvc := transactionsModule.NewService(transactionRepo, stripeClient, listingRepo)
-	transactionsModule.NewHandler(transactionRepo, transactionSvc, walletSvc).RegisterRoutes(api, authMiddleware)
+	transactionsModule.NewHandler(transactionRepo, transactionSvc, walletSvc, notificationsSvc).RegisterRoutes(api, authMiddleware)
 
 	// Messages
 	messagesModule.NewHandler(

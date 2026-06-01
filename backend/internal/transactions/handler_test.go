@@ -23,6 +23,12 @@ type noopPointsAdder struct{}
 
 func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
 
+type noopNotificationCreator struct{}
+
+func (noopNotificationCreator) Create(_ context.Context, _ string, _ string, _ map[string]any) error {
+	return nil
+}
+
 type noopListingUpdater struct{}
 
 func (noopListingUpdater) UpdateStatus(_ context.Context, _ string, _ string) error { return nil }
@@ -87,6 +93,18 @@ func (f *fakeRepository) FindListingOwnerByTransactionID(ctx context.Context, id
 		}
 	}
 	return "", fmt.Errorf("transaction %s not found", id)
+}
+
+func (f *fakeRepository) FindListingOwnerAndTitle(ctx context.Context, id string) (string, string, error) {
+	if f.err != nil {
+		return "", "", f.err
+	}
+	if f.ownerByTransactionID != nil {
+		if ownerID, ok := f.ownerByTransactionID[id]; ok {
+			return ownerID, "listing-title", nil
+		}
+	}
+	return "", "", fmt.Errorf("transaction %s not found", id)
 }
 
 func (f *fakeRepository) Create(ctx context.Context, t transactions.Transaction) (*transactions.Transaction, error) {
@@ -181,7 +199,7 @@ func setupRouter(repo transactions.Repository) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	svc := transactions.NewService(repo, nil, noopListingUpdater{})
-	h := transactions.NewHandler(repo, svc, noopPointsAdder{})
+	h := transactions.NewHandler(repo, svc, noopPointsAdder{}, noopNotificationCreator{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r

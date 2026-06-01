@@ -22,11 +22,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
 
     if (!response.ok) {
+        // Si el token es inválido/expirado, forzar logout global
+        if (response.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.dispatchEvent(new Event('auth:logout'));
+        }
         const error = await response.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(error.error ?? `HTTP ${response.status}`);
     }
 
-    // 204 No Content — no hay body que parsear
     if (response.status === 204) {
         return undefined as T;
     }
@@ -41,5 +46,7 @@ export const api = {
         request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
     put: <T>(path: string, body: unknown) =>
         request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+    patch: <T>(path: string, body?: unknown) =>   // ← añadir esto
+        request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
     delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };

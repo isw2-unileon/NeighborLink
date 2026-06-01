@@ -62,8 +62,13 @@ func (f *fakeRepository) FindActiveByParticipant(_ context.Context, _ string) ([
 }
 
 type fakeTxReader struct {
-	summary *messages.TransactionSummary
-	err     error
+	summary         *messages.TransactionSummary
+	err             error
+	updateStatusErr error
+}
+
+func (f *fakeTxReader) UpdateStatus(_ context.Context, _ string, _ string) error {
+	return f.updateStatusErr
 }
 
 func (f *fakeTxReader) FindByID(_ context.Context, _ string) (*messages.TransactionSummary, error) {

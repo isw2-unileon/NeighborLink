@@ -52,6 +52,17 @@ export interface Message {
     status?: string;
     listing_title?: string;
     listing_photo?: string;
+    borrower_id?: string;
+    owner_id?: string;
+}
+
+export interface Notification {
+    id: string;
+    user_id: string;
+    type: string;
+    payload: Record<string, unknown>;
+    read: boolean;
+    created_at: string;
 }
 
 export interface Review {
