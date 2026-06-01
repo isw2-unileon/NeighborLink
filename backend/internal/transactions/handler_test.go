@@ -194,15 +194,19 @@ func makeToken(userID string) string {
 	return "Bearer " + t
 }
 
-func setupRouter(repo transactions.Repository) *gin.Engine {
+func setupRouterWithStripe(repo transactions.Repository, fs *fakeStripe) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	svc := transactions.NewService(repo, nil, noopListingUpdater{})
-	h := transactions.NewHandler(repo, svc, noopPointsAdder{}, noopNotificationCreator{})
+	svc := transactions.NewService(repo, fs, noopListingUpdater{})
+  h := transactions.NewHandler(repo, svc, noopPointsAdder{}, noopNotificationCreator{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r
+}
+
+func setupRouter(repo transactions.Repository) *gin.Engine {
+	return setupRouterWithStripe(repo, nil)
 }
 
 func TestListTransactions(t *testing.T) {
@@ -455,6 +459,33 @@ func TestRejectTransaction_AllowsOwner(t *testing.T) {
 
 	assert.NotEqual(t, http.StatusUnauthorized, w.Code)
 	assert.NotEqual(t, http.StatusForbidden, w.Code)
+}
+
+func TestPayTransaction_RequiresAuth(t *testing.T) {
+	router := setupRouter(&fakeRepository{})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestPayTransaction_ForbidsNonBorrower(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		transactions: []transactions.Transaction{{ID: "tx-1", BorrowerID: "borrower-1"}},
+	})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("other-user"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
 func TestHandoverTransaction_RequiresAuth(t *testing.T) {
@@ -932,4 +963,93 @@ func TestConfirmReturn_ValidCode_Returns200(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// ---- Success paths ----
+
+func TestPayTransaction_Success(t *testing.T) {
+	router := setupRouterWithStripe(&fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", PaymentMethodID: "pm_test"},
+		},
+	}, &fakeStripe{})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestHandoverTransaction_Success(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "agreed", StripePaymentIntentID: "", ListingID: "lst-1"},
+		},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/handover", bytes.NewReader([]byte{}))
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestReturnTransaction_Success(t *testing.T) {
+	handoverAt := time.Now().Add(-24 * time.Hour)
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "handed_over", StripePaymentIntentID: "", ListingID: "lst-1", HandoverAt: &handoverAt},
+		},
+	})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/return", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// ---- Invalid state transitions return 409 ----
+
+func TestPayTransaction_WrongStatus_Returns409(t *testing.T) {
+	router := setupRouterWithStripe(&fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "pending", BorrowerID: "borrower-1"},
+		},
+	}, &fakeStripe{})
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+}
+
+func TestHandoverTransaction_WrongStatus_Returns409(t *testing.T) {
+	router := setupRouter(&fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "returned"},
+		},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/handover", bytes.NewReader([]byte{}))
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
 }
