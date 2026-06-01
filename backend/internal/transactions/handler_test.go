@@ -925,9 +925,12 @@ func TestConfirmReturn_InvalidCode_Returns422(t *testing.T) {
 }
 
 func TestConfirmReturn_ValidCode_Returns200(t *testing.T) {
+	handoverAt := time.Now().Add(-24 * time.Hour)
 	router := setupRouter(&fakeRepository{
 		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
-		transactions:         []transactions.Transaction{{ID: "tx-1", Status: "handed_over"}},
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "handed_over", HandoverAt: &handoverAt},
+		},
 	})
 
 	body := `{"code":"123456","deposit_amount_cents":5000}`

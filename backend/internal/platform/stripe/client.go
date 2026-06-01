@@ -55,13 +55,13 @@ func (c *Client) CaptureDeposit(paymentIntentID string) error {
 	return nil
 }
 
-// ReleaseDeposit refunds 95% of the captured amount to the borrower.
-// The remaining 5% stays as platform income (to be distributed to the lender separately).
+// ReleaseDeposit issues a partial refund of refundAmountCents to the borrower.
+// The platform keeps the €2 management fee and the lender's share is credited as wallet points.
 // Call this when the return QR is scanned successfully.
 // paymentIntentID is the pi_... value stored in the transactions table.
-// totalAmountCents is the original deposit amount in the smallest currency unit.
-func (c *Client) ReleaseDeposit(paymentIntentID string, totalAmountCents int64) error {
-	refundAmount := totalAmountCents * 95 / 100
+// refundAmountCents is the pre-computed refund amount (calculated by the service).
+func (c *Client) ReleaseDeposit(paymentIntentID string, refundAmountCents int64) error {
+	refundAmount := refundAmountCents
 
 	params := &stripe.RefundParams{
 		PaymentIntent: stripe.String(paymentIntentID),

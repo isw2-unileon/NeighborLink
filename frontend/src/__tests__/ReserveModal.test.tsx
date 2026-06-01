@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React from 'react';
 import ReserveModal from '../components/ReserveModal';
 import * as reservationsLib from '../lib/reservations';
 
-// Mock DayPicker para evitar conflicto de versiones de React
 vi.mock('react-day-picker', () => ({
     DayPicker: ({ onSelect }: { onSelect: (r: { from: Date; to: Date }) => void }) => (
         <div data-testid="day-picker">
@@ -19,6 +19,24 @@ vi.mock('react-day-picker', () => ({
             </button>
         </div>
     ),
+}));
+
+vi.mock('@stripe/stripe-js', () => ({
+    loadStripe: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@stripe/react-stripe-js', () => ({
+    Elements: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    CardNumberElement: () => <div data-testid="card-number" />,
+    CardExpiryElement: () => <div data-testid="card-expiry" />,
+    CardCvcElement: () => <div data-testid="card-cvc" />,
+    useStripe: () => ({
+        createPaymentMethod: vi.fn().mockResolvedValue({
+            paymentMethod: { id: 'pm_test_123' },
+            error: undefined,
+        }),
+    }),
+    useElements: () => ({ getElement: vi.fn().mockReturnValue({}) }),
 }));
 
 vi.mock('../lib/reservations');
@@ -78,6 +96,7 @@ describe('ReserveModal', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
         expect(screen.getByText('Datos de pago')).toBeInTheDocument();
+        expect(screen.getByTestId('card-number')).toBeInTheDocument();
     });
 
     it('carga las fechas bloqueadas al montar', async () => {
@@ -104,18 +123,6 @@ describe('ReserveModal', () => {
         });
         fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
 
-
-        // Rellenar tarjeta válida (número Luhn válido)
-        fireEvent.change(screen.getByPlaceholderText('1234 5678 9012 3456'), {
-            target: { value: '4532015112830366' },
-        });
-        fireEvent.change(screen.getByPlaceholderText('MM/AA'), {
-            target: { value: '12/30' },
-        });
-        fireEvent.change(screen.getByPlaceholderText('123'), {
-            target: { value: '123' },
-        });
-
         fireEvent.click(screen.getByRole('button', { name: /confirmar reserva/i }));
 
         await waitFor(() => {
@@ -123,7 +130,7 @@ describe('ReserveModal', () => {
         });
     });
 
-    it('llama a onSuccess tras reserva correcta', async () => {
+    it('llama a onSuccess con el id de transacción tras reserva correcta', async () => {
         vi.mocked(reservationsLib.reservationsApi.reserve).mockResolvedValue({ id: 'tx-1' });
 
         render(<ReserveModal {...defaultProps} />);
@@ -134,20 +141,10 @@ describe('ReserveModal', () => {
         });
         fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
 
-        fireEvent.change(screen.getByPlaceholderText('1234 5678 9012 3456'), {
-            target: { value: '4532015112830366' },
-        });
-        fireEvent.change(screen.getByPlaceholderText('MM/AA'), {
-            target: { value: '12/30' },
-        });
-        fireEvent.change(screen.getByPlaceholderText('123'), {
-            target: { value: '123' },
-        });
-
         fireEvent.click(screen.getByRole('button', { name: /confirmar reserva/i }));
 
         await waitFor(() => {
-            expect(defaultProps.onSuccess).toHaveBeenCalled();
+            expect(defaultProps.onSuccess).toHaveBeenCalledWith('tx-1');
         });
     });
 
