@@ -182,6 +182,10 @@ func (f *fakeRepository) ValidateCode(_ context.Context, _ string, _ string, cod
 	return code == "123456", nil
 }
 
+func (f *fakeRepository) CancelByPaymentIntentID(_ context.Context, _ string) error {
+	return f.err
+}
+
 const testJWTSecret = "test-secret"
 
 func makeToken(userID string) string {

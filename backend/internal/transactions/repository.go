@@ -37,6 +37,9 @@ type Repository interface {
 	// ValidateCode checks if the given code matches the stored value in the given column.
 	ValidateCode(ctx context.Context, transactionID string, field string, code string) (bool, error)
 
+	// CancelByPaymentIntentID sets status to cancelled for the transaction with the given Stripe PaymentIntent ID.
+	CancelByPaymentIntentID(ctx context.Context, paymentIntentID string) error
+  
 	// FindListingOwnerAndTitle returns the owner_id and title of the listing associated with the given listingID.
 	FindListingOwnerAndTitle(ctx context.Context, listingID string) (ownerID string, title string, err error)
 }
