@@ -10,19 +10,20 @@ import (
 	"github.com/stripe/stripe-go/v76"
 )
 
-type webhookVerifier interface {
+// WebhookVerifier validates and parses a Stripe webhook payload.
+type WebhookVerifier interface {
 	ConstructEvent(payload []byte, sigHeader, secret string) (stripe.Event, error)
 }
 
 // WebhookHandler handles incoming Stripe webhook events.
 type WebhookHandler struct {
-	verifier webhookVerifier
+	verifier WebhookVerifier
 	repo     Repository
 	secret   string
 }
 
 // NewWebhookHandler returns a WebhookHandler wired to the given verifier, repo, and webhook secret.
-func NewWebhookHandler(verifier webhookVerifier, repo Repository, secret string) *WebhookHandler {
+func NewWebhookHandler(verifier WebhookVerifier, repo Repository, secret string) *WebhookHandler {
 	return &WebhookHandler{verifier: verifier, repo: repo, secret: secret}
 }
 
@@ -61,7 +62,7 @@ func (h *WebhookHandler) handle(c *gin.Context) {
 			slog.Warn("webhook: failed to parse dispute", "error", err)
 			break
 		}
-		slog.Warn("charge disputed — review required", "dispute_id", dispute.ID, "charge_id", dispute.Charge.ID)
+		slog.Warn("charge disputed — review required", "dispute_id", dispute.ID)
 	}
 
 	c.Status(http.StatusOK)
