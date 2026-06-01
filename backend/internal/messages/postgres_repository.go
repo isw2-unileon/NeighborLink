@@ -80,32 +80,44 @@ func (r *postgresRepository) Create(ctx context.Context, m Message) (*Message, e
 
 func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID string) ([]Message, error) {
 	rows, err := r.pool.Query(ctx, `
-        SELECT id, transaction_id, sender_id, content, created_at, title, photo, status
+        SELECT id, transaction_id, sender_id, content, created_at, title, photo, status, borrower_id, owner_id
         FROM (
             SELECT DISTINCT ON (m.transaction_id)
-                m.id, m.transaction_id, m.sender_id, m.content, m.created_at,
+                m.id,
+                m.transaction_id,
+                m.sender_id,
+                m.content,
+                m.created_at,
                 l.title,
                 COALESCE(l.photos->>0, '') AS photo,
-                t.status
+                t.status,
+                t.borrower_id,
+                l.owner_id
             FROM messages m
             JOIN transactions t ON t.id = m.transaction_id
             JOIN listings l     ON l.id = t.listing_id
             WHERE (t.borrower_id = $1 OR l.owner_id = $1)
-              AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over')
+              AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over', 'cancelled')
             ORDER BY m.transaction_id, m.created_at DESC
         ) AS with_messages
 
         UNION ALL
 
         SELECT
-            t.id, t.id, '00000000-0000-0000-0000-000000000000'::uuid, '', COALESCE(t.agreed_at, t.start_date::timestamptz),
+            t.id,
+            t.id,
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            '',
+            COALESCE(t.agreed_at, t.start_date::timestamptz),
             l.title,
             COALESCE(l.photos->>0, '') AS photo,
-            t.status
+            t.status,
+            t.borrower_id,
+            l.owner_id
         FROM transactions t
         JOIN listings l ON l.id = t.listing_id
         WHERE (t.borrower_id = $1 OR l.owner_id = $1)
-          AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over')
+          AND t.status IN ('pending', 'awaiting_payment', 'agreed', 'handed_over', 'cancelled')
           AND NOT EXISTS (
               SELECT 1 FROM messages m WHERE m.transaction_id = t.id
           )
@@ -121,6 +133,7 @@ func (r *postgresRepository) FindActiveByParticipant(ctx context.Context, userID
 		if err := rows.Scan(
 			&m.ID, &m.TransactionID, &m.SenderID, &m.Content, &m.CreatedAt,
 			&m.ListingTitle, &m.ListingPhoto, &m.Status,
+			&m.BorrowerID, &m.OwnerID,
 		); err != nil {
 			return nil, fmt.Errorf("messages: scan failed: %w", err)
 		}

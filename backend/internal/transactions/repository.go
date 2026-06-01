@@ -39,4 +39,7 @@ type Repository interface {
 
 	// CancelByPaymentIntentID sets status to cancelled for the transaction with the given Stripe PaymentIntent ID.
 	CancelByPaymentIntentID(ctx context.Context, paymentIntentID string) error
+  
+	// FindListingOwnerAndTitle returns the owner_id and title of the listing associated with the given listingID.
+	FindListingOwnerAndTitle(ctx context.Context, listingID string) (ownerID string, title string, err error)
 }

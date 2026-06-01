@@ -4,19 +4,24 @@ import { listingsApi } from '../../lib/listings';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Listing } from '../../types';
 
-interface Coords { lat: number; lon: number; }
+interface Coords {
+    lat: number;
+    lon: number;
+}
 
 interface Filters {
     search: string;
     category: string;
-    deposit: string;
+    depositMin: string;
+    depositMax: string;
     status: string;
 }
 
 const INITIAL_FILTERS: Filters = {
     search: '',
     category: '',
-    deposit: '',
+    depositMin: '',
+    depositMax: '',
     status: '',
 };
 
@@ -29,6 +34,8 @@ export default function ListingsPage() {
     const [error, setError] = useState<string | null>(null);
     const [coords, setCoords] = useState<Coords | null>(null);
     const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+    const [depositMinInput, setDepositMinInput] = useState('');
+    const [depositMaxInput, setDepositMaxInput] = useState('');
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -45,25 +52,41 @@ export default function ListingsPage() {
     useEffect(() => {
         setLoading(true);
         setError(null);
+
         listingsApi.getAll({
             category: filters.category || undefined,
-            deposit: filters.deposit || undefined,
+            deposit_min: filters.depositMin || undefined,
+            deposit_max: filters.depositMax || undefined,
             status: filters.status || undefined,
-            //exclude_owner_id: user?.id || undefined, esto es para que no vea sus propios artículos en el apartado de listings
+            // exclude_owner_id: user?.id || undefined, esto es para que no vea sus propios artículos en el apartado de listings
             lat: coords ? String(coords.lat) : undefined,
             lon: coords ? String(coords.lon) : undefined,
         })
             .then(setAllListings)
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
-    }, [filters.category, filters.deposit, filters.status, coords, user?.id]);
+    }, [filters.category, filters.depositMin, filters.depositMax, filters.status, coords, user?.id]);
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            setFilters(prev => ({
+                ...prev,
+                depositMin: depositMinInput,
+                depositMax: depositMaxInput,
+            }));
+        }, 300);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [depositMinInput, depositMaxInput]);
 
     const listings = useMemo(() => {
         if (!filters.search.trim()) return allListings;
+
         const q = filters.search.toLowerCase();
-        return allListings.filter(l =>
-            l.title.toLowerCase().includes(q) ||
-            l.description.toLowerCase().includes(q)
+        return allListings.filter(
+            l =>
+                l.title.toLowerCase().includes(q) ||
+                l.description.toLowerCase().includes(q)
         );
     }, [allListings, filters.search]);
 
@@ -71,9 +94,15 @@ export default function ListingsPage() {
         setFilters(prev => ({ ...prev, [key]: value }));
     }
 
+    function handleResetFilters() {
+        setFilters(INITIAL_FILTERS);
+        setDepositMinInput('');
+        setDepositMaxInput('');
+    }
+
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-64">
+            <div className="flex min-h-64 items-center justify-center">
                 <p className="text-gray-500">Cargando artículos...</p>
             </div>
         );
@@ -89,12 +118,12 @@ export default function ListingsPage() {
 
     return (
         <div className="flex w-full flex-col gap-6 lg:flex-row">
-            {/* ── Panel de filtros lateral ── */}
             <aside className="w-full shrink-0 lg:w-72">
-                <div className="glass-panel rounded-3xl p-6 flex flex-col gap-4">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">Filtros</h2>
+                <div className="glass-panel flex flex-col gap-4 rounded-3xl p-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
+                        Filtros
+                    </h2>
 
-                    {/* Búsqueda */}
                     <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-[var(--muted)]">Buscar</label>
                         <input
@@ -106,7 +135,6 @@ export default function ListingsPage() {
                         />
                     </div>
 
-                    {/* Categoría */}
                     <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-[var(--muted)]">Categoría</label>
                         <select
@@ -128,27 +156,43 @@ export default function ListingsPage() {
                         </select>
                     </div>
 
-                    {/* Depósito máximo */}
-                    <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-[var(--muted)]">
-                            Depósito máx:{' '}
-                            <span className="text-[var(--accent-2)] font-semibold">
-                                {filters.deposit ? `${filters.deposit} €` : 'Sin límite'}
-                            </span>
-                        </label>
-                        <input
-                            type="range"
-                            min={20} max={200} step={10}
-                            value={filters.deposit || 200}
-                            onChange={e => handleFilter('deposit', e.target.value === '200' ? '' : e.target.value)}
-                            className="w-full accent-[var(--accent-2)]"
-                        />
-                        <div className="flex justify-between text-xs text-[var(--muted)]">
-                            <span>20 €</span><span>+200 €</span>
+                    <div className="flex flex-col gap-3">
+                        <label className="text-sm font-medium text-[var(--muted)]">Depósito</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-[var(--muted)]">Mín.</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step={5}
+                                    placeholder="Sin mínimo"
+                                    value={depositMinInput}
+                                    onChange={e => setDepositMinInput(e.target.value)}
+                                    className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-[var(--muted)]">Máx.</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step={5}
+                                    placeholder="Sin máximo"
+                                    value={depositMaxInput}
+                                    onChange={e => setDepositMaxInput(e.target.value)}
+                                    className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                                />
+                            </div>
                         </div>
+
+                        <p className="text-sm text-[var(--muted)]">
+                            {depositMinInput || depositMaxInput
+                                ? `Depósito: ${depositMinInput || '0'} € - ${depositMaxInput || 'sin límite'} €`
+                                : 'Todos los listings'}
+                        </p>
                     </div>
 
-                    {/* Estado */}
                     <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-[var(--muted)]">Estado</label>
                         <select
@@ -164,21 +208,20 @@ export default function ListingsPage() {
                     </div>
 
                     {!coords && (
-                        <p className="text-xs text-[var(--muted)] italic">
+                        <p className="text-xs italic text-[var(--muted)]">
                             Activa la ubicación para filtrar por distancia.
                         </p>
                     )}
 
                     <button
-                        onClick={() => setFilters(INITIAL_FILTERS)}
-                        className="text-sm text-[var(--muted)] hover:text-[var(--text)] underline text-left"
+                        onClick={handleResetFilters}
+                        className="text-left text-sm text-[var(--muted)] underline hover:text-[var(--text)]"
                     >
                         Limpiar filtros
                     </button>
                 </div>
             </aside>
 
-            {/* ── Contenido principal ── */}
             <div className="flex-1">
                 <div className="glass-panel rounded-3xl px-6 py-6">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -190,6 +233,7 @@ export default function ListingsPage() {
                                 </span>
                             )}
                         </h1>
+
                         {user && (
                             <button
                                 onClick={() => navigate('/listings/new')}
@@ -201,12 +245,12 @@ export default function ListingsPage() {
                     </div>
 
                     {listings.length === 0 ? (
-                        <div className="text-center py-16">
-                            <p className="text-4xl mb-3">🔍</p>
+                        <div className="py-16 text-center">
+                            <p className="mb-3 text-4xl">🔍</p>
                             <p className="text-[var(--muted)]">No hay artículos disponibles todavía.</p>
                             <button
-                                onClick={() => setFilters(INITIAL_FILTERS)}
-                                className="mt-4 text-[var(--accent-2)] hover:underline text-sm"
+                                onClick={handleResetFilters}
+                                className="mt-4 text-sm text-[var(--accent-2)] hover:underline"
                             >
                                 Limpiar filtros
                             </button>
@@ -220,7 +264,7 @@ export default function ListingsPage() {
                                     className="group flex flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white transition hover:-translate-y-1 hover:shadow-lg"
                                 >
                                     {listing.photos?.length > 0 ? (
-                                        <div className="w-full aspect-square overflow-hidden bg-[var(--surface-strong)]">
+                                        <div className="aspect-square w-full overflow-hidden bg-[var(--surface-strong)]">
                                             <img
                                                 src={listing.photos[0]}
                                                 alt={listing.title}
@@ -228,26 +272,28 @@ export default function ListingsPage() {
                                             />
                                         </div>
                                     ) : (
-                                        <div className="flex w-full aspect-square items-center justify-center bg-[var(--surface-strong)]">
+                                        <div className="flex aspect-square w-full items-center justify-center bg-[var(--surface-strong)]">
                                             <span className="text-3xl">📦</span>
                                         </div>
                                     )}
 
                                     <div className="flex flex-1 flex-col gap-2 p-4">
                                         <h2 className="text-base font-semibold leading-tight">{listing.title}</h2>
-                                        <p className="text-xs text-[var(--muted)] line-clamp-2 flex-1">
+                                        <p className="line-clamp-2 flex-1 text-xs text-[var(--muted)]">
                                             {listing.description}
                                         </p>
                                         <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
                                             {listing.category?.replace(/_/g, ' ')}
                                         </p>
-                                        <p className="text-[var(--accent-2)] font-semibold text-sm">
+                                        <p className="text-sm font-semibold text-[var(--accent-2)]">
                                             {listing.deposit_amount} € depósito
                                         </p>
-                                        <span className={`mt-1 w-fit rounded-full px-3 py-1 text-xs font-semibold ${listing.status === 'available'
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'bg-orange-100 text-orange-700'
-                                            }`}>
+                                        <span
+                                            className={`mt-1 w-fit rounded-full px-3 py-1 text-xs font-semibold ${listing.status === 'available'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-orange-100 text-orange-700'
+                                                }`}
+                                        >
                                             {listing.status === 'available' ? 'Disponible' : 'No disponible'}
                                         </span>
                                     </div>

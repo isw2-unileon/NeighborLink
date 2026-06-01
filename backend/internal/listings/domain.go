@@ -72,6 +72,7 @@ type ListingInput struct {
 type FilterParams struct {
 	Category       Category
 	Status         string
-	Deposit        float64
+	MinDeposit     float64
+	MaxDeposit     float64
 	ExcludeOwnerID string
 }

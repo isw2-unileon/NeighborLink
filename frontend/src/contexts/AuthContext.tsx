@@ -1,9 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User } from '../types';
 
-
-// Forma del contexto — lo que exponemos globalmente
 interface AuthContextValue {
     token: string | null;
     user: User | null;
@@ -12,22 +9,17 @@ interface AuthContextValue {
     updateUser: (user: User) => void;
 }
 
-// Creamos el contexto con valor inicial undefined
-// Usamos undefined para detectar si alguien lo consume fuera del Provider
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Hook personalizado — encapsula el useContext y lanza error si se usa mal
-// Patrón: Custom Hook sobre Context (evita importar AuthContext directamente)
 export function useAuth(): AuthContextValue {
     const ctx = useContext(AuthContext);
     if (!ctx) throw new Error('useAuth must be used within AuthProvider');
     return ctx;
 }
 
-// Provider — envuelve la app y comparte estado global de autenticación
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(
-        () => localStorage.getItem('token') // Hidratamos desde localStorage al iniciar
+        () => localStorage.getItem('token')
     );
     const [user, setUser] = useState<User | null>(
         () => {
@@ -35,6 +27,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return raw ? (JSON.parse(raw) as User) : null;
         }
     );
+
+    // Escucha el evento de logout forzado desde api.ts (token expirado/inválido)
+    useEffect(() => {
+        const handleForceLogout = () => {
+            setToken(null);
+            setUser(null);
+            window.location.href = '/login';
+        };
+        window.addEventListener('auth:logout', handleForceLogout);
+        return () => window.removeEventListener('auth:logout', handleForceLogout);
+    }, []);
 
     function login(newToken: string, newUser: User) {
         localStorage.setItem('token', newToken);

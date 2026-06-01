@@ -14,4 +14,6 @@ type Message struct {
 	Status        string    `json:"status,omitempty"`
 	ListingTitle  string    `json:"listing_title,omitempty"`
 	ListingPhoto  string    `json:"listing_photo,omitempty"`
+	BorrowerID    string    `json:"borrower_id,omitempty"`
+	OwnerID       string    `json:"owner_id,omitempty"`
 }

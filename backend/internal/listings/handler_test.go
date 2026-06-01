@@ -71,6 +71,12 @@ func (s *fakeStorageService) UploadPhoto(listingID string, filename string, r io
 	return s.url, s.err
 }
 
+type fakeNotificationCreator struct{}
+
+func (fakeNotificationCreator) Create(_ context.Context, _ string, _ string, _ map[string]any) error {
+	return nil
+}
+
 // --- Helpers ---
 
 func fakeAuthMiddleware(userID string) gin.HandlerFunc {
@@ -95,7 +101,7 @@ func setupRouterWithStorage(repo listings.Repository, storage listings.StorageSe
 func setupRouterFull(repo listings.Repository, storage listings.StorageService, auth gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := listings.NewHandler(repo, storage)
+	h := listings.NewHandler(repo, storage, fakeNotificationCreator{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, auth)
 	return r
