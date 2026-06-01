@@ -7,6 +7,7 @@ import (
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/paymentintent"
 	"github.com/stripe/stripe-go/v76/refund"
+	"github.com/stripe/stripe-go/v76/webhook"
 )
 
 // Client wraps the Stripe SDK and exposes only the operations needed
@@ -53,6 +54,16 @@ func (c *Client) CaptureDeposit(paymentIntentID string) error {
 		return fmt.Errorf("stripe: failed to capture deposit: %w", err)
 	}
 	return nil
+}
+
+// ConstructEvent validates the Stripe-Signature header and parses the event payload.
+// Returns an error if the signature is invalid or the secret is wrong.
+func (c *Client) ConstructEvent(payload []byte, sigHeader, secret string) (stripe.Event, error) {
+	event, err := webhook.ConstructEvent(payload, sigHeader, secret)
+	if err != nil {
+		return stripe.Event{}, fmt.Errorf("stripe: invalid webhook signature: %w", err)
+	}
+	return event, nil
 }
 
 // ReleaseDeposit issues a partial refund of refundAmountCents to the borrower.
