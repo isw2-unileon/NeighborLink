@@ -268,6 +268,17 @@ func (r *postgresRepository) GenerateCode(ctx context.Context, transactionID str
 	return code, nil
 }
 
+func (r *postgresRepository) CancelByPaymentIntentID(ctx context.Context, paymentIntentID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions SET status = 'cancelled'
+		WHERE stripe_payment_intent_id = $1
+	`, paymentIntentID)
+	if err != nil {
+		return fmt.Errorf("transactions: cancel by payment intent failed: %w", err)
+	}
+	return nil
+}
+
 func (r *postgresRepository) ValidateCode(ctx context.Context, transactionID string, field string, code string) (bool, error) {
 	var stored string
 	query := fmt.Sprintf("SELECT %s FROM transactions WHERE id = $1", field)
