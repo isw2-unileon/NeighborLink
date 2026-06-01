@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -244,11 +245,11 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
 
 	ranges := make([]DateRange, 0)
 	for rows.Next() {
-		var dr DateRange
-		if err := rows.Scan(&dr.StartDate, &dr.EndDate); err != nil {
+		var startDate, endDate time.Time
+		if err := rows.Scan(&startDate, &endDate); err != nil {
 			return nil, fmt.Errorf("transactions: scan blocked dates failed: %w", err)
 		}
-		ranges = append(ranges, dr)
+		ranges = append(ranges, NewDateRange(&startDate, &endDate))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("transactions: iteration failed: %w", err)

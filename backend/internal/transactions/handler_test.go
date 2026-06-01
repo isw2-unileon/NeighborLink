@@ -557,7 +557,7 @@ func TestReturnTransaction_AllowsOwner(t *testing.T) {
 func TestGetAvailability_ReturnsBlockedDates(t *testing.T) {
 	repo := &fakeRepository{
 		blockedDates: []transactions.DateRange{
-			{StartDate: mustDate("2026-06-01"), EndDate: mustDate("2026-06-03")},
+			{StartDate: "2026-06-01", EndDate: "2026-06-03"},
 		},
 	}
 	router := setupRouter(repo)

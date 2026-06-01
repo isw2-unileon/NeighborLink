@@ -2,7 +2,6 @@
 package transactions
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -35,25 +34,22 @@ type ReserveInput struct {
 
 // DateRange represents a blocked date range for availability checks.
 type DateRange struct {
-	StartDate *time.Time
-	EndDate   *time.Time
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
-// MarshalJSON implements custom JSON marshalling for DateRange to format dates as "YYYY-MM-DD" strings. Nil dates are marshalled as empty strings.
-func (d DateRange) MarshalJSON() ([]byte, error) {
+// NewDateRange creates a DateRange from two *time.Time pointers, formatting as "YYYY-MM-DD".
+func NewDateRange(start, end *time.Time) DateRange {
 	format := func(t *time.Time) string {
 		if t == nil {
 			return ""
 		}
 		return t.Format("2006-01-02")
 	}
-	return json.Marshal(struct {
-		StartDate string `json:"start_date"`
-		EndDate   string `json:"end_date"`
-	}{
-		StartDate: format(d.StartDate),
-		EndDate:   format(d.EndDate),
-	})
+	return DateRange{
+		StartDate: format(start),
+		EndDate:   format(end),
+	}
 }
 
 // BorrowerTransaction enriches a Transaction with listing display data
