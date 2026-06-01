@@ -67,9 +67,14 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 			argN++
 		}
 	}
-	if f.Deposit > 0 {
+	if f.MinDeposit > 0 {
+		q += fmt.Sprintf(" AND deposit_amount >= $%d", argN)
+		args = append(args, f.MinDeposit)
+		argN++
+	}
+	if f.MaxDeposit > 0 {
 		q += fmt.Sprintf(" AND deposit_amount <= $%d", argN)
-		args = append(args, f.Deposit)
+		args = append(args, f.MaxDeposit)
 	}
 
 	q += " ORDER BY created_at DESC"
