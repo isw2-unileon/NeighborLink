@@ -118,7 +118,7 @@ func TestConfirmPayment_ChargesDepositPlusPlatformFee(t *testing.T) {
 	fs := &fakeStripe{}
 	svc := transactions.NewService(repo, fs, &fakeListingSvc{})
 
-	err := svc.ConfirmPayment(context.Background(), "tx-1", 500)
+	err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(700), fs.capturedAmount) // 500 deposit + 200 platform fee
@@ -132,7 +132,7 @@ func TestConfirmPayment_FailsIfNotAwaitingPayment(t *testing.T) {
 	}
 	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
 
-	err := svc.ConfirmPayment(context.Background(), "tx-1", 500)
+	err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
 
 	assert.Error(t, err)
 }

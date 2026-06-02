@@ -5,7 +5,10 @@ export const transactionsApi = {
     getById: (id: string): Promise<Transaction> =>
         api.get<{ data: Transaction }>(`/transactions/${id}`).then(r => r.data),
 
-    pay: (id: string, depositAmountCents: number): Promise<void> =>
-        api.put<unknown>(`/transactions/${id}/pay`, { deposit_amount_cents: depositAmountCents })
+    pay: (id: string, depositAmountCents: number, paymentMethodId: string): Promise<void> =>
+        api.put<unknown>(`/transactions/${id}/pay`, {
+            deposit_amount_cents: depositAmountCents,
+            payment_method_id: paymentMethodId
+        })
             .then(() => undefined),
 };

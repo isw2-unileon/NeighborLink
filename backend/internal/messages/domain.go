@@ -3,6 +3,8 @@ package messages
 
 import "time"
 
+const SystemUserID = "00000000-0000-0000-0000-000000000000"
+
 // Message represents a chat message within a transaction.
 // Pure business data — zero external dependencies.
 type Message struct {

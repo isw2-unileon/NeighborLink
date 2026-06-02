@@ -16,9 +16,9 @@ install:
 ## Run backend with hot reload
 run-backend:
 ifeq ($(OS),Windows_NT)
-	$(shell go env GOPATH)/bin/air -c backend/.air.toml --build.bin "./tmp/server.exe" --build.cmd "go build -o ./tmp/server.exe ./backend/cmd/server"
+	air -c backend/.air.toml --build.bin "./tmp/server.exe" --build.cmd "go build -o ./tmp/server.exe ./backend/cmd/server"
 else
-	$(shell go env GOPATH)/bin/air -c backend/.air.toml
+	air -c backend/.air.toml
 endif
 ## Run frontend dev server
 run-frontend:

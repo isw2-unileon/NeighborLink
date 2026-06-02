@@ -3,19 +3,49 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import { listingsApi } from '../../lib/listings';
-import type { Message, Listing } from '../../types';
+import type { Message, Listing, Transaction } from '../../types';
 import { api } from '../../lib/api';
+import PaymentModal from '../../components/PaymentModal';
 
 const POLL_INTERVAL_MS = 3000;
 
-function MessageBubble({ message, isMe }: { message: Message; isMe: boolean }) {
+function MessageBubble({
+    message,
+    isMe,
+    isBorrower,
+    transactionStatus,
+    onOpenPayment
+}: {
+    message: Message;
+    isMe: boolean;
+    isBorrower: boolean;
+    transactionStatus?: string;
+    onOpenPayment: () => void;
+}) {
     const isSystem = message.sender_id === '00000000-0000-0000-0000-000000000000';
 
     if (isSystem) {
+        const isPaymentPrompt = message.content.toLowerCase().includes('métodos de pago');
+
+        // Si ya está pagada (status 'agreed' o superior), no mostramos el prompt de pago
+        const isAlreadyPaid = transactionStatus !== 'awaiting_payment' && transactionStatus !== 'pending';
+        if (isPaymentPrompt && (isAlreadyPaid || !isBorrower)) return null;
+
         return (
-            <div className="flex justify-center">
-                <div className="max-w-md px-4 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center">
-                    <p>{message.content}</p>
+            <div className="flex justify-center w-full my-2">
+                <div className="max-w-md px-6 py-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-sm text-center shadow-sm">
+                    <p className="font-medium">{message.content}</p>
+                    {isPaymentPrompt && isBorrower && !isAlreadyPaid && (
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                onOpenPayment();
+                            }}
+                            className="mt-3 w-full bg-[var(--accent)] text-white px-6 py-2.5 rounded-full text-sm font-bold hover:brightness-95 transition-all shadow-md active:scale-95"
+                        >
+                            💳 Confirmar y Pagar fianza
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -102,12 +132,13 @@ export default function ChatDetailPage() {
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [listing, setListing] = useState<Listing | null>(null);
+    const [transaction, setTransaction] = useState<Transaction | null>(null);
     const [content, setContent] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
     const [showEleccion, setShowEleccion] = useState(false);
+    const [showPayment, setShowPayment] = useState(false);
     const [decisionLoading, setDecisionLoading] = useState(false);
 
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -115,9 +146,9 @@ export default function ChatDetailPage() {
 
     useEffect(() => {
         if (!transactionId) return;
-        api.get<{ data: { listing_id: string; status: string } }>(`/transactions/${transactionId}`)
+        api.get<{ data: Transaction }>(`/transactions/${transactionId}`)
             .then(r => {
-                setTransactionStatus(r.data.status);
+                setTransaction(r.data);
                 return listingsApi.getById(r.data.listing_id);
             })
             .then(setListing)
@@ -174,7 +205,7 @@ export default function ChatDetailPage() {
             await api.post(`/transactions/${transactionId}/decision`, { decision });
 
             if (decision === 'accept') {
-                setTransactionStatus('awaiting_payment');
+                setTransaction(prev => prev ? { ...prev, status: 'awaiting_payment' } : null);
                 setMessages(prev => [
                     ...prev,
                     {
@@ -186,7 +217,7 @@ export default function ChatDetailPage() {
                     },
                 ]);
             } else {
-                setTransactionStatus('cancelled');
+                setTransaction(prev => prev ? { ...prev, status: 'cancelled' } : null);
                 setMessages(prev => [
                     ...prev,
                     {
@@ -205,9 +236,24 @@ export default function ChatDetailPage() {
         }
     }
 
+    async function handlePaymentSuccess() {
+        setShowPayment(false);
+        setTransaction(prev => prev ? { ...prev, status: 'agreed' } : null);
+        setMessages(prev => [
+            ...prev,
+            {
+                id: crypto.randomUUID(),
+                transaction_id: transactionId!,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: '¡Pago completado! La reserva ahora está confirmada.',
+                created_at: new Date().toISOString(),
+            },
+        ]);
+    }
+
     if (!user) return null;
     const isOwner = listing?.owner_id === user.id;
-    const isBorrowerAwaitingPayment = !isOwner && transactionStatus === 'awaiting_payment';
+    const transactionStatus = transaction?.status;
 
     return (
         <>
@@ -220,19 +266,15 @@ export default function ChatDetailPage() {
                 />
             )}
 
-            {/* Panel lateral izquierdo — solo para el borrower cuando awaiting_payment */}
-            {isBorrowerAwaitingPayment && (
-                <div
-                    className="fixed top-16 bottom-0 flex items-start justify-end pt-10 pr-4"
-                    style={{ left: 0, width: 'calc((100vw - 48rem) / 2)' }}
-                >
-                    <button
-                        onClick={() => navigate(`/transactions/${transactionId}/pay`)}
-                        className="w-40 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white shadow-md hover:brightness-95 transition text-center"
-                    >
-                        💳 Método de pago
-                    </button>
-                </div>
+            {showPayment && transaction && listing && (
+                <PaymentModal
+                    transactionId={transactionId!}
+                    depositAmount={listing.deposit_amount}
+                    startDate={transaction.start_date}
+                    endDate={transaction.end_date}
+                    onClose={() => setShowPayment(false)}
+                    onSuccess={handlePaymentSuccess}
+                />
             )}
 
             <div className="max-w-3xl mx-auto flex flex-col fixed inset-x-0 bottom-0" style={{ top: '4rem' }}>
@@ -301,6 +343,9 @@ export default function ChatDetailPage() {
                             key={msg.id}
                             message={msg}
                             isMe={msg.sender_id === user.id}
+                            isBorrower={!isOwner}
+                            transactionStatus={transactionStatus}
+                            onOpenPayment={() => setShowPayment(true)}
                         />
                     ))}
 
