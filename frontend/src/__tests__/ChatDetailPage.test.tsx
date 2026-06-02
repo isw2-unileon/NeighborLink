@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ChatDetailPage from '../pages/chats/ChatDetailPage';
 import type { Listing } from '../types';
@@ -35,11 +35,24 @@ const mockListing = {
     photos: [],
 } as Listing;
 
+const mockTransaction = {
+    id: TX_ID,
+    listing_id: 'listing-1',
+    borrower_id: BORROWER_ID,
+    status: 'pending' as const,
+    total_charged_cents: 5200,
+    start_date: '2026-06-10',
+    end_date: '2026-06-12',
+    agreed_at: null,
+    handover_at: null,
+    return_at: null,
+};
+
 function renderPage() {
     return render(
-        <MemoryRouter initialEntries={[`/chats/${TX_ID}`]}>
+        <MemoryRouter initialEntries={[`/transactions/${TX_ID}/chat`]}>
             <Routes>
-                <Route path="/chats/:id" element={<ChatDetailPage />} />
+                <Route path="/transactions/:id/chat" element={<ChatDetailPage />} />
                 <Route path="/chats" element={<div>Lista chats</div>} />
             </Routes>
         </MemoryRouter>
@@ -58,7 +71,7 @@ beforeEach(() => {
         created_at: new Date().toISOString(),
     });
     vi.mocked(listingsLib.listingsApi.getById).mockResolvedValue(mockListing);
-    vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1', status: 'pending' } });
+    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction });
     vi.mocked(api.post).mockResolvedValue({});
 });
 
@@ -100,7 +113,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
     });
 
     it('muestra badge ACEPTADO cuando status es awaiting_payment', async () => {
-        vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1', status: 'awaiting_payment' } });
+        vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'awaiting_payment' } });
         renderPage();
         await waitFor(() => {
             expect(screen.getByText('ACEPTADO')).toBeInTheDocument();
@@ -108,28 +121,53 @@ describe('ChatDetailPage — flujo de transacción', () => {
     });
 
     it('muestra badge DENEGADO cuando status es cancelled', async () => {
-        vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1', status: 'cancelled' } });
+        vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'cancelled' } });
         renderPage();
         await waitFor(() => {
             expect(screen.getByText('DENEGADO')).toBeInTheDocument();
         });
     });
 
-    it('muestra botón Método de pago solo para el borrower con awaiting_payment', async () => {
+    it('muestra botón Pagar ahora dentro del mensaje del sistema para el borrower', async () => {
         currentUserId = BORROWER_ID;
-        vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1', status: 'awaiting_payment' } });
+        vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'awaiting_payment' } });
+        vi.mocked(messagesLib.messagesApi.getByTransaction).mockResolvedValue([
+            {
+                id: 'sys-1',
+                transaction_id: TX_ID,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: 'El prestador ha aceptado las condiciones propuestas, ahora mete los métodos de pago.',
+                created_at: new Date().toISOString(),
+            }
+        ]);
         renderPage();
         await waitFor(() => {
-            expect(screen.getByText(/método de pago/i)).toBeInTheDocument();
+            expect(screen.getByText(/confirmar y pagar fianza/i)).toBeInTheDocument();
         });
     });
 
-    it('NO muestra Método de pago cuando status es pending', async () => {
-        currentUserId = BORROWER_ID;
-        vi.mocked(api.get).mockResolvedValue({ data: { listing_id: 'listing-1', status: 'pending' } });
+    it('NO muestra botón Pagar ahora para el owner', async () => {
+        currentUserId = OWNER_ID;
+        vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'awaiting_payment' } });
+        vi.mocked(messagesLib.messagesApi.getByTransaction).mockResolvedValue([
+            {
+                id: 'sys-1',
+                transaction_id: TX_ID,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: 'El prestador ha aceptado las condiciones propuestas, ahora mete los métodos de pago.',
+                created_at: new Date().toISOString(),
+            }
+        ]);
         renderPage();
         await waitFor(() => screen.getByText('Taladro Bosch'));
-        expect(screen.queryByText(/método de pago/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/confirmar y pagar fianza/i)).not.toBeInTheDocument();
+    });
+
+    it('NO muestra botón Pagar ahora cuando status es pending', async () => {
+        currentUserId = BORROWER_ID;
+        renderPage();
+        await waitFor(() => screen.getByText('Taladro Bosch'));
+        expect(screen.queryByText(/confirmar y pagar fianza/i)).not.toBeInTheDocument();
     });
 
     it('el owner puede abrir y cerrar el modal de Elección', async () => {
@@ -146,7 +184,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
         expect(screen.queryByText(/tomar una decisión/i)).not.toBeInTheDocument();
     });
 
-    it('tras aceptar, cambia el estado a awaiting_payment y muestra mensaje del sistema', async () => {
+    it('tras aceptar, cambia el estado a awaiting_payment y el borrower ve el mensaje del sistema', async () => {
         currentUserId = OWNER_ID;
         renderPage();
 
@@ -161,7 +199,31 @@ describe('ChatDetailPage — flujo de transacción', () => {
         await waitFor(() => {
             expect(screen.getByText('ACEPTADO')).toBeInTheDocument();
         });
-        expect(screen.getByText(/el prestador ha aceptado las condiciones/i)).toBeInTheDocument();
+
+        // El owner NO debería ver el mensaje del sistema de pago (según requerimiento)
+        expect(screen.queryByText(/el prestador ha aceptado las condiciones/i)).not.toBeInTheDocument();
+
+        // Si cambiamos a borrower, sí debería verlo
+        currentUserId = BORROWER_ID;
+        cleanup(); // Limpiamos y re-renderizamos como borrower
+        
+        // Mocking the accepted state for the re-render
+        vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'awaiting_payment' } });
+        vi.mocked(messagesLib.messagesApi.getByTransaction).mockResolvedValue([
+            {
+                id: 'sys-1',
+                transaction_id: TX_ID,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: 'El prestador ha aceptado las condiciones propuestas, ahora mete los métodos de pago.',
+                created_at: new Date().toISOString(),
+            }
+        ]);
+        
+        renderPage();
+        await waitFor(() => {
+            expect(screen.getByText(/el prestador ha aceptado las condiciones/i)).toBeInTheDocument();
+            expect(screen.getByText(/confirmar y pagar fianza/i)).toBeInTheDocument();
+        });
     });
 
     it('tras rechazar, cambia el estado a cancelled y muestra mensaje del sistema', async () => {

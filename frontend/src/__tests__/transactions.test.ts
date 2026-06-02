@@ -69,13 +69,16 @@ describe('transactionsApi.pay', () => {
             json: async () => ({ success: true }),
         });
 
-        await transactionsApi.pay('tx-1', 5000);
+        await transactionsApi.pay('tx-1', 5000, 'pm_123');
 
         expect(fetchMock).toHaveBeenCalledWith(
             expect.stringContaining('/transactions/tx-1/pay'),
             expect.objectContaining({
                 method: 'PUT',
-                body: JSON.stringify({ deposit_amount_cents: 5000 }),
+                body: JSON.stringify({
+                    deposit_amount_cents: 5000,
+                    payment_method_id: 'pm_123'
+                }),
             })
         );
     });
@@ -86,6 +89,6 @@ describe('transactionsApi.pay', () => {
             json: async () => ({ error: 'transaction not in awaiting_payment state' }),
         });
 
-        await expect(transactionsApi.pay('tx-1', 5000)).rejects.toThrow('awaiting_payment');
+        await expect(transactionsApi.pay('tx-1', 5000, 'pm_123')).rejects.toThrow('awaiting_payment');
     });
 });

@@ -33,3 +33,21 @@ vi.stubGlobal('IntersectionObserver', class {
 })
 
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
+// Mock de Stripe
+vi.mock('@stripe/stripe-js', () => ({
+    loadStripe: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@stripe/react-stripe-js', () => ({
+    Elements: ({ children }: { children: React.ReactNode }) => children,
+    CardNumberElement: () => null,
+    CardExpiryElement: () => null,
+    CardCvcElement: () => null,
+    useStripe: () => ({
+        createPaymentMethod: vi.fn().mockResolvedValue({ paymentMethod: { id: 'pm_123' } }),
+    }),
+    useElements: () => ({
+        getElement: vi.fn(),
+    }),
+}));

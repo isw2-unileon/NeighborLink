@@ -29,7 +29,7 @@ type Transaction struct {
 type ReserveInput struct {
 	StartDate       string `json:"start_date"        binding:"required"`
 	EndDate         string `json:"end_date"          binding:"required"`
-	PaymentMethodID string `json:"payment_method_id" binding:"required"`
+	PaymentMethodID string `json:"payment_method_id"`
 }
 
 // DateRange represents a blocked date range for availability checks.

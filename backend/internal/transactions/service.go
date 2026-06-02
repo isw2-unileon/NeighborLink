@@ -43,7 +43,7 @@ func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error
 
 // ConfirmPayment autoriza el depósito en Stripe y mueve la transacción a agreed.
 // Solo puede llamarlo el borrower cuando status = awaiting_payment.
-func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64) error {
+func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64, paymentMethodID string) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
 		return fmt.Errorf("service: find transaction: %w", err)
@@ -53,12 +53,21 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 	}
 
 	totalCents := depositAmountCents + PlatformFeeCents
-	paymentIntentID, err := s.stripe.AuthorizeDeposit(totalCents, "eur", t.PaymentMethodID)
+	actualPaymentMethodID := paymentMethodID
+	if actualPaymentMethodID == "" {
+		actualPaymentMethodID = t.PaymentMethodID
+	}
+
+	if actualPaymentMethodID == "" {
+		return fmt.Errorf("service: payment method ID is required")
+	}
+
+	stripePIID, err := s.stripe.AuthorizeDeposit(totalCents, "eur", actualPaymentMethodID)
 	if err != nil {
 		return fmt.Errorf("service: authorize deposit: %w", err)
 	}
 
-	return s.repo.UpdatePaymentIntent(ctx, transactionID, paymentIntentID, t.PaymentMethodID, totalCents)
+	return s.repo.UpdatePaymentIntent(ctx, transactionID, stripePIID, actualPaymentMethodID, totalCents)
 }
 
 // Reject cancels a pending transaction and updates its status to cancelled.

@@ -978,7 +978,7 @@ func TestPayTransaction_Success(t *testing.T) {
 		},
 	}, &fakeStripe{})
 
-	body := `{"deposit_amount_cents":5000}`
+	body := `{"deposit_amount_cents":5000, "payment_method_id": "pm_new"}`
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -1032,7 +1032,7 @@ func TestPayTransaction_WrongStatus_Returns409(t *testing.T) {
 		},
 	}, &fakeStripe{})
 
-	body := `{"deposit_amount_cents":5000}`
+	body := `{"deposit_amount_cents":5000, "payment_method_id": "pm_any"}`
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

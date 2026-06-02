@@ -213,12 +213,17 @@ func (h *Handler) payTransaction(c *gin.Context) {
 		return
 	}
 
-	depositAmountCents, ok := h.parseDepositAmountCents(c)
-	if !ok {
+	var body struct {
+		DepositAmountCents int64  `json:"deposit_amount_cents"`
+		PaymentMethodID    string `json:"payment_method_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		slog.Error("failed to parse pay transaction body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.service.ConfirmPayment(c.Request.Context(), id, depositAmountCents); err != nil {
+	if err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID); err != nil {
 		h.handleServiceError(c, "pay", id, err)
 		return
 	}

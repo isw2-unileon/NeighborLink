@@ -33,8 +33,11 @@ func (c *Client) AuthorizeDeposit(amountCents int64, currency string, paymentMet
 		Currency:      stripe.String(currency),
 		PaymentMethod: stripe.String(paymentMethodID),
 		CaptureMethod: stripe.String(string(stripe.PaymentIntentCaptureMethodManual)),
-		ConfirmationMethod: stripe.String(string(stripe.PaymentIntentConfirmationMethodAutomatic)),
-		Confirm: stripe.Bool(true),
+		Confirm:       stripe.Bool(true),
+		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
+			Enabled:        stripe.Bool(true),
+			AllowRedirects: stripe.String("never"),
+		},
 	}
 
 	pi, err := paymentintent.New(params)

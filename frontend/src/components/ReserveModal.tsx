@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { DayPicker, DateRange as DayPickerRange } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { reservationsApi, DateRange } from '../lib/reservations';
-import PaymentForm, { type PaymentFormHandle } from './PaymentForm';
 
 interface Props {
     listingId: string;
@@ -17,12 +16,10 @@ interface DefinedRange {
 }
 
 export default function ReserveModal({ listingId, depositAmount, onClose, onSuccess }: Props) {
-    const [step, setStep] = useState<'calendar' | 'payment'>('calendar');
     const [range, setRange] = useState<DefinedRange | undefined>();
     const [blockedDates, setBlockedDates] = useState<DateRange[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const paymentFormRef = useRef<PaymentFormHandle>(null);
 
     useEffect(() => {
         reservationsApi.getAvailability(listingId).then(setBlockedDates).catch(console.error);
@@ -57,17 +54,16 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
     }
 
     async function handleConfirm() {
-        if (!paymentFormRef.current || !range) return;
+        if (!range) return;
         const startDate = range.from.toISOString().split('T')[0] ?? '';
         const endDate = range.to.toISOString().split('T')[0] ?? '';
         setSubmitting(true);
         setError(null);
         try {
-            const pmId = await paymentFormRef.current.createPaymentMethod();
             const result = await reservationsApi.reserve(listingId, {
                 start_date: startDate,
                 end_date: endDate,
-                payment_method_id: pmId,
+                payment_method_id: '', // Ya no se requiere aquí
             });
             onSuccess(result.id);
         } catch (err: unknown) {
@@ -84,9 +80,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
         >
             <div className="bg-white rounded-[28px] shadow-xl w-full max-w-md p-6">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">
-                        {step === 'calendar' ? 'Elige las fechas' : 'Datos de pago'}
-                    </h2>
+                    <h2 className="text-xl font-semibold">Elige las fechas</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                 </div>
 
@@ -96,54 +90,30 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                     </p>
                 )}
 
-                {step === 'calendar' ? (
-                    <>
-                        <DayPicker
-                            mode="range"
-                            selected={range}
-                            onSelect={handleRangeSelect}
-                            disabled={[{ before: new Date() }, ...disabledDays]}
-                            numberOfMonths={1}
-                        />
+                <DayPicker
+                    mode="range"
+                    selected={range}
+                    onSelect={handleRangeSelect}
+                    disabled={[{ before: new Date() }, ...disabledDays]}
+                    numberOfMonths={1}
+                />
 
-                        {days > 0 && (
-                            <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-[var(--muted)]">{days} días × {depositAmount} €</span>
-                                    <span className="font-semibold">{total} €</span>
-                                </div>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={() => setStep('payment')}
-                            disabled={!range}
-                            className="w-full mt-4 bg-[var(--accent)] text-white py-2.5 rounded-full hover:brightness-95 disabled:opacity-50 font-semibold"
-                        >
-                            Continuar
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <PaymentForm ref={paymentFormRef} totalEuros={total} />
-
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setStep('calendar')}
-                                className="px-4 py-2 bg-[var(--surface-strong)] rounded-full font-semibold"
-                            >
-                                Atrás
-                            </button>
-                            <button
-                                onClick={handleConfirm}
-                                disabled={submitting}
-                                className="flex-1 bg-[var(--accent)] text-white py-2 rounded-full hover:brightness-95 disabled:opacity-50 font-semibold"
-                            >
-                                {submitting ? 'Confirmando...' : 'Confirmar reserva'}
-                            </button>
+                {days > 0 && (
+                    <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-[var(--muted)]">{days} días × {depositAmount} €</span>
+                            <span className="font-semibold">{total} €</span>
                         </div>
-                    </>
+                    </div>
                 )}
+
+                <button
+                    onClick={handleConfirm}
+                    disabled={!range || submitting}
+                    className="w-full mt-4 bg-[var(--accent)] text-white py-2.5 rounded-full hover:brightness-95 disabled:opacity-50 font-semibold"
+                >
+                    {submitting ? 'Confirmando...' : 'Confirmar reserva'}
+                </button>
             </div>
         </div>
     );

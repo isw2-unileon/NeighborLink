@@ -60,9 +60,9 @@ describe('ReserveModal', () => {
         expect(screen.getByTestId('day-picker')).toBeInTheDocument();
     });
 
-    it('el botón continuar está deshabilitado sin fechas seleccionadas', () => {
+    it('el botón confirmar reserva está deshabilitado sin fechas seleccionadas', () => {
         render(<ReserveModal {...defaultProps} />);
-        expect(screen.getByRole('button', { name: /continuar/i })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /confirmar reserva/i })).toBeDisabled();
     });
 
     it('llama a onClose al pulsar ✕', () => {
@@ -71,32 +71,18 @@ describe('ReserveModal', () => {
         expect(defaultProps.onClose).toHaveBeenCalled();
     });
 
-    it('habilita continuar y muestra precio tras seleccionar fechas', async () => {
+    it('habilita confirmar reserva y muestra precio tras seleccionar fechas', async () => {
         render(<ReserveModal {...defaultProps} />);
 
         fireEvent.click(screen.getByText('Seleccionar rango'));
 
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /continuar/i })).not.toBeDisabled();
+            expect(screen.getByRole('button', { name: /confirmar reserva/i })).not.toBeDisabled();
         });
 
         // 4 días × 20 € = 80 €
         expect(screen.getByText(/4 días × 20 €/)).toBeInTheDocument();
         expect(screen.getByText('80 €')).toBeInTheDocument();
-    });
-
-    it('navega al paso de pago al pulsar continuar', async () => {
-        render(<ReserveModal {...defaultProps} />);
-
-        fireEvent.click(screen.getByText('Seleccionar rango'));
-
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /continuar/i })).not.toBeDisabled();
-        });
-
-        fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-        expect(screen.getByText('Datos de pago')).toBeInTheDocument();
-        expect(screen.getByTestId('card-number')).toBeInTheDocument();
     });
 
     it('carga las fechas bloqueadas al montar', async () => {
@@ -119,9 +105,8 @@ describe('ReserveModal', () => {
         fireEvent.click(screen.getByText('Seleccionar rango'));
 
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /continuar/i })).not.toBeDisabled();
+            expect(screen.getByRole('button', { name: /confirmar reserva/i })).not.toBeDisabled();
         });
-        fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
 
         fireEvent.click(screen.getByRole('button', { name: /confirmar reserva/i }));
 
@@ -137,28 +122,13 @@ describe('ReserveModal', () => {
         fireEvent.click(screen.getByText('Seleccionar rango'));
 
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /continuar/i })).not.toBeDisabled();
+            expect(screen.getByRole('button', { name: /confirmar reserva/i })).not.toBeDisabled();
         });
-        fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
 
         fireEvent.click(screen.getByRole('button', { name: /confirmar reserva/i }));
 
         await waitFor(() => {
             expect(defaultProps.onSuccess).toHaveBeenCalledWith('tx-1');
         });
-    });
-
-    it('vuelve al calendario al pulsar Atrás', async () => {
-        render(<ReserveModal {...defaultProps} />);
-        fireEvent.click(screen.getByText('Seleccionar rango'));
-
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /continuar/i })).not.toBeDisabled();
-        });
-        fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-        expect(screen.getByText('Datos de pago')).toBeInTheDocument();
-
-        fireEvent.click(screen.getByRole('button', { name: /atrás/i }));
-        expect(screen.getByText('Elige las fechas')).toBeInTheDocument();
     });
 });

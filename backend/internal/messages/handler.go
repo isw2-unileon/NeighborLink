@@ -201,7 +201,7 @@ func (h *Handler) decideTransaction(c *gin.Context) {
 
 	_, err = h.repo.Create(c.Request.Context(), Message{
 		TransactionID: transactionID,
-		SenderID:      userID.(string),
+		SenderID:      SystemUserID,
 		Content:       systemMessage,
 	})
 	if err != nil {
