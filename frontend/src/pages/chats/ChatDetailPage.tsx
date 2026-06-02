@@ -270,8 +270,8 @@ export default function ChatDetailPage() {
                 <PaymentModal
                     transactionId={transactionId!}
                     depositAmount={listing.deposit_amount}
-                    startDate={transaction.start_date}
-                    endDate={transaction.end_date}
+                    startDate={transaction.start_date ?? ''}
+                    endDate={transaction.end_date ?? ''}
                     onClose={() => setShowPayment(false)}
                     onSuccess={handlePaymentSuccess}
                 />

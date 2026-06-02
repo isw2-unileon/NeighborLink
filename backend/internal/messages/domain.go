@@ -3,6 +3,7 @@ package messages
 
 import "time"
 
+// SystemUserID is the reserved UUID for automated system messages.
 const SystemUserID = "00000000-0000-0000-0000-000000000000"
 
 // Message represents a chat message within a transaction.
