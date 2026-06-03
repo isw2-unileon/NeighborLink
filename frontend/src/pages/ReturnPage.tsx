@@ -15,13 +15,15 @@ export default function ReturnPage() {
 
     useEffect(() => {
         if (!listingId) return;
-        api.get<{ data: { id: string; status: string; deposit_amount_cents?: number }[] }>(
+        api.get<{ data: { id: string; status: string; total_charged_cents?: number }[] }>(
             `/listings/${listingId}/transactions`
         ).then(r => {
             const active = r.data.find(t => t.status === 'handed_over');
             if (active) {
                 setTransactionId(active.id);
-                setDepositAmountCents(active.deposit_amount_cents ?? 0);
+                // total_charged_cents is deposit + fee, but the backend handles the share calculation.
+                // We send the full amount charged as base for the variable refund.
+                setDepositAmountCents(active.total_charged_cents ?? 0);
             }
         }).catch(() => { });
     }, [listingId]);

@@ -29,9 +29,16 @@ func (f *fakeStripe) ReleaseDeposit(_ string, amount int64) error {
 	return nil
 }
 
-type fakeListingSvc struct{}
+type fakeListingSvc struct {
+	updatedListingID string
+	updatedStatus    string
+}
 
-func (f *fakeListingSvc) UpdateStatus(_ context.Context, _ string, _ string) error { return nil }
+func (f *fakeListingSvc) UpdateStatus(_ context.Context, id string, status string) error {
+	f.updatedListingID = id
+	f.updatedStatus = status
+	return nil
+}
 
 // --- Handover ---
 
@@ -42,13 +49,16 @@ func TestHandover_CapturesDeposit(t *testing.T) {
 		},
 	}
 	fs := &fakeStripe{}
-	svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+	lsvc := &fakeListingSvc{}
+	svc := transactions.NewService(repo, fs, lsvc)
 
 	err := svc.Handover(context.Background(), "tx-1")
 
 	assert.NoError(t, err)
 	assert.True(t, fs.captureCalled)
 	assert.Equal(t, "handed_over", repo.transactions[0].Status)
+	assert.Equal(t, "lst-1", lsvc.updatedListingID)
+	assert.Equal(t, "pending_return", lsvc.updatedStatus)
 }
 
 func TestHandover_FailsIfNotAgreed(t *testing.T) {
@@ -70,12 +80,15 @@ func TestHandover_SkipsStripeForDevPaymentIntent(t *testing.T) {
 			{ID: "tx-1", Status: "agreed", StripePaymentIntentID: "", ListingID: "lst-1"},
 		},
 	}
-	svc := transactions.NewService(repo, nil, &fakeListingSvc{})
+	lsvc := &fakeListingSvc{}
+	svc := transactions.NewService(repo, nil, lsvc)
 
 	err := svc.Handover(context.Background(), "tx-1")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "handed_over", repo.transactions[0].Status)
+	assert.Equal(t, "lst-1", lsvc.updatedListingID)
+	assert.Equal(t, "pending_return", lsvc.updatedStatus)
 }
 
 // --- AcceptRequest ---
@@ -112,16 +125,19 @@ func TestAcceptRequest_FailsIfNotPending(t *testing.T) {
 func TestConfirmPayment_ChargesDepositPlusPlatformFee(t *testing.T) {
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
-			{ID: "tx-1", Status: "awaiting_payment", PaymentMethodID: "pm_test"},
+			{ID: "tx-1", Status: "awaiting_payment", PaymentMethodID: "pm_test", ListingID: "lst-1"},
 		},
 	}
 	fs := &fakeStripe{}
-	svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+	lsvc := &fakeListingSvc{}
+	svc := transactions.NewService(repo, fs, lsvc)
 
 	err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(700), fs.capturedAmount) // 500 deposit + 200 platform fee
+	assert.Equal(t, "lst-1", lsvc.updatedListingID)
+	assert.Equal(t, "pending_handover", lsvc.updatedStatus)
 }
 
 func TestConfirmPayment_FailsIfNotAwaitingPayment(t *testing.T) {
@@ -199,13 +215,16 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 				},
 			}
 			fs := &fakeStripe{}
-			svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+			lsvc := &fakeListingSvc{}
+			svc := transactions.NewService(repo, fs, lsvc)
 
 			daysBorrowed, err := svc.Return(context.Background(), "tx-1", tc.deposit)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantDayReturned, daysBorrowed)
 			assert.Equal(t, tc.wantRefund, fs.releasedAmount)
+			assert.Equal(t, "lst-1", lsvc.updatedListingID)
+			assert.Equal(t, "available", lsvc.updatedStatus)
 		})
 	}
 }
@@ -227,13 +246,16 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 		},
 	}
 	fs := &fakeStripe{}
-	svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+	lsvc := &fakeListingSvc{}
+	svc := transactions.NewService(repo, fs, lsvc)
 
 	_, err := svc.Return(context.Background(), "tx-1", deposit)
 
 	assert.NoError(t, err)
 	// refundAmount must be strictly less than the deposit (fee not refunded, and lender keeps a share)
 	assert.Less(t, fs.releasedAmount, deposit)
+	assert.Equal(t, "lst-1", lsvc.updatedListingID)
+	assert.Equal(t, "available", lsvc.updatedStatus)
 }
 
 func TestReturn_DaysClamped(t *testing.T) {
@@ -251,12 +273,15 @@ func TestReturn_DaysClamped(t *testing.T) {
 			},
 		}
 		fs := &fakeStripe{}
-		svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+		lsvc := &fakeListingSvc{}
+		svc := transactions.NewService(repo, fs, lsvc)
 
 		daysBorrowed, err := svc.Return(context.Background(), "tx-1", 10000)
 
 		assert.NoError(t, err)
 		assert.Equal(t, 1, daysBorrowed)
+		assert.Equal(t, "lst-1", lsvc.updatedListingID)
+		assert.Equal(t, "available", lsvc.updatedStatus)
 	})
 
 	t.Run("over-7-day return clamps to 7", func(t *testing.T) {
@@ -273,12 +298,15 @@ func TestReturn_DaysClamped(t *testing.T) {
 			},
 		}
 		fs := &fakeStripe{}
-		svc := transactions.NewService(repo, fs, &fakeListingSvc{})
+		lsvc := &fakeListingSvc{}
+		svc := transactions.NewService(repo, fs, lsvc)
 
 		daysBorrowed, err := svc.Return(context.Background(), "tx-1", 10000)
 
 		assert.NoError(t, err)
 		assert.Equal(t, 7, daysBorrowed)
+		assert.Equal(t, "lst-1", lsvc.updatedListingID)
+		assert.Equal(t, "available", lsvc.updatedStatus)
 	})
 }
 

@@ -24,7 +24,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 
 func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
+		SELECT id, listing_id, borrower_id, status, total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
 		FROM transactions
 	`)
 	if err != nil {
@@ -35,7 +35,7 @@ func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error)
 	transactions := make([]Transaction, 0)
 	for rows.Next() {
 		var t Transaction
-		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)
 		}
 		transactions = append(transactions, t)
@@ -53,12 +53,12 @@ func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transact
 		SELECT id, listing_id, borrower_id, status,
 			COALESCE(stripe_payment_intent_id, '') AS stripe_payment_intent_id,
 			COALESCE(payment_method_id, '')        AS payment_method_id,
-			total_charged_cents, agreed_at, handover_at, return_at
+			total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
 		FROM transactions
 		WHERE id = $1
 	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status,
 		&t.StripePaymentIntentID, &t.PaymentMethodID,
-		&t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
+		&t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -103,7 +103,7 @@ func (r *postgresRepository) scanRows(rows pgx.Rows) ([]Transaction, error) {
 	transactions := make([]Transaction, 0)
 	for rows.Next() {
 		var t Transaction
-		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)
 		}
 		transactions = append(transactions, t)
@@ -116,7 +116,7 @@ func (r *postgresRepository) scanRows(rows pgx.Rows) ([]Transaction, error) {
 
 func (r *postgresRepository) FindByListing(ctx context.Context, listingID string) ([]Transaction, error) {
 	rows, err := r.pool.Query(ctx, `
-        SELECT id, listing_id, borrower_id, status, total_charged_cents, agreed_at, handover_at, return_at
+        SELECT id, listing_id, borrower_id, status, total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
         FROM transactions WHERE listing_id = $1
     `, listingID)
 	if err != nil {
@@ -129,7 +129,7 @@ func (r *postgresRepository) FindByListing(ctx context.Context, listingID string
 func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, t.listing_id, t.borrower_id, t.status,
-		       t.total_charged_cents, t.agreed_at, t.handover_at, t.return_at,
+		       t.total_charged_cents, t.start_date, t.end_date, t.agreed_at, t.handover_at, t.return_at,
 		       l.title, l.photos
 		FROM transactions t
 		JOIN listings l ON t.listing_id = l.id
@@ -148,7 +148,7 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 		var photos []string
 		if err := rows.Scan(
 			&bt.ID, &bt.ListingID, &bt.BorrowerID, &bt.Status,
-			&bt.TotalChargedCents, &bt.AgreedAt, &bt.HandoverAt, &bt.ReturnAt,
+			&bt.TotalChargedCents, &bt.StartDate, &bt.EndDate, &bt.AgreedAt, &bt.HandoverAt, &bt.ReturnAt,
 			&bt.ListingTitle, &photos,
 		); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)

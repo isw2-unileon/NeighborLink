@@ -23,6 +23,22 @@ const STATUS_COLORS: Record<string, string> = {
     cancelled: 'bg-red-100 text-red-700',
 };
 
+const LISTING_STATUS_LABELS: Record<string, string> = {
+    available: 'Disponible',
+    pending_handover: 'Reservado (pendiente de entrega)',
+    pending_return: 'Prestado (pendiente de devolución)',
+    borrowed: 'Prestado',
+    inactive: 'Inactivo',
+};
+
+const LISTING_STATUS_COLORS: Record<string, string> = {
+    available: 'bg-green-100 text-green-700',
+    pending_handover: 'bg-orange-100 text-orange-700',
+    pending_return: 'bg-yellow-100 text-yellow-700',
+    borrowed: 'bg-yellow-100 text-yellow-700',
+    inactive: 'bg-gray-100 text-gray-600',
+};
+
 interface ListingInput {
     title: string;
     description: string;
@@ -213,13 +229,8 @@ export default function ListingDetailPage() {
                     <div className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm">
                         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <h1 className="text-3xl font-semibold">{listing.title}</h1>
-                            <span className={`text-sm px-3 py-1 rounded-full font-medium ${listing.status === 'available'
-                                ? 'bg-green-100 text-green-700'
-                                : listing.status === 'borrowed'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                {listing.status}
+                            <span className={`text-sm px-3 py-1 rounded-full font-medium ${LISTING_STATUS_COLORS[listing.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                {LISTING_STATUS_LABELS[listing.status] ?? listing.status}
                             </span>
                         </div>
 
