@@ -77,8 +77,10 @@ function EleccionModal({
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="text-base font-bold text-gray-900 mb-1">Tomar una decisión</h2>
-                    <p className="text-sm text-gray-500">
-                    <p className="text-sm text-gray-500">¿Deseas aceptar o rechazar esta solicitud?</p>
+                    <div>
+                        Texto
+                        <p className="text-sm text-gray-500">¿Deseas aceptar o rechazar esta solicitud?</p>
+                    </div>
                 </div>
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                     <span className="text-amber-500 text-base mt-0.5">⚠️</span>
