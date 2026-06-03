@@ -25,9 +25,10 @@ export default function PaymentModal({
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const days = Math.round((end.getTime() - start.getTime()) / 86400000);
-    const depositCents = Math.round(days * depositAmount * 100);
-    const totalEuros = (depositCents + 200) / 100; // 200 cents platform fee
+    const diffMs = end.getTime() - start.getTime();
+    const days = Math.max(1, Math.round(diffMs / 86400000)) || 1; // Default to 1 day if invalid
+    const depositCents = Math.round(days * Number(depositAmount) * 100) || 0;
+    const totalEuros = (depositCents + 200) / 100;
 
     async function handlePay() {
         if (!paymentFormRef.current) return;

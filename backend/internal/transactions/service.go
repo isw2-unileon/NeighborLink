@@ -67,7 +67,15 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 		return fmt.Errorf("service: authorize deposit: %w", err)
 	}
 
-	return s.repo.UpdatePaymentIntent(ctx, transactionID, stripePIID, actualPaymentMethodID, totalCents)
+	if err := s.repo.UpdatePaymentIntent(ctx, transactionID, stripePIID, actualPaymentMethodID, totalCents); err != nil {
+		return fmt.Errorf("service: update payment intent: %w", err)
+	}
+
+	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "pending_handover"); err != nil {
+		return fmt.Errorf("service: update listing status: %w", err)
+	}
+
+	return nil
 }
 
 // Reject cancels a pending transaction and updates its status to cancelled.
@@ -147,6 +155,11 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 
 	daysBorrowed := calcDaysBorrowed(*t.HandoverAt, time.Now())
 	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
+
+	// Stripe requires at least 1 cent for refunds.
+	if refundAmountCents < 1 {
+		refundAmountCents = 1
+	}
 
 	if !isDevPaymentIntent(t.StripePaymentIntentID) {
 		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {

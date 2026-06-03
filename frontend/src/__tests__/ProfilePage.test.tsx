@@ -100,7 +100,7 @@ describe('ProfilePage', () => {
 
     it('muestra mensaje vacío si no hay listings en un estado', async () => {
         renderPage()
-        expect(await screen.findByText('No tienes objetos disponibles en este momento.')).toBeInTheDocument()
+        expect(await screen.findByText('No tienes objetos disponibles.')).toBeInTheDocument()
     })
 
     it('llama a uploadAvatar y actualiza el usuario al cambiar el avatar', async () => {

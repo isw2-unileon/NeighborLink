@@ -66,7 +66,12 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 			args = append(args, f.Status)
 			argN++
 		}
+	} else if f.ExcludeOwnerID != "" {
+		// If we are EXCLUDING the owner (exploring page), only show 'available'
+		q += " AND status = 'available'"
 	}
+	// If f.Status is empty AND f.ExcludeOwnerID is empty (profile page), 
+	// we show ALL statuses by default (no filter added).
 	if f.MinDeposit > 0 {
 		q += fmt.Sprintf(" AND deposit_amount >= $%d", argN)
 		args = append(args, f.MinDeposit)

@@ -14,14 +14,18 @@ import type { Transaction } from '../types';
 
 const STATUS_LABELS: Record<string, string> = {
     available: 'Disponibles',
-    pending_handover: 'Pendiente de entrega',
-    pending_return: 'Pendiente de devolución',
+    pending_handover: 'Pendientes de entrega',
+    pending_return: 'Prestados',
+    borrowed: 'Prestados',
+    inactive: 'Inactivos',
 };
 
 const STATUS_COLORS: Record<string, string> = {
     available: 'bg-green-100 text-green-700',
-    pending_handover: 'bg-yellow-100 text-yellow-700',
-    pending_return: 'bg-blue-100 text-blue-700',
+    pending_handover: 'bg-orange-100 text-orange-700',
+    pending_return: 'bg-yellow-100 text-yellow-700',
+    borrowed: 'bg-yellow-100 text-yellow-700',
+    inactive: 'bg-gray-100 text-gray-600',
 };
 
 const RESERVATION_STATUS_LABELS: Record<string, string> = {
@@ -40,17 +44,16 @@ const RESERVATION_STATUS_COLORS: Record<string, string> = {
     rejected: 'bg-red-100 text-red-700',
 };
 
-const VISIBLE_STATUSES = ['available', 'pending_handover', 'pending_return'];
-
-const EMPTY_MESSAGES: Record<string, string> = {
-    available: 'No tienes objetos disponibles en este momento.',
-    pending_handover: 'No tienes objetos pendientes de entregar en este momento.',
-    pending_return: 'No tienes objetos pendientes de devolver en este momento.',
-};
+const VISIBLE_STATUS_GROUPS = [
+    { label: 'Disponibles', statuses: ['available'], empty: 'No tienes objetos disponibles.' },
+    { label: 'Pendientes de entrega', statuses: ['pending_handover'], empty: 'No tienes objetos pendientes de entregar.' },
+    { label: 'Prestados', statuses: ['pending_return', 'borrowed'], empty: 'No tienes objetos prestados en este momento.' },
+    { label: 'Inactivos', statuses: ['inactive'], empty: 'No tienes objetos inactivos.' },
+];
 
 function getListingTo(listing: Listing): string {
     if (listing.status === 'pending_handover') return `/listings/${listing.id}/handover`;
-    if (listing.status === 'pending_return') return `/listings/${listing.id}/return`;
+    if (listing.status === 'pending_return' || listing.status === 'borrowed') return `/listings/${listing.id}/return`;
     return `/listings/${listing.id}`;
 }
 
@@ -65,11 +68,6 @@ function MyListings({ userID }: { userID: string }) {
             .catch(() => setError('No se pudieron cargar tus objetos'))
             .finally(() => setLoading(false));
     }, [userID]);
-
-    const grouped = VISIBLE_STATUSES.reduce<Record<string, Listing[]>>((acc, status) => {
-        acc[status] = listings.filter(l => l.status === status);
-        return acc;
-    }, {});
 
     return (
         <div className="glass-panel rounded-3xl p-6 flex flex-col gap-6">
@@ -88,15 +86,15 @@ function MyListings({ userID }: { userID: string }) {
                 <p className="text-sm text-red-500 text-center">{error}</p>
             )}
 
-            {!loading && !error && VISIBLE_STATUSES.map(status => {
-                const items = grouped[status] ?? [];
+            {!loading && !error && VISIBLE_STATUS_GROUPS.map(group => {
+                const items = listings.filter(l => group.statuses.includes(l.status));
                 return (
-                    <div key={status} className="flex flex-col gap-2">
+                    <div key={group.label} className="flex flex-col gap-2">
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                            {STATUS_LABELS[status]}
+                            {group.label}
                         </h3>
                         {items.length === 0 ? (
-                            <p className="text-sm text-[var(--muted)] py-2">{EMPTY_MESSAGES[status]}</p>
+                            <p className="text-sm text-[var(--muted)] py-2">{group.empty}</p>
                         ) : (
                             items.map(listing => (
                                 <Link key={listing.id} to={getListingTo(listing)}
@@ -111,8 +109,8 @@ function MyListings({ userID }: { userID: string }) {
                                         <p className="text-sm font-medium text-[var(--text)] truncate">{listing.title}</p>
                                         <p className="text-xs text-[var(--muted)] mt-0.5">Depósito: {listing.deposit_amount}€</p>
                                     </div>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[status]}`}>
-                                        {STATUS_LABELS[status]}
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[listing.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        {STATUS_LABELS[listing.status] ?? listing.status}
                                     </span>
                                 </Link>
                             ))
