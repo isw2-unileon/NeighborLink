@@ -68,7 +68,7 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 		}
 	} else if f.ExcludeOwnerID != "" {
 		// If we are EXCLUDING the owner (exploring page), only show 'available'
-		q += fmt.Sprintf(" AND status = 'available'")
+		q += " AND status = 'available'"
 	}
 	// If f.Status is empty AND f.ExcludeOwnerID is empty (profile page), 
 	// we show ALL statuses by default (no filter added).
