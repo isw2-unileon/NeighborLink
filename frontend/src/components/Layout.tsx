@@ -9,8 +9,6 @@ function formatNotificationText(notification: Notification): string {
     switch (notification.type) {
         case 'listing_created':
             return `Se ha creado tu anuncio: ${String(notification.payload.listing_title ?? 'listing')}`;
-        case 'transaction_requested':
-            return `Tienes una nueva solicitud en ${String(notification.payload.listing_title ?? 'tu listing')}`;
         case 'transaction_accepted':
             return `Han aceptado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
         case 'transaction_rejected':
@@ -36,6 +34,7 @@ export default function Layout() {
     const notificationsRef = useRef<HTMLDivElement>(null);
 
     const hasUnreadNotifications = unreadCount > 0;
+    const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
     const handleLogout = () => {
         logout();
@@ -83,7 +82,7 @@ export default function Layout() {
                 notificationsApi.list(20),
                 notificationsApi.unreadCount(),
             ]);
-            setNotifications(items);
+            setNotifications(Array.isArray(items) ? items : []);
             setUnreadCount(count);
         } catch (error) {
             console.error('Error cargando notificaciones', error);
@@ -195,7 +194,7 @@ export default function Layout() {
                                     <div className="text-sm font-semibold text-gray-700">
                                         Notificaciones
                                     </div>
-                                    {notifications.length > 0 && (
+                                    {safeNotifications.length > 0 && (
                                         <button
                                             type="button"
                                             onClick={handleMarkAllAsRead}
@@ -217,26 +216,25 @@ export default function Layout() {
                                         </div>
                                     ) : (
                                         <ul className="divide-y divide-gray-100">
-                                            {notifications.map((notification) => (
-                                                <li
-                                                    key={notification.id}
-                                                    className={notification.read ? 'bg-white' : 'bg-teal-50'}
+                                            {safeNotifications.map((notification) => (<li
+                                                key={notification.id}
+                                                className={notification.read ? 'bg-white' : 'bg-teal-50'}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleMarkAsRead(notification.id, notification.read)
+                                                    }
+                                                    className="w-full px-4 py-3 text-left transition hover:bg-gray-50"
                                                 >
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handleMarkAsRead(notification.id, notification.read)
-                                                        }
-                                                        className="w-full px-4 py-3 text-left transition hover:bg-gray-50"
-                                                    >
-                                                        <p className="text-sm text-gray-800">
-                                                            {formatNotificationText(notification)}
-                                                        </p>
-                                                        <p className="mt-1 text-xs text-gray-400">
-                                                            {new Date(notification.created_at).toLocaleString('es-ES')}
-                                                        </p>
-                                                    </button>
-                                                </li>
+                                                    <p className="text-sm text-gray-800">
+                                                        {formatNotificationText(notification)}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-gray-400">
+                                                        {new Date(notification.created_at).toLocaleString('es-ES')}
+                                                    </p>
+                                                </button>
+                                            </li>
                                             ))}
                                         </ul>
                                     )}
