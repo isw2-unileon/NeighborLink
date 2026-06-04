@@ -59,14 +59,18 @@ func parseValidationErrors(err error) string {
 	return "Datos inválidos"
 }
 
+// domainError agrupa el status HTTP y el mensaje asociado a un error de dominio.
+type domainError struct {
+	status int
+	msg    string
+}
+
 // handleAuth encapsulates the common pattern: bind JSON → call service → respond.
 // Uses generics to avoid duplicating the same flow for register and login.
 func handleAuth[Req any, Resp any](
 	c *gin.Context,
 	svcFn func(context.Context, Req) (Resp, error),
-	domainErr error,
-	domainStatus int,
-	domainMsg string,
+	domainErrors map[error]domainError,
 	successStatus int,
 ) {
 	var req Req
@@ -75,11 +79,13 @@ func handleAuth[Req any, Resp any](
 		return
 	}
 	resp, err := svcFn(c.Request.Context(), req)
-	if errors.Is(err, domainErr) {
-		c.JSON(domainStatus, gin.H{"error": domainMsg})
-		return
-	}
 	if err != nil {
+		for domainErr, de := range domainErrors {
+			if errors.Is(err, domainErr) {
+				c.JSON(de.status, gin.H{"error": de.msg})
+				return
+			}
+		}
 		slog.Error("auth request failed", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor"})
 		return
@@ -88,11 +94,14 @@ func handleAuth[Req any, Resp any](
 }
 
 func (h *Handler) register(c *gin.Context) {
-	handleAuth(c, h.svc.Register, ErrEmailTaken,
-		http.StatusConflict, "Este email ya está registrado", http.StatusCreated)
+	handleAuth(c, h.svc.Register, map[error]domainError{
+		ErrEmailTaken:      {http.StatusConflict, "Este email ya está registrado"},
+		ErrGeocodingFailed: {http.StatusUnprocessableEntity, "No hemos podido localizar esa dirección. Por favor, revísala e inténtalo de nuevo."},
+	}, http.StatusCreated)
 }
 
 func (h *Handler) login(c *gin.Context) {
-	handleAuth(c, h.svc.Login, ErrInvalidCredentials,
-		http.StatusUnauthorized, "Email o contraseña incorrectos", http.StatusOK)
+	handleAuth(c, h.svc.Login, map[error]domainError{
+		ErrInvalidCredentials: {http.StatusUnauthorized, "Email o contraseña incorrectos"},
+	}, http.StatusOK)
 }

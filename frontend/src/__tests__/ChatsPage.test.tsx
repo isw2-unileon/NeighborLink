@@ -17,6 +17,8 @@ const mockUser: User = {
     reputation_score: 0,
     points: 0,
     created_at: '2026-01-01T00:00:00Z',
+    lat: 0,
+    lon: 0,
 };
 
 const mockChats: Message[] = [

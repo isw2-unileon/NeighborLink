@@ -21,6 +21,8 @@ const fakeUser: User = {
     reputation_score: 4,
     points: 0,
     created_at: '2024-01-01',
+    lat: 42.5987,
+    lon: -5.5671,
 }
 
 const mockUpdateUser = vi.fn()

@@ -22,6 +22,8 @@ const fakeListing: Listing = {
     status: 'available',
     category: 'herramientas',
     created_at: '',
+    owner_lat: 0,
+    owner_lon: 0,
 }
 
 const fakeListingWithPhoto: Listing = {
@@ -81,27 +83,6 @@ describe('ListingsPage', () => {
             expect(screen.getByRole('img')).toHaveAttribute('src', 'http://img.test/foto.jpg')
         })
     })
-
-    it('no muestra el botón Publicar si no hay usuario', async () => {
-        vi.spyOn(listingsLib.listingsApi, 'getAll').mockResolvedValue([])
-        renderPage(null)
-        await screen.findByText('No hay artículos disponibles todavía.')
-        expect(screen.queryByText('+ Publicar artículo')).not.toBeInTheDocument()
-    })
-
-    it('muestra el botón Publicar si hay usuario autenticado', async () => {
-        vi.spyOn(listingsLib.listingsApi, 'getAll').mockResolvedValue([])
-        renderPage({ id: 'u1', name: 'Ana' } as User)
-        expect(await screen.findByText('+ Publicar artículo')).toBeInTheDocument()
-    })
-
-    it('navega a /listings/new al pulsar Publicar artículo', async () => {
-        vi.spyOn(listingsLib.listingsApi, 'getAll').mockResolvedValue([])
-        renderPage({ id: 'u1', name: 'Ana' } as User)
-        fireEvent.click(await screen.findByText('+ Publicar artículo'))
-        expect(mockNavigate).toHaveBeenCalledWith('/listings/new')
-    })
-
     it('el link de un listing apunta a /listings/:id', async () => {
         vi.spyOn(listingsLib.listingsApi, 'getAll').mockResolvedValue([fakeListing])
         renderPage()

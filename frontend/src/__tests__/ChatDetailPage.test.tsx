@@ -33,6 +33,8 @@ const mockListing = {
     category: 'tools',
     created_at: new Date().toISOString(),
     photos: [],
+    owner_lat: 0,
+    owner_lon: 0,
 } as Listing;
 
 const mockTransaction = {
