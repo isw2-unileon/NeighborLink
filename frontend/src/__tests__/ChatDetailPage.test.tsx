@@ -79,7 +79,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
     it('renderiza el chat con el título del listing', async () => {
         renderPage();
         await waitFor(() => {
-            expect(screen.getByText('Taladro Bosch')).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Taladro Bosch' })).toBeInTheDocument();
         });
     });
 
@@ -108,7 +108,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
     it('NO muestra botón Elección para el borrower', async () => {
         currentUserId = BORROWER_ID; // ya es el default, explícito por claridad
         renderPage();
-        await waitFor(() => screen.getByText('Taladro Bosch'));
+        await waitFor(() => screen.getAllByText('Taladro Bosch'));
         expect(screen.queryByRole('button', { name: /elección/i })).not.toBeInTheDocument();
     });
 
@@ -159,14 +159,14 @@ describe('ChatDetailPage — flujo de transacción', () => {
             }
         ]);
         renderPage();
-        await waitFor(() => screen.getByText('Taladro Bosch'));
+        await waitFor(() => screen.getAllByText('Taladro Bosch'));
         expect(screen.queryByText(/confirmar y pagar fianza/i)).not.toBeInTheDocument();
     });
 
     it('NO muestra botón Pagar ahora cuando status es pending', async () => {
         currentUserId = BORROWER_ID;
         renderPage();
-        await waitFor(() => screen.getByText('Taladro Bosch'));
+        await waitFor(() => screen.getAllByText('Taladro Bosch'));
         expect(screen.queryByText(/confirmar y pagar fianza/i)).not.toBeInTheDocument();
     });
 
@@ -206,7 +206,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
         // Si cambiamos a borrower, sí debería verlo
         currentUserId = BORROWER_ID;
         cleanup(); // Limpiamos y re-renderizamos como borrower
-        
+
         // Mocking the accepted state for the re-render
         vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'awaiting_payment' } });
         vi.mocked(messagesLib.messagesApi.getByTransaction).mockResolvedValue([
@@ -218,7 +218,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
                 created_at: new Date().toISOString(),
             }
         ]);
-        
+
         renderPage();
         await waitFor(() => {
             expect(screen.getByText(/el prestador ha aceptado las condiciones/i)).toBeInTheDocument();
