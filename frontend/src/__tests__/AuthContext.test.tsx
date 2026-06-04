@@ -12,6 +12,8 @@ const mockUser: User = {
     points: 0,
     address: 'Calle Mayor 1, León',
     created_at: '2026-01-01T00:00:00Z',
+    lat: 42.5987,
+    lon: -5.5671,
 }
 
 beforeEach(() => {
@@ -70,7 +72,7 @@ describe('AuthContext', () => {
     it('updateUser actualiza el usuario en estado y localStorage', () => {
         const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider })
 
-        const original: User = { id: '1', name: 'Ana', email: 'ana@test.com', avatar_url: '', reputation_score: 0, points: 0, address: 'Calle Test', created_at: '' }
+        const original: User = { id: '1', name: 'Ana', email: 'ana@test.com', avatar_url: '', reputation_score: 0, points: 0, address: 'Calle Test', created_at: '', lat: 0, lon: 0 }
         const updated: User = { ...original, name: 'Ana López' }
 
         act(() => { result.current.login('tok', original) })

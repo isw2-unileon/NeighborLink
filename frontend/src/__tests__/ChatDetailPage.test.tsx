@@ -33,6 +33,8 @@ const mockListing = {
     category: 'tools',
     created_at: new Date().toISOString(),
     photos: [],
+    owner_lat: 0,
+    owner_lon: 0,
 } as Listing;
 
 const mockTransaction = {
@@ -206,7 +208,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
         // Si cambiamos a borrower, sí debería verlo
         currentUserId = BORROWER_ID;
         cleanup(); // Limpiamos y re-renderizamos como borrower
-        
+
         // Mocking the accepted state for the re-render
         vi.mocked(api.get).mockResolvedValue({ data: { ...mockTransaction, status: 'awaiting_payment' } });
         vi.mocked(messagesLib.messagesApi.getByTransaction).mockResolvedValue([
@@ -218,7 +220,7 @@ describe('ChatDetailPage — flujo de transacción', () => {
                 created_at: new Date().toISOString(),
             }
         ]);
-        
+
         renderPage();
         await waitFor(() => {
             expect(screen.getByText(/el prestador ha aceptado las condiciones/i)).toBeInTheDocument();

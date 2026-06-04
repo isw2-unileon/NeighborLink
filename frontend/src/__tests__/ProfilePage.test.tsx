@@ -25,6 +25,8 @@ const fakeUser: User = {
     reputation_score: 4,
     points: 0,
     created_at: '2024-01-01',
+    lat: 42.5987,
+    lon: -5.5671,
 }
 
 const mockUpdateUser = vi.fn()
@@ -142,6 +144,8 @@ describe('ProfilePage', () => {
                 status: 'available',
                 category: 'herramientas',
                 created_at: '',
+                owner_lat: 42.5987,
+                owner_lon: -5.5671,
             },
             {
                 id: 'l2',
@@ -153,6 +157,8 @@ describe('ProfilePage', () => {
                 status: 'pending_handover',
                 category: 'material_deportivo',
                 created_at: '',
+                owner_lat: 42.5987,
+                owner_lon: -5.5671,
             },
         ]
         vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue(listings)
@@ -173,6 +179,8 @@ describe('ProfilePage', () => {
                 status: 'available',
                 category: 'herramientas',
                 created_at: '',
+                owner_lat: 42.5987,
+                owner_lon: -5.5671,
             },
         ]
         vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue(listings)

@@ -13,6 +13,7 @@ type postgresRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewPostgresRepository creates a new PostgreSQL-backed listings repository.
 func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{pool: pool}
 }
@@ -73,7 +74,6 @@ func (r *postgresRepository) FindAll(ctx context.Context, f FilterParams) ([]Lis
 	if f.MaxDeposit > 0 {
 		q += fmt.Sprintf(" AND l.deposit_amount <= $%d", argN)
 		args = append(args, f.MaxDeposit)
-		argN++
 	}
 
 	q += " ORDER BY l.created_at DESC"
