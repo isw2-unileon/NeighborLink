@@ -51,7 +51,6 @@ export default function Layout() {
                 setIsNotificationsOpen(false);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
@@ -76,7 +75,6 @@ export default function Layout() {
 
     async function loadNotifications() {
         if (!user) return;
-
         try {
             setLoadingNotifications(true);
             const [items, count] = await Promise.all([
@@ -92,15 +90,9 @@ export default function Layout() {
         }
     }
 
-    useEffect(() => {
-        if (!user) return;
-        loadNotifications();
-    }, [user]);
-
     async function handleOpenNotifications() {
         const nextOpen = !isNotificationsOpen;
         setIsNotificationsOpen(nextOpen);
-
         if (nextOpen) {
             await loadNotifications();
         }
@@ -108,7 +100,6 @@ export default function Layout() {
 
     async function handleMarkAsRead(id: string, alreadyRead: boolean) {
         if (alreadyRead) return;
-
         try {
             await notificationsApi.markAsRead(id);
             setNotifications((prev) =>
@@ -142,13 +133,7 @@ export default function Layout() {
                     <div className="relative flex items-center gap-4" ref={notificationsRef}>
                         {user ? (
                             <>
-                                <Link to="/listings" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-                                    Explorar
-                                </Link>
-                                <Link to="/chats" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-                                    Chats
-                                </Link>
-
+                                {/* Notificaciones */}
                                 <button
                                     type="button"
                                     onClick={handleOpenNotifications}
@@ -163,16 +148,38 @@ export default function Layout() {
                                     )}
                                 </button>
 
-                                <Link to="/profile" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-                                    {user.name}
+                                {/* Chats */}
+                                <Link
+                                    to="/chats"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-800 hover:bg-gray-100"
+                                    aria-label="Chats"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.52 3.66 1.424 5.168L2.1 21.1a.75.75 0 00.943.943l3.932-1.324A9.956 9.956 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zM8 13a1 1 0 110-2 1 1 0 010 2zm4 0a1 1 0 110-2 1 1 0 010 2zm4 0a1 1 0 110-2 1 1 0 010 2z" />
+                                    </svg>
                                 </Link>
 
+                                {/* Perfil */}
+                                <Link
+                                    to="/profile"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-800 hover:bg-gray-100"
+                                    aria-label="Mi perfil"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path fillRule="evenodd" clipRule="evenodd" d="M12 2a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM4 19.5A7.5 7.5 0 0120 19.5a.75.75 0 01-.75.75H4.75A.75.75 0 014 19.5z" />
+                                    </svg>
+                                </Link>
+
+                                {/* Salir */}
                                 <button
                                     type="button"
                                     onClick={handleLogout}
-                                    className="text-sm text-[#b9382e] hover:text-[#8f2a23]"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#b9382e] hover:bg-red-50"
+                                    aria-label="Cerrar sesión"
                                 >
-                                    Salir
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+                                    </svg>
                                 </button>
                             </>
                         ) : (
