@@ -4,9 +4,17 @@ import { listingsApi } from '../../lib/listings';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Listing } from '../../types';
 
-interface Coords {
-    lat: number;
-    lon: number;
+// Fórmula de Haversine — calcula la distancia en km entre dos coordenadas
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 interface Filters {
@@ -15,6 +23,7 @@ interface Filters {
     depositMin: string;
     depositMax: string;
     status: string;
+    maxDistanceKm: number; // 0 = sin límite
 }
 
 const INITIAL_FILTERS: Filters = {
@@ -22,7 +31,8 @@ const INITIAL_FILTERS: Filters = {
     category: '',
     depositMin: '',
     depositMax: '',
-    status: '',
+    status: 'available',
+    maxDistanceKm: 0,
 };
 
 export default function ListingsPage() {
@@ -31,22 +41,17 @@ export default function ListingsPage() {
     const [allListings, setAllListings] = useState<Listing[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [coords, setCoords] = useState<Coords | null>(null);
     const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
     const [depositMinInput, setDepositMinInput] = useState('');
     const [depositMaxInput, setDepositMaxInput] = useState('');
 
-    useEffect(() => {
-        if (!navigator.geolocation) {
-            setCoords(null);
-            return;
-        }
+    // Coords vienen del perfil del usuario — no se usa navigator.geolocation
+    const userLat = user?.lat ?? null;
+    const userLon = user?.lon ?? null;
 
-        navigator.geolocation.getCurrentPosition(
-            pos => setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-            () => setCoords(null),
-        );
-    }, []);
+    console.log('userLat:', userLat, 'userLon:', userLon);
+    console.log('primer listing:', allListings[0]);
+    console.log('owner_lat:', allListings[0]?.owner_lat, 'owner_lon:', allListings[0]?.owner_lon);
 
     useEffect(() => {
         setLoading(true);
@@ -58,13 +63,11 @@ export default function ListingsPage() {
             deposit_max: filters.depositMax || undefined,
             status: filters.status || undefined,
             exclude_owner_id: user?.id || undefined,
-            lat: coords ? String(coords.lat) : undefined,
-            lon: coords ? String(coords.lon) : undefined,
         })
             .then(setAllListings)
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
-    }, [filters.category, filters.depositMin, filters.depositMax, filters.status, coords, user?.id]);
+    }, [filters.category, filters.depositMin, filters.depositMax, filters.status, user?.id]);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
@@ -74,22 +77,32 @@ export default function ListingsPage() {
                 depositMax: depositMaxInput,
             }));
         }, 300);
-
         return () => window.clearTimeout(timeoutId);
     }, [depositMinInput, depositMaxInput]);
 
     const listings = useMemo(() => {
-        if (!filters.search.trim()) return allListings;
+        let result = allListings;
 
-        const q = filters.search.toLowerCase();
-        return allListings.filter(
-            l =>
-                l.title.toLowerCase().includes(q) ||
-                l.description.toLowerCase().includes(q)
-        );
-    }, [allListings, filters.search]);
+        if (filters.search.trim()) {
+            const q = filters.search.toLowerCase();
+            result = result.filter(
+                l =>
+                    l.title.toLowerCase().includes(q) ||
+                    l.description.toLowerCase().includes(q)
+            );
+        }
 
-    function handleFilter(key: keyof Filters, value: string) {
+        if (filters.maxDistanceKm > 0 && userLat !== null && userLon !== null) {
+            result = result.filter(l => {
+                if (!l.owner_lat || !l.owner_lon) return true;
+                return haversineKm(userLat, userLon, l.owner_lat, l.owner_lon) <= filters.maxDistanceKm;
+            });
+        }
+
+        return result;
+    }, [allListings, filters.search, filters.maxDistanceKm, userLat, userLon]);
+
+    function handleFilter(key: keyof Filters, value: string | number) {
         setFilters(prev => ({ ...prev, [key]: value }));
     }
 
@@ -170,7 +183,6 @@ export default function ListingsPage() {
                                     className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                                 />
                             </div>
-
                             <div className="flex flex-col gap-1">
                                 <span className="text-xs text-[var(--muted)]">Máx.</span>
                                 <input
@@ -184,7 +196,6 @@ export default function ListingsPage() {
                                 />
                             </div>
                         </div>
-
                         <p className="text-sm text-[var(--muted)]">
                             {depositMinInput || depositMaxInput
                                 ? `Depósito: ${depositMinInput || '0'} € - ${depositMaxInput || 'sin límite'} €`
@@ -199,17 +210,35 @@ export default function ListingsPage() {
                             onChange={e => handleFilter('status', e.target.value)}
                             className="rounded-2xl border border-[var(--border)] bg-white px-4 py-2 text-sm"
                         >
-                            <option value="">Todos</option>
                             <option value="available">Disponible</option>
                             <option value="borrowed">Prestado</option>
                             <option value="inactive">Inactivo</option>
                         </select>
                     </div>
 
-                    {!coords && (
-                        <p className="text-xs italic text-[var(--muted)]">
-                            Activa la ubicación para filtrar por distancia.
-                        </p>
+                    {/* Filtro de distancia — solo visible si el usuario tiene ubicación */}
+                    {userLat !== null && userLon !== null && (
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-medium text-[var(--muted)]">
+                                Distancia máxima
+                                {filters.maxDistanceKm > 0
+                                    ? `: ${filters.maxDistanceKm} km`
+                                    : ': sin límite'}
+                            </label>
+                            <input
+                                type="range"
+                                min={0}
+                                max={50}
+                                step={1}
+                                value={filters.maxDistanceKm}
+                                onChange={e => handleFilter('maxDistanceKm', Number(e.target.value))}
+                                className="w-full accent-[var(--accent-2)]"
+                            />
+                            <div className="flex justify-between text-xs text-[var(--muted)]">
+                                <span>Sin límite</span>
+                                <span>50 km</span>
+                            </div>
+                        </div>
                     )}
 
                     <button
@@ -247,48 +276,62 @@ export default function ListingsPage() {
                         </div>
                     ) : (
                         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {listings.map(listing => (
-                                <Link
-                                    key={listing.id}
-                                    to={`/listings/${listing.id}`}
-                                    className="group flex flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white transition hover:-translate-y-1 hover:shadow-lg"
-                                >
-                                    {listing.photos?.length > 0 ? (
-                                        <div className="aspect-square w-full overflow-hidden bg-[var(--surface-strong)]">
-                                            <img
-                                                src={listing.photos[0]}
-                                                alt={listing.title}
-                                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="flex aspect-square w-full items-center justify-center bg-[var(--surface-strong)]">
-                                            <span className="text-3xl">📦</span>
-                                        </div>
-                                    )}
+                            {listings.map(listing => {
+                                const distKm =
+                                    userLat !== null && userLon !== null && listing.owner_lat && listing.owner_lon
+                                        ? haversineKm(userLat, userLon, listing.owner_lat, listing.owner_lon)
+                                        : null;
 
-                                    <div className="flex flex-1 flex-col gap-2 p-4">
-                                        <h2 className="text-base font-semibold leading-tight">{listing.title}</h2>
-                                        <p className="line-clamp-2 flex-1 text-xs text-[var(--muted)]">
-                                            {listing.description}
-                                        </p>
-                                        <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
-                                            {listing.category?.replace(/_/g, ' ')}
-                                        </p>
-                                        <p className="text-sm font-semibold text-[var(--accent-2)]">
-                                            {listing.deposit_amount} € depósito
-                                        </p>
-                                        <span
-                                            className={`mt-1 w-fit rounded-full px-3 py-1 text-xs font-semibold ${listing.status === 'available'
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-orange-100 text-orange-700'
-                                                }`}
-                                        >
-                                            {listing.status === 'available' ? 'Disponible' : 'No disponible'}
-                                        </span>
-                                    </div>
-                                </Link>
-                            ))}
+                                return (
+                                    <Link
+                                        key={listing.id}
+                                        to={`/listings/${listing.id}`}
+                                        className="group flex flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white transition hover:-translate-y-1 hover:shadow-lg"
+                                    >
+                                        {listing.photos?.length > 0 ? (
+                                            <div className="aspect-square w-full overflow-hidden bg-[var(--surface-strong)]">
+                                                <img
+                                                    src={listing.photos[0]}
+                                                    alt={listing.title}
+                                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex aspect-square w-full items-center justify-center bg-[var(--surface-strong)]">
+                                                <span className="text-3xl">📦</span>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-1 flex-col gap-2 p-4">
+                                            <h2 className="text-base font-semibold leading-tight">{listing.title}</h2>
+                                            <p className="line-clamp-2 flex-1 text-xs text-[var(--muted)]">
+                                                {listing.description}
+                                            </p>
+                                            <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+                                                {listing.category?.replace(/_/g, ' ')}
+                                            </p>
+                                            <p className="text-sm font-semibold text-[var(--accent-2)]">
+                                                {listing.deposit_amount} € depósito
+                                            </p>
+                                            {distKm !== null && (
+                                                <p className="text-xs text-[var(--muted)]">
+                                                    📍 {distKm < 1
+                                                        ? `${Math.round(distKm * 1000)} m de ti`
+                                                        : `${distKm.toFixed(1)} km de ti`}
+                                                </p>
+                                            )}
+                                            <span
+                                                className={`mt-1 w-fit rounded-full px-3 py-1 text-xs font-semibold ${listing.status === 'available'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-orange-100 text-orange-700'
+                                                    }`}
+                                            >
+                                                {listing.status === 'available' ? 'Disponible' : 'No disponible'}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

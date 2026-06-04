@@ -10,6 +10,8 @@ export interface User {
     reputation_score: number;
     points: number;
     created_at: string;
+    lat: number;
+    lon: number;
 }
 
 export interface Listing {
@@ -22,6 +24,8 @@ export interface Listing {
     status: string;
     category: string;
     created_at: string;
+    owner_lat: number;
+    owner_lon: number;
 }
 
 export type TransactionStatus = 'pending' | 'awaiting_payment' | 'agreed' | 'handed_over' | 'returned' | 'cancelled';

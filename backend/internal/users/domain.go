@@ -14,6 +14,8 @@ type User struct {
 	ReputationScore int       `json:"reputation_score"`
 	Points          int       `json:"points"`
 	CreatedAt       time.Time `json:"created_at"`
+	Lat             float64   `json:"lat"`
+	Lon             float64   `json:"lon"`
 }
 
 // UpdateUserInput holds the fields that can be modified by the user.

@@ -56,6 +56,8 @@ type Listing struct {
 	Status        string    `json:"status"`
 	Category      Category  `json:"category"`
 	CreatedAt     time.Time `json:"created_at"`
+	OwnerLat      float64   `json:"owner_lat"`
+	OwnerLon      float64   `json:"owner_lon"`
 }
 
 // ListingInput representa los datos necesarios para crear o actualizar un listing.

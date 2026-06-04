@@ -14,12 +14,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const selectUserFields = `
+	SELECT id, email, name, avatar_url, address, reputation_score, points, created_at,
+	       ST_Y(location::geometry) AS lat,
+	       ST_X(location::geometry) AS lon
+`
+
 type postgresRepository struct {
 	pool       *pgxpool.Pool
 	httpClient *http.Client
 }
 
-// NewPostgresRepository creates a new PostgreSQL-backed users repository.
 func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 	return &postgresRepository{
 		pool:       pool,
@@ -27,11 +32,24 @@ func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 	}
 }
 
+// scanUser — helper DRY: centraliza el Scan de todos los campos de User.
+func scanUser(row pgx.Row, u *User) error {
+	var avatarURL sql.NullString
+	if err := row.Scan(
+		&u.ID, &u.Email, &u.Name, &avatarURL, &u.Address,
+		&u.ReputationScore, &u.Points, &u.CreatedAt,
+		&u.Lat, &u.Lon,
+	); err != nil {
+		return err
+	}
+	if avatarURL.Valid {
+		u.AvatarURL = avatarURL.String
+	}
+	return nil
+}
+
 func (r *postgresRepository) FindAll(ctx context.Context) ([]User, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, email, name, avatar_url, address, reputation_score, points, created_at
-		FROM users
-	`)
+	rows, err := r.pool.Query(ctx, selectUserFields+` FROM users`)
 	if err != nil {
 		return nil, fmt.Errorf("users: query failed: %w", err)
 	}
@@ -40,41 +58,28 @@ func (r *postgresRepository) FindAll(ctx context.Context) ([]User, error) {
 	users := make([]User, 0)
 	for rows.Next() {
 		var u User
-		var avatarURL sql.NullString
-		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &avatarURL, &u.Address, &u.ReputationScore, &u.Points, &u.CreatedAt); err != nil {
+		if err := scanUser(rows, &u); err != nil {
 			return nil, fmt.Errorf("users: scan failed: %w", err)
-		}
-		if avatarURL.Valid {
-			u.AvatarURL = avatarURL.String
 		}
 		users = append(users, u)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("users: iteration failed: %w", err)
 	}
-
 	return users, nil
 }
 
 func (r *postgresRepository) FindByID(ctx context.Context, id string) (*User, error) {
 	var u User
-	var avatarURL sql.NullString
-	err := r.pool.QueryRow(ctx, `
-		SELECT id, email, name, avatar_url, address, reputation_score, points, created_at
-		FROM users
-		WHERE id = $1
-	`, id).Scan(&u.ID, &u.Email, &u.Name, &avatarURL, &u.Address, &u.ReputationScore, &u.Points, &u.CreatedAt)
+	err := scanUser(r.pool.QueryRow(ctx,
+		selectUserFields+` FROM users WHERE id = $1`, id,
+	), &u)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("users: query failed: %w", err)
-	}
-
-	if avatarURL.Valid {
-		u.AvatarURL = avatarURL.String
 	}
 	return &u, nil
 }
@@ -85,34 +90,30 @@ func (r *postgresRepository) Update(ctx context.Context, id string, input Update
 		slog.Warn("geocoding failed on update, saving without location", "address", input.Address, "error", err)
 	}
 
+	returning := ` RETURNING id, email, name, avatar_url, address, reputation_score, points, created_at,
+	                          ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon`
+
 	var u User
-	var avatarURL sql.NullString
 	if coords != nil {
-		err = r.pool.QueryRow(ctx, `
+		err = scanUser(r.pool.QueryRow(ctx, `
 			UPDATE users
 			SET name = $1, avatar_url = $2, address = $3,
 			    location = ST_SetSRID(ST_MakePoint($4, $5), 4326)
 			WHERE id = $6
-			RETURNING id, email, name, avatar_url, address, reputation_score, points, created_at
-		`, input.Name, input.AvatarURL, input.Address, coords.Lng, coords.Lat, id,
-		).Scan(&u.ID, &u.Email, &u.Name, &avatarURL, &u.Address, &u.ReputationScore, &u.Points, &u.CreatedAt)
+		`+returning, input.Name, input.AvatarURL, input.Address, coords.Lng, coords.Lat, id), &u)
 	} else {
-		err = r.pool.QueryRow(ctx, `
+		err = scanUser(r.pool.QueryRow(ctx, `
 			UPDATE users
 			SET name = $1, avatar_url = $2, address = $3
 			WHERE id = $4
-			RETURNING id, email, name, avatar_url, address, reputation_score, points, created_at
-		`, input.Name, input.AvatarURL, input.Address, id,
-		).Scan(&u.ID, &u.Email, &u.Name, &avatarURL, &u.Address, &u.ReputationScore, &u.Points, &u.CreatedAt)
+		`+returning, input.Name, input.AvatarURL, input.Address, id), &u)
 	}
+
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("users: update failed: %w", err)
-	}
-	if avatarURL.Valid {
-		u.AvatarURL = avatarURL.String
 	}
 	return &u, nil
 }
