@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { listingsApi } from '../../lib/listings';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Listing } from '../../types';
@@ -27,7 +27,6 @@ const INITIAL_FILTERS: Filters = {
 
 export default function ListingsPage() {
     const { user } = useAuth();
-    const navigate = useNavigate();
 
     const [allListings, setAllListings] = useState<Listing[]>([]);
     const [loading, setLoading] = useState(true);
@@ -58,7 +57,7 @@ export default function ListingsPage() {
             deposit_min: filters.depositMin || undefined,
             deposit_max: filters.depositMax || undefined,
             status: filters.status || undefined,
-            // exclude_owner_id: user?.id || undefined, esto es para que no vea sus propios artículos en el apartado de listings
+            exclude_owner_id: user?.id || undefined,
             lat: coords ? String(coords.lat) : undefined,
             lon: coords ? String(coords.lon) : undefined,
         })
@@ -233,15 +232,6 @@ export default function ListingsPage() {
                                 </span>
                             )}
                         </h1>
-
-                        {user && (
-                            <button
-                                onClick={() => navigate('/listings/new')}
-                                className="rounded-full bg-[var(--accent-2)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
-                            >
-                                + Publicar artículo
-                            </button>
-                        )}
                     </div>
 
                     {listings.length === 0 ? (
@@ -290,8 +280,8 @@ export default function ListingsPage() {
                                         </p>
                                         <span
                                             className={`mt-1 w-fit rounded-full px-3 py-1 text-xs font-semibold ${listing.status === 'available'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-orange-100 text-orange-700'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-orange-100 text-orange-700'
                                                 }`}
                                         >
                                             {listing.status === 'available' ? 'Disponible' : 'No disponible'}
