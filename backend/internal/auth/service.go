@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 var (
 	ErrEmailTaken         = errors.New("email already registered")
 	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrGeocodingFailed    = errors.New("address could not be geocoded")
 )
 
 type service struct {
@@ -51,26 +51,21 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (Response, 
 
 	// Geocodificación — fallo no bloquea el registro
 	coords, err := geocoder.Geocode(ctx, s.httpClient, req.Address)
-	if err != nil {
-		slog.Warn("geocoding failed, registering without location", "address", req.Address, "error", err)
+	if err != nil || coords == nil {
+		return Response{}, ErrGeocodingFailed
 	}
 
 	var user UserDTO
-	if coords != nil {
-		err = s.pool.QueryRow(ctx,
-			`INSERT INTO users (email, name, password_hash, address, location)
-             VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))
-             RETURNING id, email, name, address`,
-			req.Email, req.Name, string(hash), req.Address, coords.Lng, coords.Lat,
-		).Scan(&user.ID, &user.Email, &user.Name, &user.Address)
-	} else {
-		err = s.pool.QueryRow(ctx,
-			`INSERT INTO users (email, name, password_hash, address)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id, email, name, address`,
-			req.Email, req.Name, string(hash), req.Address,
-		).Scan(&user.ID, &user.Email, &user.Name, &user.Address)
-	}
+	err = s.pool.QueryRow(ctx,
+		`INSERT INTO users (email, name, password_hash, address, location)
+		VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))
+		RETURNING id, email, name, address,
+				reputation_score, points,
+				ST_Y(location::geometry) AS lat,
+				ST_X(location::geometry) AS lon`,
+		req.Email, req.Name, string(hash), req.Address, coords.Lng, coords.Lat,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Address,
+		&user.ReputationScore, &user.Points, &user.Lat, &user.Lon)
 	if err != nil {
 		return Response{}, err
 	}
@@ -87,9 +82,16 @@ func (s *service) Login(ctx context.Context, req LoginRequest) (Response, error)
 	var user UserDTO
 	var hash string
 	err := s.pool.QueryRow(ctx,
-		"SELECT id, email, name, address, avatar_url, password_hash FROM users WHERE email = $1",
+		`SELECT id, email, name, address, avatar_url, password_hash,
+                reputation_score, points,
+                ST_Y(location::geometry) AS lat,
+                ST_X(location::geometry) AS lon
+         FROM users WHERE email = $1`,
 		req.Email,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Address, &user.AvatarURL, &hash)
+	).Scan(
+		&user.ID, &user.Email, &user.Name, &user.Address, &user.AvatarURL, &hash,
+		&user.ReputationScore, &user.Points, &user.Lat, &user.Lon,
+	)
 	if err != nil {
 		return Response{}, ErrInvalidCredentials
 	}

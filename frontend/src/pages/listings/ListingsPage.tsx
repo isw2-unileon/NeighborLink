@@ -45,13 +45,11 @@ export default function ListingsPage() {
     const [depositMinInput, setDepositMinInput] = useState('');
     const [depositMaxInput, setDepositMaxInput] = useState('');
 
-    // Coords vienen del perfil del usuario — no se usa navigator.geolocation
+
     const userLat = user?.lat ?? null;
     const userLon = user?.lon ?? null;
 
-    console.log('userLat:', userLat, 'userLon:', userLon);
-    console.log('primer listing:', allListings[0]);
-    console.log('owner_lat:', allListings[0]?.owner_lat, 'owner_lon:', allListings[0]?.owner_lon);
+
 
     useEffect(() => {
         setLoading(true);
@@ -96,6 +94,18 @@ export default function ListingsPage() {
             result = result.filter(l => {
                 if (!l.owner_lat || !l.owner_lon) return true;
                 return haversineKm(userLat, userLon, l.owner_lat, l.owner_lon) <= filters.maxDistanceKm;
+            });
+        }
+
+        if (userLat !== null && userLon !== null) {
+            result = [...result].sort((a, b) => {
+                const distA = a.owner_lat && a.owner_lon
+                    ? haversineKm(userLat, userLon, a.owner_lat, a.owner_lon)
+                    : Infinity;
+                const distB = b.owner_lat && b.owner_lon
+                    ? haversineKm(userLat, userLon, b.owner_lat, b.owner_lon)
+                    : Infinity;
+                return distA - distB;
             });
         }
 
