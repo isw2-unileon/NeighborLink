@@ -17,6 +17,7 @@ import ChatsPage from './pages/chats/ChatsPage'
 import ChatDetailPage from './pages/chats/ChatDetailPage'
 import BorrowerHandoverPage from './pages/BorrowerHandoverPage'
 import BorrowerReturnPage from './pages/BorrowerReturnPage'
+import OtherUserProfilePage from './pages/OtherUserProfilePage'
 
 // Redirige a /listings si ya hay sesión, si no muestra la página pasada
 function PublicHome() {
@@ -46,6 +47,7 @@ export default function App() {
               <Route path="/transactions/:id/chat" element={<ChatDetailPage />} />
               <Route path="/reservations/:id/handover" element={<BorrowerHandoverPage />} />
               <Route path="/reservations/:id/return" element={<BorrowerReturnPage />} />
+              <Route path="/users/:id" element={<OtherUserProfilePage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
