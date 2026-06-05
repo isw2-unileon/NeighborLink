@@ -36,7 +36,8 @@ export default function PaymentModal({
         setError(null);
         try {
             const pmId = await paymentFormRef.current.createPaymentMethod();
-            await transactionsApi.pay(transactionId, depositCents, pmId);
+            const { clientSecret } = await transactionsApi.pay(transactionId, depositCents, pmId);
+            await paymentFormRef.current.handleNextAction(clientSecret);
             onSuccess();
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Error al procesar el pago');
