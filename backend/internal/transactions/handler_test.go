@@ -804,6 +804,30 @@ func TestPayTransaction_Success(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	assert.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	_, hasClientSecret := resp["client_secret"]
+	assert.True(t, hasClientSecret, "response must contain client_secret field")
+}
+
+func TestPayTransaction_ReturnsClientSecret(t *testing.T) {
+	router := setupRouterWithStripe(&fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", PaymentMethodID: "pm_test", ListingID: "lst-1"},
+		},
+	}, &fakeStripe{clientSecret: "pi_secret_handler_test"})
+
+	body := `{"deposit_amount_cents":5000, "payment_method_id": "pm_new"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	assert.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "pi_secret_handler_test", resp["client_secret"])
 }
 
 func TestHandoverTransaction_Success(t *testing.T) {

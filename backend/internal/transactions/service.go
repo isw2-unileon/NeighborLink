@@ -7,7 +7,7 @@ import (
 )
 
 type stripeDepositor interface {
-	AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error)
+	AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (piID string, clientSecret string, err error)
 	CaptureDeposit(paymentIntentID string) error
 	ReleaseDeposit(paymentIntentID string, refundAmountCents int64) error
 }
@@ -63,13 +63,13 @@ func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error
 
 // ConfirmPayment autoriza el depósito en Stripe y mueve la transacción a agreed.
 // Solo puede llamarlo el borrower cuando status = awaiting_payment.
-func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64, paymentMethodID string) error {
+func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64, paymentMethodID string) (string, error) {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
-		return fmt.Errorf("service: find transaction: %w", err)
+		return "", fmt.Errorf("service: find transaction: %w", err)
 	}
 	if t == nil || t.Status != "awaiting_payment" {
-		return fmt.Errorf("service: transaction %s must be in awaiting_payment status to pay", transactionID)
+		return "", fmt.Errorf("service: transaction %s must be in awaiting_payment status to pay", transactionID)
 	}
 
 	totalCents := depositAmountCents + PlatformFeeCents
@@ -79,23 +79,23 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 	}
 
 	if actualPaymentMethodID == "" {
-		return fmt.Errorf("service: payment method ID is required")
+		return "", fmt.Errorf("service: payment method ID is required")
 	}
 
-	stripePIID, err := s.stripe.AuthorizeDeposit(totalCents, "eur", actualPaymentMethodID)
+	stripePIID, clientSecret, err := s.stripe.AuthorizeDeposit(totalCents, "eur", actualPaymentMethodID)
 	if err != nil {
-		return fmt.Errorf("service: authorize deposit: %w", err)
+		return "", fmt.Errorf("service: authorize deposit: %w", err)
 	}
 
 	if err := s.repo.UpdatePaymentIntent(ctx, transactionID, stripePIID, actualPaymentMethodID, totalCents); err != nil {
-		return fmt.Errorf("service: update payment intent: %w", err)
+		return "", fmt.Errorf("service: update payment intent: %w", err)
 	}
 
 	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "pending_handover"); err != nil {
-		return fmt.Errorf("service: update listing status: %w", err)
+		return "", fmt.Errorf("service: update listing status: %w", err)
 	}
 
-	return nil
+	return clientSecret, nil
 }
 
 // Reject cancels a pending transaction and updates its status to cancelled.

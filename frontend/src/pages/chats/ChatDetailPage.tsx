@@ -28,7 +28,7 @@ function MessageBubble({
 
     if (isSystem) {
         const isPaymentPrompt = message.content.toLowerCase().includes('métodos de pago');
-        const isAlreadyPaid = transactionStatus !== 'awaiting_payment' && transactionStatus !== 'pending';
+        const isAlreadyPaid = transactionStatus !== 'awaiting_payment';
         if (isPaymentPrompt && (isAlreadyPaid || !isBorrower)) return null;
 
         return (
@@ -498,7 +498,12 @@ export default function ChatDetailPage() {
                                 isMe={msg.sender_id === user.id}
                                 isBorrower={!isOwner}
                                 transactionStatus={transactionStatus}
-                                onOpenPayment={() => setShowPayment(true)}
+                                onOpenPayment={async () => {
+                                    if (!transactionId) return;
+                                    const t = await transactionsApi.getById(transactionId);
+                                    setTransaction(t);
+                                    if (t.status === 'awaiting_payment') setShowPayment(true);
+                                }}
                             />
                         ))}
                         <div ref={bottomRef} />

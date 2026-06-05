@@ -27,6 +27,7 @@ function mapStripeError(err: { code?: string; message?: string }): string {
 
 export interface PaymentFormHandle {
     createPaymentMethod(): Promise<string>;
+    handleNextAction(clientSecret: string): Promise<void>;
 }
 
 interface Props {
@@ -72,6 +73,11 @@ const PaymentFormInner = forwardRef<PaymentFormHandle, Props>(({ totalEuros }, r
 
             if (error) throw new Error(mapStripeError(error));
             return paymentMethod!.id;
+        },
+        async handleNextAction(clientSecret: string): Promise<void> {
+            if (!stripe) throw new Error('Stripe no está disponible.');
+            const { error } = await stripe.handleNextAction({ clientSecret });
+            if (error) throw new Error(mapStripeError(error));
         },
     }));
 

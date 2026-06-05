@@ -299,12 +299,13 @@ func (h *Handler) payTransaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID); err != nil {
+	clientSecret, err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID)
+	if err != nil {
 		h.handleServiceError(c, "pay", id, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	c.JSON(http.StatusOK, gin.H{"client_secret": clientSecret})
 }
 
 func (h *Handler) acceptTransaction(c *gin.Context) {

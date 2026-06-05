@@ -5,6 +5,7 @@ import React from 'react';
 import PaymentForm, { type PaymentFormHandle } from '../components/PaymentForm';
 
 const mockCreatePaymentMethod = vi.fn();
+const mockHandleNextAction = vi.fn();
 
 vi.mock('@stripe/stripe-js', () => ({
     loadStripe: vi.fn().mockResolvedValue(null),
@@ -15,7 +16,7 @@ vi.mock('@stripe/react-stripe-js', () => ({
     CardNumberElement: () => <div data-testid="card-number" />,
     CardExpiryElement: () => <div data-testid="card-expiry" />,
     CardCvcElement: () => <div data-testid="card-cvc" />,
-    useStripe: () => ({ createPaymentMethod: mockCreatePaymentMethod }),
+    useStripe: () => ({ createPaymentMethod: mockCreatePaymentMethod, handleNextAction: mockHandleNextAction }),
     useElements: () => ({ getElement: vi.fn().mockReturnValue({}) }),
 }));
 
@@ -112,5 +113,31 @@ describe('PaymentForm.createPaymentMethod', () => {
         });
 
         await expect(promise).rejects.toThrow('Error de conexión. Comprueba tu red e inténtalo de nuevo.');
+    });
+});
+
+describe('PaymentForm.handleNextAction', () => {
+    it('resuelve sin error cuando no se requiere acción adicional', async () => {
+        mockHandleNextAction.mockResolvedValueOnce({ paymentIntent: { status: 'requires_capture' } });
+
+        const ref = renderPaymentForm();
+
+        await act(async () => {
+            await ref.current!.handleNextAction('pi_secret_abc');
+        });
+
+        expect(mockHandleNextAction).toHaveBeenCalledWith({ clientSecret: 'pi_secret_abc' });
+    });
+
+    it('lanza error localizado cuando Stripe devuelve error en handleNextAction', async () => {
+        mockHandleNextAction.mockResolvedValueOnce({
+            error: { code: 'card_declined', message: 'Your card was declined.' },
+        });
+
+        const ref = renderPaymentForm();
+
+        await expect(
+            act(async () => { await ref.current!.handleNextAction('pi_secret_abc'); })
+        ).rejects.toThrow('Tu tarjeta fue rechazada. Por favor, usa otra tarjeta.');
     });
 });
