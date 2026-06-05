@@ -61,7 +61,7 @@ export const listingsApi = {
         api.delete(`/listings/${id}`).then(() => undefined),
 
     deleteAsAdmin: (id: string, reason: string) =>
-        api.delete(`/listings/${id}`, { data: { reason } }).then(() => undefined),
+        api.delete(`/listings/${id}`, { body: { reason } }).then(() => undefined),
 
     uploadPhoto: (id: string, file: File): Promise<Listing> => {
         const formData = new FormData();

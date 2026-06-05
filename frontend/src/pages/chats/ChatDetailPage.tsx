@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, isAxiosError } from '../../lib/api';
+import { api } from '../../lib/api';
 import { usersApi } from '../../lib/users';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import { listingsApi } from '../../lib/listings';
 import { transactionsApi } from '../../lib/transactions';
-import type { Message, Listing, Transaction, User } from '../../types'; // ← User añadido
-import { api } from '../../lib/api';
+import type { Message, Listing, Transaction, User } from '../../types';
 import PaymentModal from '../../components/PaymentModal';
 
 const POLL_INTERVAL_MS = 3000;
@@ -316,11 +315,7 @@ export default function ChatDetailPage() {
                 created_at: new Date().toISOString(),
             }]);
         } catch (err: unknown) {
-            let msg = 'Error al resolver la incidencia.';
-            if (isAxiosError(err) && err.response?.data?.error) {
-                msg = err.response.data.error;
-            }
-            setError(msg);
+            setError(err instanceof Error ? err.message : 'Error al procesar el reembolso.');
         } finally {
             setDecisionLoading(false);
         }
@@ -342,11 +337,7 @@ export default function ChatDetailPage() {
                 created_at: new Date().toISOString(),
             }]);
         } catch (err: unknown) {
-            let msg = 'Error al procesar el reembolso.';
-            if (axios.isAxiosError(err) && err.response?.data?.error) {
-                msg = err.response.data.error;
-            }
-            setError(msg);
+            setError(err instanceof Error ? err.message : 'Error al procesar el reembolso.');
         } finally {
             setDecisionLoading(false);
         }
