@@ -7,6 +7,7 @@ import { walletApi } from '../lib/wallet';
 import type { Listing, PointsHistoryEntry } from '../types';
 import { reservationsApi } from '../lib/reservations';
 import type { Transaction } from '../types';
+import { RedeemModal } from '../components/RedeemModal';
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,30 +130,16 @@ function MyListings({ userID }: { userID: string }) {
 function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void }) {
     const [history, setHistory] = useState<PointsHistoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [redeeming, setRedeeming] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [showRedeemModal, setShowRedeemModal] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         walletApi.getPointsHistory()
             .then(setHistory)
-            .catch(() => setError('No se pudo cargar el historial'))
+            .catch(() => setHistoryError('No se pudo cargar el historial'))
             .finally(() => setLoading(false));
     }, []);
-
-    async function handleRedeem() {
-        setRedeeming(true);
-        setError(null);
-        try {
-            await walletApi.redeemPoints();
-            onRedeem();
-            setSuccess('Solicitud de cobro enviada. El pago se procesará en breve.');
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Error al canjear puntos');
-        } finally {
-            setRedeeming(false);
-        }
-    }
 
     const displayPoints = (points / 100).toFixed(2);
     const canRedeem = points >= 1000;
@@ -167,11 +154,11 @@ function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void 
                         <p className="text-sm text-[var(--muted)] mt-0.5">{displayPoints} €</p>
                     </div>
                     <button
-                        onClick={handleRedeem}
-                        disabled={!canRedeem || redeeming}
+                        onClick={() => setShowRedeemModal(true)}
+                        disabled={!canRedeem}
                         className="text-sm font-semibold px-4 py-2 rounded-full border transition disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--accent-2)] text-white border-[var(--accent-2)] hover:brightness-95"
                     >
-                        {redeeming ? 'Procesando…' : 'Canjear puntos'}
+                        Canjear puntos
                     </button>
                 </div>
                 {!canRedeem && (
@@ -184,9 +171,9 @@ function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void 
                         ✓ {success}
                     </p>
                 )}
-                {error && (
+                {historyError && (
                     <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                        {error}
+                        {historyError}
                     </p>
                 )}
             </div>
@@ -214,6 +201,18 @@ function WalletTab({ points, onRedeem }: { points: number; onRedeem: () => void 
                     </div>
                 ))}
             </div>
+
+            {showRedeemModal && (
+                <RedeemModal
+                    points={points}
+                    onClose={() => setShowRedeemModal(false)}
+                    onSuccess={() => {
+                        setShowRedeemModal(false);
+                        setSuccess('Solicitud de cobro enviada. El pago se procesará en breve.');
+                        onRedeem();
+                    }}
+                />
+            )}
         </div>
     );
 }

@@ -225,6 +225,9 @@ describe('ProfilePage — Cartera tab', () => {
         await openWalletTab({ ...fakeUser, points: 1000 })
         const btn = await screen.findByRole('button', { name: /Canjear puntos/i })
         fireEvent.click(btn)
+        // Modal opens — confirm the redemption
+        const confirmBtn = await screen.findByRole('button', { name: /Confirmar canje/i })
+        fireEvent.click(confirmBtn)
         expect(await screen.findByText(/Solicitud de cobro enviada/)).toBeInTheDocument()
         expect(mockUpdateUser).toHaveBeenCalledWith(expect.objectContaining({ points: 0 }))
     })
