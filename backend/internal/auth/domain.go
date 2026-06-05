@@ -31,6 +31,7 @@ type UserDTO struct {
 	AvatarURL       *string  `json:"avatar_url"`
 	ReputationScore float64  `json:"reputation_score"`
 	Points          int      `json:"points"`
+	Role            string   `json:"role"`
 	Lat             *float64 `json:"lat"`
 	Lon             *float64 `json:"lon"`
 }

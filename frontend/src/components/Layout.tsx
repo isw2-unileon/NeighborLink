@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import notificacionIcon from '../assets/notificacion.jpg';
 import { notificationsApi } from '../lib/notifications';
 import type { Notification } from '../types';
@@ -15,6 +15,12 @@ function formatNotificationText(notification: Notification): string {
             return `Han rechazado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
         case 'chat_opened':
             return `Se ha abierto un chat para reservar tu objeto: ${String(notification.payload.listing_title ?? 'tu listing')}`;
+        case 'points_refunded':
+            return `¡Reembolso recibido! Has recibido ${notification.payload.points} puntos por una incidencia en: ${notification.payload.listing_title}`;
+        case 'dispute_created':
+            return `Nueva incidencia reportada en: ${notification.payload.listing_title}. Revisión requerida.`;
+        case 'listing_deleted_by_admin':
+            return `Tu anuncio '${notification.payload.listing_title}' ha sido eliminado por un administrador. Motivo: ${notification.payload.reason}`;
         case 'message_received':
             return 'Tienes un nuevo mensaje';
         default:
@@ -67,12 +73,7 @@ export default function Layout() {
         return () => clearInterval(interval);
     }, [user]);
 
-    useEffect(() => {
-        if (!user) return;
-        loadNotifications();
-    }, [user]);
-
-    async function loadNotifications() {
+    const loadNotifications = useCallback(async () => {
         if (!user) return;
         try {
             setLoadingNotifications(true);
@@ -87,7 +88,12 @@ export default function Layout() {
         } finally {
             setLoadingNotifications(false);
         }
-    }
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        loadNotifications();
+    }, [user, loadNotifications]);
 
     async function handleOpenNotifications() {
         const nextOpen = !isNotificationsOpen;

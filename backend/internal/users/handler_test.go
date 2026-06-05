@@ -21,6 +21,7 @@ import (
 
 type fakeRepository struct {
 	users     []users.User
+	user      *users.User
 	findErr   error // error en FindByID y FindAll
 	updateErr error // error en Update
 }
@@ -28,16 +29,14 @@ type fakeRepository struct {
 func (f *fakeRepository) FindAll(ctx context.Context) ([]users.User, error) {
 	return f.users, f.findErr
 }
-
 func (f *fakeRepository) FindByID(ctx context.Context, id string) (*users.User, error) {
 	if f.findErr != nil {
 		return nil, f.findErr
 	}
-	for _, u := range f.users {
-		if u.ID == id {
-			return &u, nil
-		}
-	}
+	return f.user, nil
+}
+
+func (f *fakeRepository) FindFirstAdmin(ctx context.Context) (*users.User, error) {
 	return nil, nil
 }
 
@@ -102,7 +101,7 @@ func TestListUsers(t *testing.T) {
 		},
 		{
 			name:       "returns list with users",
-			repoUsers:  []users.User{{ID: "1", Name: "Alice"}, {ID: "2", Name: "Bob"}},
+			repoUsers:  []users.User{{ID: "1", Name: "Alice", Role: "user"}, {ID: "2", Name: "Bob", Role: "user"}},
 			wantStatus: http.StatusOK,
 			wantLen:    2,
 		},
@@ -145,7 +144,7 @@ func TestGetUser(t *testing.T) {
 	}{
 		{
 			name:       "user found returns 200",
-			repoUsers:  []users.User{{ID: "abc-123", Name: "Alice"}},
+			repoUsers:  []users.User{{ID: "abc-123", Name: "Alice", Role: "user"}},
 			userID:     "abc-123",
 			wantStatus: http.StatusOK,
 		},
@@ -165,7 +164,10 @@ func TestGetUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(&fakeRepository{users: tt.repoUsers, findErr: tt.findErr}, &fakeStorageService{})
+			router := setupRouter(&fakeRepository{user: &users.User{ID: tt.userID, Name: "Alice", Role: "user"}, findErr: tt.findErr}, &fakeStorageService{})
+			if tt.wantStatus == http.StatusNotFound {
+				router = setupRouter(&fakeRepository{user: nil, findErr: nil}, &fakeStorageService{})
+			}
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/users/"+tt.userID, nil)
@@ -221,9 +223,12 @@ func TestUpdateMe(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := setupRouter(
-				&fakeRepository{users: tt.repoUsers, findErr: tt.findErr, updateErr: tt.updateErr},
+				&fakeRepository{users: tt.repoUsers, user: &users.User{ID: "test-user-id"}, findErr: tt.findErr, updateErr: tt.updateErr},
 				&fakeStorageService{},
 			)
+			if len(tt.repoUsers) == 0 && tt.findErr == nil {
+				router = setupRouter(&fakeRepository{user: nil}, &fakeStorageService{})
+			}
 
 			bodyBytes, _ := json.Marshal(tt.body)
 			w := httptest.NewRecorder()
@@ -278,7 +283,7 @@ func TestUploadAvatar(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeRepository{users: tt.repoUsers, updateErr: tt.updateErr}
+			repo := &fakeRepository{users: tt.repoUsers, user: &users.User{ID: "test-user-id"}, updateErr: tt.updateErr}
 			storage := &fakeStorageService{url: "https://cdn.example.com/new-avatar.jpg", err: tt.storageErr}
 
 			gin.SetMode(gin.TestMode)
@@ -302,6 +307,7 @@ func TestUploadAvatar(t *testing.T) {
 				buf := &bytes.Buffer{}
 				writer := multipart.NewWriter(buf)
 				part, _ := writer.CreateFormFile("avatar", "avatar.jpg")
+				require.NotNil(t, part)
 				_, err := part.Write([]byte("fake-image-content"))
 				require.NoError(t, err)
 				writer.Close()

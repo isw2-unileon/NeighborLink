@@ -9,39 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type fakeStripe struct {
-	capturedAmount int64
-	releasedAmount int64
-	captureCalled  bool
-}
-
-func (f *fakeStripe) AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (string, error) {
-	f.capturedAmount = amountCents
-	return "pi_fake", nil
-}
-
-func (f *fakeStripe) CaptureDeposit(_ string) error {
-	f.captureCalled = true
-	return nil
-}
-func (f *fakeStripe) ReleaseDeposit(_ string, amount int64) error {
-	f.releasedAmount = amount
-	return nil
-}
-
-type fakeListingSvc struct {
-	updatedListingID string
-	updatedStatus    string
-}
-
-func (f *fakeListingSvc) UpdateStatus(_ context.Context, id string, status string) error {
-	f.updatedListingID = id
-	f.updatedStatus = status
-	return nil
-}
-
-// --- Handover ---
-
 func TestHandover_CapturesDeposit(t *testing.T) {
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
@@ -50,7 +17,7 @@ func TestHandover_CapturesDeposit(t *testing.T) {
 	}
 	fs := &fakeStripe{}
 	lsvc := &fakeListingSvc{}
-	svc := transactions.NewService(repo, fs, lsvc)
+	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.Handover(context.Background(), "tx-1")
 
@@ -67,7 +34,7 @@ func TestHandover_FailsIfNotAgreed(t *testing.T) {
 			{ID: "tx-1", Status: "returned"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.Handover(context.Background(), "tx-1")
 
@@ -81,7 +48,7 @@ func TestHandover_SkipsStripeForDevPaymentIntent(t *testing.T) {
 		},
 	}
 	lsvc := &fakeListingSvc{}
-	svc := transactions.NewService(repo, nil, lsvc)
+	svc := transactions.NewService(repo, nil, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.Handover(context.Background(), "tx-1")
 
@@ -99,7 +66,7 @@ func TestAcceptRequest_SetsAwaitingPayment(t *testing.T) {
 			{ID: "tx-1", Status: "pending", PaymentMethodID: "pm_test"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.AcceptRequest(context.Background(), "tx-1")
 
@@ -113,7 +80,7 @@ func TestAcceptRequest_FailsIfNotPending(t *testing.T) {
 			{ID: "tx-1", Status: "agreed", PaymentMethodID: "pm_test"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.AcceptRequest(context.Background(), "tx-1")
 
@@ -130,7 +97,7 @@ func TestConfirmPayment_ChargesDepositPlusPlatformFee(t *testing.T) {
 	}
 	fs := &fakeStripe{}
 	lsvc := &fakeListingSvc{}
-	svc := transactions.NewService(repo, fs, lsvc)
+	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
 
@@ -146,7 +113,7 @@ func TestConfirmPayment_FailsIfNotAwaitingPayment(t *testing.T) {
 			{ID: "tx-1", Status: "pending", PaymentMethodID: "pm_test"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
 
@@ -161,7 +128,7 @@ func TestReject_SetsCancelledStatus(t *testing.T) {
 			{ID: "tx-1", Status: "pending"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.Reject(context.Background(), "tx-1")
 
@@ -175,7 +142,7 @@ func TestReject_FailsIfNotPending(t *testing.T) {
 			{ID: "tx-1", Status: "agreed"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	err := svc.Reject(context.Background(), "tx-1")
 
@@ -216,7 +183,7 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 			}
 			fs := &fakeStripe{}
 			lsvc := &fakeListingSvc{}
-			svc := transactions.NewService(repo, fs, lsvc)
+			svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 			daysBorrowed, err := svc.Return(context.Background(), "tx-1", tc.deposit)
 
@@ -247,7 +214,7 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 	}
 	fs := &fakeStripe{}
 	lsvc := &fakeListingSvc{}
-	svc := transactions.NewService(repo, fs, lsvc)
+	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	_, err := svc.Return(context.Background(), "tx-1", deposit)
 
@@ -274,7 +241,7 @@ func TestReturn_DaysClamped(t *testing.T) {
 		}
 		fs := &fakeStripe{}
 		lsvc := &fakeListingSvc{}
-		svc := transactions.NewService(repo, fs, lsvc)
+		svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 		daysBorrowed, err := svc.Return(context.Background(), "tx-1", 10000)
 
@@ -299,7 +266,7 @@ func TestReturn_DaysClamped(t *testing.T) {
 		}
 		fs := &fakeStripe{}
 		lsvc := &fakeListingSvc{}
-		svc := transactions.NewService(repo, fs, lsvc)
+		svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 		daysBorrowed, err := svc.Return(context.Background(), "tx-1", 10000)
 
@@ -316,7 +283,7 @@ func TestReturn_FailsIfNotHandedOver(t *testing.T) {
 			{ID: "tx-1", Status: "agreed"},
 		},
 	}
-	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{})
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
 	_, err := svc.Return(context.Background(), "tx-1", 10000)
 

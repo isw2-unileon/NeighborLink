@@ -74,38 +74,54 @@ func buildRouter(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 
 // registerModules inicializa y registra cada módulo en el grupo /api.
 func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg config.Config, pool *pgxpool.Pool) {
-	// Users
-	userStorageSvc := usersModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
-	usersModule.NewHandler(usersModule.NewPostgresRepository(pool), userStorageSvc).RegisterRoutes(api, authMiddleware)
-
-	// Auth
-	authModule.NewHandler(authModule.NewService(pool, cfg.JWTSecret)).RegisterRoutes(api)
-
-	// Notifications
-	notificationsRepo := notificationsModule.NewRepository(pool)
-	notificationsSvc := notificationsModule.NewService(notificationsRepo)
-	notificationsHandler := notificationsModule.NewHandler(notificationsRepo)
-	notificationsHandler.RegisterRoutes(api, authMiddleware)
-	// Listings
+	// Repositories
+	userRepo := usersModule.NewPostgresRepository(pool)
+	messageRepo := messagesModule.NewPostgresRepository(pool)
 	listingRepo := listingsModule.NewPostgresRepository(pool)
-	storageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
-	listingsModule.NewHandler(listingRepo, storageSvc, notificationsSvc).RegisterRoutes(api, authMiddleware)
-
-	// Wallet (init before transactions so walletSvc can be injected there)
 	walletRepo := walletModule.NewPostgresRepository(pool)
-	walletSvc := walletModule.NewService(walletRepo)
-	walletModule.NewHandler(walletSvc).RegisterRoutes(api, authMiddleware)
-
-	// Transactions
-	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
+	notificationsRepo := notificationsModule.NewRepository(pool)
 	transactionRepo := transactionsModule.NewPostgresRepository(pool)
-	transactionSvc := transactionsModule.NewService(transactionRepo, stripeClient, listingRepo)
-	transactionsModule.NewHandler(transactionRepo, transactionSvc, walletSvc, notificationsSvc).RegisterRoutes(api, authMiddleware)
+
+	// Services
+	userStorageSvc := usersModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
+	listingStorageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
+	notificationsSvc := notificationsModule.NewService(notificationsRepo)
+	walletSvc := walletModule.NewService(walletRepo)
+	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
+
+	transactionSvc := transactionsModule.NewService(
+		transactionRepo,
+		stripeClient,
+		listingRepo,
+		&adminAdapter{repo: userRepo},
+		&messageAdapter{repo: messageRepo},
+		walletSvc,
+		notificationsSvc,
+	)
+
+	// Handlers
+	usersModule.NewHandler(userRepo, userStorageSvc).RegisterRoutes(api, authMiddleware)
+	authModule.NewHandler(authModule.NewService(pool, cfg.JWTSecret)).RegisterRoutes(api)
+	notificationsModule.NewHandler(notificationsRepo).RegisterRoutes(api, authMiddleware)
+	listingsModule.NewHandler(
+		listingRepo,
+		listingStorageSvc,
+		notificationsSvc,
+		&adminCheckAdapter{repo: userRepo},
+	).RegisterRoutes(api, authMiddleware)
+	walletModule.NewHandler(walletSvc).RegisterRoutes(api, authMiddleware)
+	transactionsModule.NewHandler(
+		transactionRepo,
+		transactionSvc,
+		walletSvc,
+		notificationsSvc,
+		&adminCheckAdapter{repo: userRepo},
+	).RegisterRoutes(api, authMiddleware)
 	transactionsModule.NewWebhookHandler(stripeClient, transactionRepo, cfg.StripeWebhookSecret).RegisterRoutes(api)
 
 	// Messages
 	messagesModule.NewHandler(
-		messagesModule.NewPostgresRepository(pool),
+		messageRepo,
 		adapters.NewTxReaderAdapter(transactionRepo),
 	).RegisterRoutes(api, authMiddleware)
 
@@ -141,3 +157,49 @@ func runServer(ctx context.Context, handler http.Handler, port string) error {
 
 	return srv.Shutdown(shutdownCtx)
 }
+
+// Adapters to satisfy transactions.Service narrow interfaces without package coupling.
+
+type adminAdapter struct {
+	repo usersModule.Repository
+}
+
+func (a *adminAdapter) FindFirstAdmin(ctx context.Context) (string, error) {
+	u, err := a.repo.FindFirstAdmin(ctx)
+	if err != nil {
+		return "", err
+	}
+	if u == nil {
+		return "", nil
+	}
+	return u.ID, nil
+}
+
+type messageAdapter struct {
+	repo messagesModule.Repository
+}
+
+func (m *messageAdapter) CreateSystemMessage(ctx context.Context, transactionID, content string) error {
+	_, err := m.repo.Create(ctx, messagesModule.Message{
+		TransactionID: transactionID,
+		SenderID:      messagesModule.SystemUserID,
+		Content:       content,
+	})
+	return err
+}
+
+type adminCheckAdapter struct {
+	repo usersModule.Repository
+}
+
+func (a *adminCheckAdapter) IsAdmin(ctx context.Context, userID string) (bool, error) {
+	u, err := a.repo.FindByID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if u == nil {
+		return false, nil
+	}
+	return u.Role == "admin", nil
+}
+

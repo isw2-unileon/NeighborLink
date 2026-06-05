@@ -11,4 +11,16 @@ export const transactionsApi = {
             payment_method_id: paymentMethodId
         })
             .then(() => undefined),
+
+    reportIssue: (id: string): Promise<void> =>
+        api.post<unknown>(`/transactions/${id}/report-issue`, {})
+            .then(() => undefined),
+
+    resolveDispute: (id: string): Promise<void> =>
+        api.post<unknown>(`/transactions/${id}/resolve-dispute`, {})
+            .then(() => undefined),
+
+    refundDisputePoints: (id: string, percentage: number): Promise<void> =>
+        api.post<unknown>(`/transactions/${id}/refund-dispute`, { percentage })
+            .then(() => undefined),
 };

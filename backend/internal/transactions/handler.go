@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -10,14 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// pointsAdder is a narrow interface so the transactions package does not import the wallet package.
-type pointsAdder interface {
-	AddPoints(ctx context.Context, userID string, points int) error
-}
-
-// notificationCreator is a narrow interface so transactions doesn't import notifications.
-type notificationCreator interface {
-	Create(ctx context.Context, userID, notifType string, payload map[string]any) error
+type adminChecker interface {
+	IsAdmin(ctx context.Context, userID string) (bool, error)
 }
 
 // Handler holds the HTTP handlers for the transactions module.
@@ -26,11 +21,12 @@ type Handler struct {
 	service   *Service
 	walletSvc pointsAdder
 	notifSvc  notificationCreator
+	adminSvc  adminChecker
 }
 
 // NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
-func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator) *Handler {
-	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc}
+func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
+	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc, adminSvc: adminSvc}
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
@@ -54,6 +50,86 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected.POST("/transactions/:id/generate-return-code", h.generateReturnCode)
 	protected.POST("/transactions/:id/confirm-handover", h.confirmHandover)
 	protected.POST("/transactions/:id/confirm-return", h.confirmReturn)
+	protected.POST("/transactions/:id/report-issue", h.reportIssueTransaction)
+	protected.POST("/transactions/:id/resolve-dispute", h.resolveDisputeTransaction)
+	protected.POST("/transactions/:id/refund-dispute", h.refundDisputePoints)
+}
+
+func (h *Handler) refundDisputePoints(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	isAdmin, err := h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	if err != nil {
+		slog.Error("failed to check admin status", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only administrators can issue refunds"})
+		return
+	}
+
+	id := c.Param("id")
+	var body struct {
+		Percentage int `json:"percentage"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	points, err := h.service.RefundDisputePoints(c.Request.Context(), id, body.Percentage)
+	if err != nil {
+		h.handleServiceError(c, "refund dispute points", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "points": points})
+}
+
+func (h *Handler) resolveDisputeTransaction(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	isAdmin, err := h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	if err != nil {
+		slog.Error("failed to check admin status", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only administrators can resolve disputes"})
+		return
+	}
+
+	id := c.Param("id")
+	if err := h.service.ResolveDispute(c.Request.Context(), id); err != nil {
+		h.handleServiceError(c, "resolve dispute", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) reportIssueTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+
+	if err := h.service.ReportIssue(c.Request.Context(), id); err != nil {
+		h.handleServiceError(c, "report issue", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "status": "pending_review"})
 }
 
 func (h *Handler) listTransactions(c *gin.Context) {
@@ -319,46 +395,37 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
+	// Un administrador NO puede reservar objetos
+	isAdmin, err := h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	if err != nil {
+		slog.Error("failed to check admin status during reservation", "error", err)
+	}
+	if isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "administrators cannot reserve listings"})
+		return
+	}
+
 	var input ReserveInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// ✅ Llamada al helper — sustituye TODO el bloque de parseo/validación
 	startDate, endDate, ok := h.validateReserveDates(c, input)
 	if !ok {
 		return
 	}
 
-	// ✅ A partir de aquí ya NO hay más código de fechas — solo la comprobación de solapamiento
-	blocked, err := h.repo.FindBlockedDates(c.Request.Context(), listingID)
+	// ✅ Llamada al helper solapamiento
+	overlap, err := h.checkDateOverlap(c.Request.Context(), listingID, startDate, endDate)
 	if err != nil {
 		slog.Error("failed to check availability", "listing_id", listingID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	for _, dr := range blocked {
-		if dr.StartDate == "" || dr.EndDate == "" {
-			continue
-		}
-
-		blockedStart, err := time.Parse("2006-01-02", dr.StartDate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-			return
-		}
-
-		blockedEnd, err := time.Parse("2006-01-02", dr.EndDate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-			return
-		}
-
-		if startDate.Before(blockedEnd) && endDate.After(blockedStart) {
-			c.JSON(http.StatusConflict, gin.H{"error": "selected dates overlap with an existing reservation"})
-			return
-		}
+	if overlap {
+		c.JSON(http.StatusConflict, gin.H{"error": "selected dates overlap with an existing reservation"})
+		return
 	}
 
 	t, err := h.repo.Reserve(c.Request.Context(), Transaction{
@@ -374,22 +441,55 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	if h.notifSvc != nil {
-		go func() {
-			ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
-			if notifErr != nil {
-				slog.Error("failed to fetch listing owner for notification", "listing_id", listingID, "error", notifErr)
-				return
-			}
-			_ = h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
-				"listing_title": listingTitle,
-				"borrower_id":   userID.(string),
-			})
-		}()
-	}
+	h.notifyOwnerOfChat(listingID, userID.(string))
 
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
+
+func (h *Handler) checkDateOverlap(ctx context.Context, listingID string, start, end time.Time) (bool, error) {
+	blocked, err := h.repo.FindBlockedDates(ctx, listingID)
+	if err != nil {
+		return false, fmt.Errorf("check availability: %w", err)
+	}
+	for _, dr := range blocked {
+		if dr.StartDate == "" || dr.EndDate == "" {
+			continue
+		}
+
+		blockedStart, err := time.Parse("2006-01-02", dr.StartDate)
+		if err != nil {
+			return false, fmt.Errorf("parse blocked start: %w", err)
+		}
+
+		blockedEnd, err := time.Parse("2006-01-02", dr.EndDate)
+		if err != nil {
+			return false, fmt.Errorf("parse blocked end: %w", err)
+		}
+
+		if start.Before(blockedEnd) && end.After(blockedStart) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (h *Handler) notifyOwnerOfChat(listingID, borrowerID string) {
+	if h.notifSvc == nil {
+		return
+	}
+	go func() {
+		ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
+		if notifErr != nil {
+			slog.Error("failed to fetch listing owner for notification", "listing_id", listingID, "error", notifErr)
+			return
+		}
+		_ = h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
+			"listing_title": listingTitle,
+			"borrower_id":   borrowerID,
+		})
+	}()
+}
+
 
 func (h *Handler) validateReserveDates(c *gin.Context, input ReserveInput) (start, end time.Time, ok bool) {
 	var err error

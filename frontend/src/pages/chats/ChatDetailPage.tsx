@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { api } from '../../lib/api';
 import { usersApi } from '../../lib/users';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import { listingsApi } from '../../lib/listings';
-import type { Message, Listing, Transaction, User } from '../../types'; // ← User añadido
-import { api } from '../../lib/api';
+import { transactionsApi } from '../../lib/transactions';
+import type { Message, Listing, Transaction, User } from '../../types';
 import PaymentModal from '../../components/PaymentModal';
 
 const POLL_INTERVAL_MS = 3000;
@@ -189,6 +190,8 @@ export default function ChatDetailPage() {
     const [showEleccion, setShowEleccion] = useState(false);
     const [showPayment, setShowPayment] = useState(false);
     const [decisionLoading, setDecisionLoading] = useState(false);
+    const [refundPercentage, setRefundPercentage] = useState(50);
+    const [showRefundSlider, setShowRefundSlider] = useState(false);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const initialScrollDone = useRef(false);
@@ -210,7 +213,7 @@ export default function ChatDetailPage() {
         if (!listing || !transaction) return;
         usersApi.getUser(listing.owner_id).then(r => setOwner(r));
         usersApi.getUser(transaction.borrower_id).then(r => setBorrower(r));
-    }, [listing?.owner_id, transaction?.borrower_id]);
+    }, [listing, transaction]);
 
     useEffect(() => {
         if (transaction?.status === 'awaiting_payment' && !isOwner) {
@@ -293,6 +296,53 @@ export default function ChatDetailPage() {
         }
     }
 
+    async function handleResolveDispute() {
+        if (!transactionId) return;
+        if (!window.confirm('¿Estás seguro de que quieres dar por concluida la incidencia? Esto cerrará el caso y marcará la transacción como devuelta.')) {
+            return;
+        }
+
+        setDecisionLoading(true);
+        setError(null);
+        try {
+            await transactionsApi.resolveDispute(transactionId);
+            setTransaction(prev => prev ? { ...prev, status: 'returned' } : null);
+            setMessages(prev => [...prev, {
+                id: crypto.randomUUID(),
+                transaction_id: transactionId,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: 'INCIDENCIA RESUELTA: Un administrador ha cerrado este caso. La transacción se marca como finalizada.',
+                created_at: new Date().toISOString(),
+            }]);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error al procesar el reembolso.');
+        } finally {
+            setDecisionLoading(false);
+        }
+    }
+
+    async function handleRefundPoints() {
+        if (!transactionId) return;
+        setDecisionLoading(true);
+        setError(null);
+        try {
+            await transactionsApi.refundDisputePoints(transactionId, refundPercentage);
+            setTransaction(prev => prev ? { ...prev, dispute_refund_points: (listing?.deposit_amount || 0) * refundPercentage / 100 } : null);
+            setShowRefundSlider(false);
+            setMessages(prev => [...prev, {
+                id: crypto.randomUUID(),
+                transaction_id: transactionId,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: `REEMBOLSO DE PUNTOS: Un administrador ha concedido un reembolso del ${refundPercentage}% del valor del objeto en puntos.`,
+                created_at: new Date().toISOString(),
+            }]);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error al procesar el reembolso.');
+        } finally {
+            setDecisionLoading(false);
+        }
+    }
+
     async function handlePaymentSuccess() {
         setShowPayment(false);
         setTransaction(prev => prev ? { ...prev, status: 'agreed' } : null);
@@ -366,8 +416,73 @@ export default function ChatDetailPage() {
                         {transactionStatus === 'awaiting_payment' && (
                             <div className="flex-shrink-0 rounded-full border border-green-300 bg-green-100 px-3 py-2 text-xs font-bold text-green-700">ACEPTADO</div>
                         )}
+                        {transactionStatus === 'pending_review' && (
+                            <div className="flex-shrink-0 rounded-full border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">EN REVISIÓN</div>
+                        )}
+                        {transactionStatus === 'returned' && (
+                            <div className="flex-shrink-0 rounded-full border border-gray-300 bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">FINALIZADO</div>
+                        )}
                         {transactionStatus === 'cancelled' && (
                             <div className="flex-shrink-0 rounded-full border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">DENEGADO</div>
+                        )}
+
+                        {user.role === 'admin' && transactionStatus === 'pending_review' && (
+                            <button
+                                onClick={handleResolveDispute}
+                                disabled={decisionLoading}
+                                className="flex-shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50"
+                            >
+                                {decisionLoading ? 'Cerrando...' : 'Resolver Incidencia'}
+                            </button>
+                        )}
+
+                        {user.role === 'admin' && (transactionStatus === 'pending_review' || transactionStatus === 'returned') && transaction?.dispute_refund_points === undefined && (
+                            <div className="flex items-center gap-2">
+                                {showRefundSlider ? (
+                                    <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 shadow-inner">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Reembolso</span>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    step="5"
+                                                    value={refundPercentage}
+                                                    onChange={(e) => setRefundPercentage(parseInt(e.target.value))}
+                                                    className="w-24 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                />
+                                                <span className="text-xs font-bold text-amber-600 w-8">{refundPercentage}%</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 border-l border-gray-200 pl-2">
+                                            <button
+                                                onClick={handleRefundPoints}
+                                                disabled={decisionLoading}
+                                                className="p-1.5 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition disabled:opacity-50"
+                                                title="Confirmar reembolso"
+                                            >
+                                                <span className="text-[10px] font-bold">OK</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setShowRefundSlider(false)}
+                                                disabled={decisionLoading}
+                                                className="p-1.5 rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition"
+                                                title="Cancelar"
+                                            >
+                                                <span className="text-[10px] font-bold">✕</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowRefundSlider(true)}
+                                        className="flex-shrink-0 rounded-full bg-amber-100 border border-amber-200 px-4 py-2 text-xs font-bold text-amber-700 hover:bg-amber-200 transition"
+                                    >
+                                        💰 Devolver en Puntos
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
 

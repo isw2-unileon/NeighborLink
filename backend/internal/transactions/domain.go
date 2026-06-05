@@ -22,8 +22,9 @@ type Transaction struct {
 	EndDate               *time.Time `json:"end_date"`
 	AgreedAt              *time.Time `json:"agreed_at"`
 	HandoverAt            *time.Time `json:"handover_at"`
-	ReturnAt              *time.Time `json:"return_at"`
-}
+	ReturnAt                *time.Time `json:"return_at"`
+	DisputeRefundPoints     *int       `json:"dispute_refund_points,omitempty"`
+	}
 
 // ReserveInput is the body for POST /api/listings/:id/reserve.
 type ReserveInput struct {

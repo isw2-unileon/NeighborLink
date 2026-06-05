@@ -33,7 +33,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
 
     if (response.status === 204) {
-        return undefined as T;
+        return undefined as unknown as T;
     }
 
     return response.json() as Promise<T>;
@@ -41,12 +41,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // Métodos públicos tipados — la fachada que usan los componentes
 export const api = {
-    get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, body: unknown) =>
+    get: <T>(path: string): Promise<T> => request<T>(path),
+    post: <T>(path: string, body: unknown): Promise<T> =>
         request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
-    put: <T>(path: string, body: unknown) =>
+    put: <T>(path: string, body: unknown): Promise<T> =>
         request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-    patch: <T>(path: string, body?: unknown) =>   // ← añadir esto
+    patch: <T>(path: string, body?: unknown): Promise<T> =>
         request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
-    delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    delete: <T = void>(path: string, options?: { body?: unknown }): Promise<T> =>
+        request<T>(path, { 
+            method: 'DELETE', 
+            body: options?.body ? JSON.stringify(options.body) : undefined 
+        }),
 };

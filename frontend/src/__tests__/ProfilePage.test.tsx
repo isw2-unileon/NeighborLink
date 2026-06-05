@@ -24,6 +24,7 @@ const fakeUser: User = {
     address: 'Calle Mayor 1, León',
     reputation_score: 4,
     points: 0,
+    role: 'user',
     created_at: '2024-01-01',
     lat: 42.5987,
     lon: -5.5671,
