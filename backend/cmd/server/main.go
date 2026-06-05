@@ -108,6 +108,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 		listingStorageSvc,
 		notificationsSvc,
 		&adminCheckAdapter{repo: userRepo},
+		transactionRepo,
 	).RegisterRoutes(api, authMiddleware)
 	walletModule.NewHandler(walletSvc).RegisterRoutes(api, authMiddleware)
 	transactionsModule.NewHandler(

@@ -40,7 +40,7 @@ func TestAdminListingDeletion(t *testing.T) {
 		adminChecker := &mockAdminChecker{admins: map[string]bool{"admin-1": true}}
 		notifSvc := &mockNotificationCreator{}
 		
-		h := listings.NewHandler(repo, &fakeStorageService{}, notifSvc, adminChecker)
+		h := listings.NewHandler(repo, &fakeStorageService{}, notifSvc, adminChecker, &fakeTransactionLister{})
 
 		r := gin.New()
 		h.RegisterRoutes(r.Group("/api"), fakeAuthMiddleware("admin-1"))
@@ -62,7 +62,7 @@ func TestAdminListingDeletion(t *testing.T) {
 		}
 		adminChecker := &mockAdminChecker{admins: map[string]bool{"user-2": false}}
 		
-		h := listings.NewHandler(repo, &fakeStorageService{}, &fakeNotificationCreator{}, adminChecker)
+		h := listings.NewHandler(repo, &fakeStorageService{}, &fakeNotificationCreator{}, adminChecker, &fakeTransactionLister{})
 
 		r := gin.New()
 		h.RegisterRoutes(r.Group("/api"), fakeAuthMiddleware("user-2"))

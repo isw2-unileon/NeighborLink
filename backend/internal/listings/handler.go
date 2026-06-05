@@ -7,11 +7,17 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 )
 
 // NotificationCreator defines the interface for creating notifications from the listings module.
 type NotificationCreator interface {
 	Create(ctx context.Context, userID, typ string, payload map[string]any) error
+}
+
+// TransactionLister defines the interface for checking transactions.
+type TransactionLister interface {
+	FindByListing(ctx context.Context, listingID string) ([]transactions.Transaction, error)
 }
 
 // AdminChecker defines the interface for checking if a user has administrative privileges.
@@ -25,15 +31,17 @@ type Handler struct {
 	storageSvc       StorageService
 	notificationsSvc NotificationCreator
 	adminSvc         AdminChecker
+	txLister         TransactionLister
 }
 
 // NewHandler creates a new Handler with the given dependencies.
-func NewHandler(repo Repository, storageSvc StorageService, notificationsSvc NotificationCreator, adminSvc AdminChecker) *Handler {
+func NewHandler(repo Repository, storageSvc StorageService, notificationsSvc NotificationCreator, adminSvc AdminChecker, txLister TransactionLister) *Handler {
 	return &Handler{
 		repo:             repo,
 		storageSvc:       storageSvc,
 		notificationsSvc: notificationsSvc,
 		adminSvc:         adminSvc,
+		txLister:         txLister,
 	}
 }
 
@@ -222,6 +230,17 @@ func (h *Handler) deleteListing(c *gin.Context) {
 		Reason string `json:"reason"`
 	}
 	_ = c.ShouldBindJSON(&body) // Optional for owners, recommended for admins
+
+	// Verificar transacciones pendientes
+	txs, err := h.txLister.FindByListing(c.Request.Context(), id)
+	if err == nil {
+		for _, tx := range txs {
+			if tx.Status != "returned" && tx.Status != "cancelled" && tx.Status != "pending_review" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "No se puede eliminar el listing porque tiene transacciones pendientes"})
+				return
+			}
+		}
+	}
 
 	if err := h.repo.Delete(c.Request.Context(), id); err != nil {
 		slog.Error("failed to delete listing", "id", id, "error", err)
