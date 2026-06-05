@@ -310,12 +310,12 @@ export default function ChatsPage() {
         return () => controller.abort();
     }, []);
 
-    if (!user) return null;
-
-    const ownerChats = chats.filter((c) => c.owner_id === user.id);
-    const borrowerChats = chats.filter((c) => c.borrower_id === user.id);
+    const ownerChats = useMemo(() => chats.filter((c) => c.owner_id === user?.id), [chats, user]);
+    const borrowerChats = useMemo(() => chats.filter((c) => c.borrower_id === user?.id), [chats, user]);
     const scopedChats = activeTab === 'owner' ? ownerChats : borrowerChats;
     const groupedChats = useMemo(() => classifyChats(scopedChats), [scopedChats]);
+
+    if (!user) return null;
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-4">

@@ -83,15 +83,6 @@ export default function ChatDetailPage() {
     const bottomRef = useRef<HTMLDivElement>(null);
     const initialScrollDone = useRef(false);
 
-    if (!user) return null;
-
-    const isOwner = listing?.owner_id === user.id;
-    const isBorrower = transaction?.borrower_id === user.id;
-    const transactionStatus = transaction?.status;
-    const statusBadge = getStatusBadge(transactionStatus);
-    const otherParticipant = isOwner ? borrower : owner;
-    const refundAvailable = transaction?.dispute_refund_points === undefined;
-
     useEffect(() => {
         if (!transactionId) return;
         api.get<{ data: Transaction }>(`/transactions/${transactionId}`)
@@ -108,7 +99,6 @@ export default function ChatDetailPage() {
         usersApi.getUser(listing.owner_id).then((r) => setOwner(r));
         usersApi.getUser(transaction.borrower_id).then((r) => setBorrower(r));
     }, [listing, transaction]);
-
 
     useEffect(() => {
         if (!transactionId) return;
@@ -143,6 +133,15 @@ export default function ChatDetailPage() {
             clearInterval(interval);
         };
     }, [transactionId]);
+
+    if (!user) return null;
+
+    const isOwner = listing?.owner_id === user.id;
+    const isBorrower = transaction?.borrower_id === user.id;
+    const transactionStatus = transaction?.status;
+    const statusBadge = getStatusBadge(transactionStatus);
+    const otherParticipant = isOwner ? borrower : owner;
+    const refundAvailable = transaction?.dispute_refund_points === undefined;
 
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
