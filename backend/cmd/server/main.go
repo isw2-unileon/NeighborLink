@@ -86,8 +86,8 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	userStorageSvc := usersModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
 	listingStorageSvc := listingsModule.NewSupabaseStorageService(cfg.SupabaseURL, cfg.SupabaseServiceKey)
 	notificationsSvc := notificationsModule.NewService(notificationsRepo)
-	walletSvc := walletModule.NewService(walletRepo)
 	stripeClient := stripeplatform.NewClient(cfg.StripeSecretKey)
+	walletSvc := walletModule.NewService(walletRepo, stripeClient)
 
 	transactionSvc := transactionsModule.NewService(
 		transactionRepo,
