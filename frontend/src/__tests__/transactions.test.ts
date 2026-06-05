@@ -66,7 +66,7 @@ describe('transactionsApi.pay', () => {
         fetchMock.mockResolvedValueOnce({
             ok: true,
             status: 200,
-            json: async () => ({ success: true }),
+            json: async () => ({ client_secret: 'pi_secret_abc' }),
         });
 
         await transactionsApi.pay('tx-1', 5000, 'pm_123');
@@ -81,6 +81,18 @@ describe('transactionsApi.pay', () => {
                 }),
             })
         );
+    });
+
+    it('devuelve el clientSecret del backend', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({ client_secret: 'pi_secret_abc' }),
+        });
+
+        const result = await transactionsApi.pay('tx-1', 5000, 'pm_123');
+
+        expect(result.clientSecret).toBe('pi_secret_abc');
     });
 
     it('lanza error si la respuesta no es ok', async () => {
