@@ -1,10 +1,119 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import {
+    CreditCard,
+    Clock,
+    Home,
+    MessageCircle,
+    MessageSquareText,
+    Package,
+    Scale,
+    Search,
+    XCircle,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import type { Message } from '../../types';
 
 type Tab = 'owner' | 'borrower';
+
+type ChatGroups = {
+    disputes: Message[];
+    pending: Message[];
+    awaitingPayment: Message[];
+    rejected: Message[];
+    activeNoMsg: Message[];
+    activeWithMsg: Message[];
+};
+
+const STATUS_META = {
+    pending: {
+        text: 'Pendiente de aceptar y concretar el pago',
+        tone: 'text-[var(--warning)]',
+        Icon: Clock,
+    },
+    awaiting_payment: {
+        text: 'Aceptado, pendiente de pago',
+        tone: 'text-[var(--success)]',
+        Icon: CreditCard,
+    },
+    cancelled: {
+        text: 'Solicitud rechazada',
+        tone: 'text-[var(--danger)]',
+        Icon: XCircle,
+    },
+    pending_review: {
+        text: 'En revisión por un administrador',
+        tone: 'text-[var(--danger)]',
+        Icon: Scale,
+    },
+    default: {
+        text: 'Inicia la conversación para concretar la entrega',
+        tone: 'text-[var(--accent)]',
+        Icon: MessageSquareText,
+    },
+} as const;
+
+const sortByDateDesc = (a: Message, b: Message) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
+function classifyChats(chats: Message[]): ChatGroups {
+    const groups: ChatGroups = {
+        disputes: [],
+        pending: [],
+        awaitingPayment: [],
+        rejected: [],
+        activeNoMsg: [],
+        activeWithMsg: [],
+    };
+
+    chats.forEach((chat) => {
+        const status = chat.status ?? '';
+        const hasMessage = chat.content.trim() !== '';
+
+        if (status === 'pending_review') {
+            groups.disputes.push(chat);
+            return;
+        }
+        if (status === 'pending') {
+            groups.pending.push(chat);
+            return;
+        }
+        if (status === 'awaiting_payment') {
+            groups.awaitingPayment.push(chat);
+            return;
+        }
+        if (status === 'cancelled') {
+            groups.rejected.push(chat);
+            return;
+        }
+
+        const isActive = ['agreed', 'handed_over', 'returned'].includes(status);
+        if (isActive && hasMessage) {
+            groups.activeWithMsg.push(chat);
+            return;
+        }
+        if (isActive && !hasMessage) {
+            groups.activeNoMsg.push(chat);
+            return;
+        }
+
+        if (hasMessage) {
+            groups.activeWithMsg.push(chat);
+        } else {
+            groups.activeNoMsg.push(chat);
+        }
+    });
+
+    groups.disputes.sort(sortByDateDesc);
+    groups.pending.sort(sortByDateDesc);
+    groups.awaitingPayment.sort(sortByDateDesc);
+    groups.rejected.sort(sortByDateDesc);
+    groups.activeNoMsg.sort(sortByDateDesc);
+    groups.activeWithMsg.sort(sortByDateDesc);
+
+    return groups;
+}
 
 function ChatCard({ message, currentUserID }: { message: Message; currentUserID: string }) {
     const isMe = message.sender_id === currentUserID;
@@ -12,87 +121,106 @@ function ChatCard({ message, currentUserID }: { message: Message; currentUserID:
     return (
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
-            className="flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
         >
-            {message.listing_photo
-                ? <img src={message.listing_photo} alt={message.listing_title}
-                    className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
-                : <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center text-2xl flex-shrink-0">📦</div>
-            }
+            {message.listing_photo ? (
+                <img
+                    src={message.listing_photo}
+                    alt={message.listing_title}
+                    className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                />
+            ) : (
+                <div className="w-12 h-12 rounded-xl bg-[var(--surface-strong)] flex items-center justify-center text-[var(--muted)] flex-shrink-0">
+                    <Package className="w-6 h-6" />
+                </div>
+            )}
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
+                <p className="text-sm font-semibold text-[var(--text)] truncate">
                     {message.listing_title ?? 'Objeto'}
                 </p>
-                <p className="text-sm text-gray-500 truncate">
+                <p className="text-sm text-[var(--muted)] truncate">
                     {isMe ? 'Tú: ' : ''}{message.content}
                 </p>
             </div>
-            <p className="text-xs text-gray-400 flex-shrink-0">
+            <p className="text-xs text-[var(--muted)] flex-shrink-0">
                 {new Date(message.created_at).toLocaleDateString('es-ES', {
-                    day: 'numeric', month: 'short'
+                    day: 'numeric',
+                    month: 'short',
                 })}
             </p>
         </Link>
     );
 }
 
-function EmptyChatCard({ message }: { message: Message }) {
-    const subtitle =
-        message.status === 'pending'
-            ? '⏳ Pendiente de aceptar y concretar el pago'
-            : message.status === 'awaiting_payment'
-                ? '💳 Aceptado, pendiente de pago'
-                : message.status === 'cancelled'
-                    ? '❌ Solicitud rechazada'
-                    : message.status === 'pending_review'
-                        ? '⚖️ En revisión por un administrador'
-                        : '💬 Inicia la conversación para concretar la entrega';
-
-    const subtitleColor =
-        message.status === 'pending'
-            ? 'text-amber-500'
-            : message.status === 'awaiting_payment'
-                ? 'text-emerald-600'
-                : message.status === 'cancelled'
-                    ? 'text-red-500'
-                    : message.status === 'pending_review'
-                        ? 'text-red-600'
-                        : 'text-teal-600';
+function TransactionStatusCard({ message }: { message: Message }) {
+    const meta = STATUS_META[message.status as keyof typeof STATUS_META] ?? STATUS_META.default;
+    const Icon = meta.Icon;
 
     return (
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
-            className="flex items-center gap-4 rounded-3xl border border-dashed border-[var(--accent-2)]/40 bg-white p-4 transition hover:shadow-md"
+            className="flex items-center gap-4 rounded-3xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-4 transition hover:shadow-md"
         >
-            {message.listing_photo
-                ? <img src={message.listing_photo} alt={message.listing_title}
-                    className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
-                : <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center text-2xl flex-shrink-0">📦</div>
-            }
+            {message.listing_photo ? (
+                <img
+                    src={message.listing_photo}
+                    alt={message.listing_title}
+                    className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                />
+            ) : (
+                <div className="w-12 h-12 rounded-xl bg-[var(--surface-strong)] flex items-center justify-center text-[var(--muted)] flex-shrink-0">
+                    <Package className="w-6 h-6" />
+                </div>
+            )}
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
+                <p className="text-sm font-semibold text-[var(--text)] truncate">
                     {message.listing_title ?? 'Objeto'}
                 </p>
-                <p className={`text-sm truncate ${subtitleColor}`}>
-                    {subtitle}
+                <p className={`text-sm truncate inline-flex items-center gap-1.5 ${meta.tone}`}>
+                    <Icon className="h-4 w-4" />
+                    {meta.text}
                 </p>
             </div>
         </Link>
     );
 }
 
-function ChatSection({ chats, currentUserID }: { chats: Message[]; currentUserID: string }) {
-    const pending = chats.filter(c => c.status === 'pending');
-    const awaitingPayment = chats.filter(c => c.status === 'awaiting_payment');
-    const rejected = chats.filter(c => c.status === 'cancelled');
-    const disputes = chats.filter(c => c.status === 'pending_review');
-    const activeNoMsg = chats.filter(c => ['agreed', 'handed_over'].includes(c.status ?? '') && c.content === '');
-    const activeWithMsg = chats.filter(c => (['agreed', 'handed_over', 'pending_review'].includes(c.status ?? '')) && c.content !== '');
+function ChatCardSkeleton() {
+    return (
+        <div className="flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div className="h-12 w-12 rounded-xl bg-[var(--surface-strong)] animate-pulse" />
+            <div className="flex-1 min-w-0 space-y-2">
+                <div className="h-4 w-40 rounded-full bg-[var(--surface-strong)] animate-pulse" />
+                <div className="h-3 w-56 rounded-full bg-[var(--surface-strong)] animate-pulse" />
+            </div>
+            <div className="h-3 w-12 rounded-full bg-[var(--surface-strong)] animate-pulse" />
+        </div>
+    );
+}
 
-    if (chats.length === 0) {
+function ChatListSkeleton({ count = 4 }: { count?: number }) {
+    return (
+        <div className="flex flex-col gap-4">
+            {Array.from({ length: count }).map((_, index) => (
+                <ChatCardSkeleton key={`chat-skeleton-${index}`} />
+            ))}
+        </div>
+    );
+}
+
+function ChatSection({ groups, currentUserID }: { groups: ChatGroups; currentUserID: string }) {
+    const total =
+        groups.disputes.length +
+        groups.pending.length +
+        groups.awaitingPayment.length +
+        groups.rejected.length +
+        groups.activeNoMsg.length +
+        groups.activeWithMsg.length;
+
+    if (total === 0) {
         return (
-            <div className="text-center py-16 text-gray-400">
-                <p className="text-4xl mb-3">💬</p>
+            <div className="text-center py-16 text-[var(--muted)]">
+                <MessageCircle className="h-10 w-10 mx-auto mb-3 text-[var(--accent-3)]" />
                 <p className="text-sm">No tienes conversaciones en esta categoría.</p>
             </div>
         );
@@ -100,49 +228,61 @@ function ChatSection({ chats, currentUserID }: { chats: Message[]; currentUserID
 
     return (
         <div className="flex flex-col gap-4">
-            {disputes.length > 0 && (
+            {groups.disputes.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-red-600">Incidencias / Disputas</h2>
-                    {disputes.map(msg => (
-                        msg.content !== "" 
-                        ? <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />
-                        : <EmptyChatCard key={msg.transaction_id} message={msg} />
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--danger)]">Incidencias / Disputas</h2>
+                    {groups.disputes.map((msg) =>
+                        msg.content !== '' ? (
+                            <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />
+                        ) : (
+                            <TransactionStatusCard key={msg.transaction_id} message={msg} />
+                        )
+                    )}
+                </div>
+            )}
+
+            {groups.pending.length > 0 && (
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--warning)]">Pendientes</h2>
+                    {groups.pending.map((msg) => (
+                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
                     ))}
                 </div>
             )}
 
-            {pending.length > 0 && (
+            {groups.awaitingPayment.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pendientes</h2>
-                    {pending.map(msg => <EmptyChatCard key={msg.transaction_id} message={msg} />)}
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--success)]">Pendiente de pago</h2>
+                    {groups.awaitingPayment.map((msg) => (
+                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
+                    ))}
                 </div>
             )}
 
-            {awaitingPayment.length > 0 && (
+            {groups.rejected.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-500">Pendiente de pago</h2>
-                    {awaitingPayment.map(msg => <EmptyChatCard key={msg.transaction_id} message={msg} />)}
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--danger)]">Rechazados</h2>
+                    {groups.rejected.map((msg) => (
+                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
+                    ))}
                 </div>
             )}
 
-            {rejected.length > 0 && (
+            {groups.activeNoMsg.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-red-500">Rechazados</h2>
-                    {rejected.map(msg => <EmptyChatCard key={msg.transaction_id} message={msg} />)}
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Sin mensajes</h2>
+                    {groups.activeNoMsg.map((msg) => (
+                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
+                    ))}
                 </div>
             )}
 
-            {activeNoMsg.length > 0 && (
+            {groups.activeWithMsg.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Sin mensajes</h2>
-                    {activeNoMsg.map(msg => <EmptyChatCard key={msg.transaction_id} message={msg} />)}
-                </div>
-            )}
-
-            {activeWithMsg.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Conversaciones</h2>
-                    {activeWithMsg.map(msg => <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />)}
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Conversaciones</h2>
+                    {groups.activeWithMsg.map((msg) => (
+                        <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />
+                    ))}
                 </div>
             )}
         </div>
@@ -157,66 +297,78 @@ export default function ChatsPage() {
     const [activeTab, setActiveTab] = useState<Tab>('owner');
 
     useEffect(() => {
-        messagesApi.getActiveChats()
+        const controller = new AbortController();
+
+        messagesApi.getActiveChats(controller.signal)
             .then(setChats)
-            .catch(() => setError('No se pudieron cargar los chats'))
+            .catch((err) => {
+                if (err instanceof Error && err.name === 'AbortError') return;
+                setError('No se pudieron cargar los chats');
+            })
             .finally(() => setLoading(false));
+
+        return () => controller.abort();
     }, []);
 
     if (!user) return null;
 
-    // Pestaña 1: chats donde YO soy el propietario (presto mi objeto)
-    const ownerChats = chats.filter(c => c.owner_id === user.id);
-
-    // Pestaña 2: chats donde YO soy el solicitante (quiero alquilar)
-    const borrowerChats = chats.filter(c => c.borrower_id === user.id);
+    const ownerChats = chats.filter((c) => c.owner_id === user.id);
+    const borrowerChats = chats.filter((c) => c.borrower_id === user.id);
+    const scopedChats = activeTab === 'owner' ? ownerChats : borrowerChats;
+    const groupedChats = useMemo(() => classifyChats(scopedChats), [scopedChats]);
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-4">
             <h1 className="font-editorial text-3xl font-semibold">Mis chats</h1>
 
-            {/* Pestañas */}
-            <div className="flex border-b border-gray-200">
+            <div className="flex border-b border-[var(--border)]">
                 <button
+                    type="button"
                     onClick={() => setActiveTab('owner')}
                     className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'owner'
-                        ? 'border-b-2 border-teal-600 text-teal-700'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+                        : 'text-[var(--muted)] hover:text-[var(--text)]'
                         }`}
                 >
-                    🏠 Presto mi objeto
+                    <span className="inline-flex items-center justify-center gap-2">
+                        <Home className="h-4 w-4" />
+                        Presto mi objeto
+                    </span>
                     {!loading && ownerChats.length > 0 && (
-                        <span className="ml-2 text-xs bg-teal-100 text-teal-700 rounded-full px-1.5 py-0.5">
+                        <span className="ml-2 text-xs bg-[var(--surface-strong)] text-[var(--accent)] rounded-full px-1.5 py-0.5">
                             {ownerChats.length}
                         </span>
                     )}
                 </button>
                 <button
+                    type="button"
                     onClick={() => setActiveTab('borrower')}
                     className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'borrower'
-                        ? 'border-b-2 border-teal-600 text-teal-700'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+                        : 'text-[var(--muted)] hover:text-[var(--text)]'
                         }`}
                 >
-                    🔍 Quiero alquilar
+                    <span className="inline-flex items-center justify-center gap-2">
+                        <Search className="h-4 w-4" />
+                        Quiero alquilar
+                    </span>
                     {!loading && borrowerChats.length > 0 && (
-                        <span className="ml-2 text-xs bg-teal-100 text-teal-700 rounded-full px-1.5 py-0.5">
+                        <span className="ml-2 text-xs bg-[var(--surface-strong)] text-[var(--accent)] rounded-full px-1.5 py-0.5">
                             {borrowerChats.length}
                         </span>
                     )}
                 </button>
             </div>
 
-            {loading && (
-                <p className="text-sm text-[var(--muted)] text-center py-8">Cargando chats…</p>
-            )}
+            {loading && <ChatListSkeleton count={4} />}
+
             {error && (
-                <p className="text-sm text-red-500 text-center py-8">{error}</p>
+                <p className="text-sm text-[var(--danger)] text-center py-8">{error}</p>
             )}
 
             {!loading && !error && chats.length === 0 && (
                 <div className="text-center py-16 text-[var(--muted)]">
-                    <p className="text-4xl mb-3">💬</p>
+                    <MessageCircle className="h-10 w-10 mx-auto mb-3 text-[var(--accent-3)]" />
                     <p className="text-sm">No tienes conversaciones activas.</p>
                     <p className="text-xs mt-1">Los chats aparecen cuando haces o recibes una solicitud de préstamo.</p>
                 </div>
@@ -224,7 +376,7 @@ export default function ChatsPage() {
 
             {!loading && !error && chats.length > 0 && (
                 <ChatSection
-                    chats={activeTab === 'owner' ? ownerChats : borrowerChats}
+                    groups={groupedChats}
                     currentUserID={user.id}
                 />
             )}

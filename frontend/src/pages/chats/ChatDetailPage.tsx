@@ -6,171 +6,56 @@ import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import { listingsApi } from '../../lib/listings';
 import { transactionsApi } from '../../lib/transactions';
-import type { Message, Listing, Transaction, User } from '../../types';
+import type { Message, Listing, Transaction, User, TransactionStatus } from '../../types';
 import PaymentModal from '../../components/PaymentModal';
+import MessageBubble from '../../components/chats/MessageBubble';
+import DecisionModal from '../../components/chats/DecisionModal';
+import TransactionInfoPanel from '../../components/chats/TransactionInfoPanel';
+import AdminToolbar from '../../components/chats/AdminToolbar';
+import ConfirmModal from '../../components/chats/ConfirmModal';
 
 const POLL_INTERVAL_MS = 3000;
 
-function MessageBubble({
-    message,
-    isMe,
-    isBorrower,
-    transactionStatus,
-    onOpenPayment
-}: {
-    message: Message;
-    isMe: boolean;
-    isBorrower: boolean;
-    transactionStatus?: string;
-    onOpenPayment: () => void;
-}) {
-    const isSystem = message.sender_id === '00000000-0000-0000-0000-000000000000';
+type StatusBadge = {
+    label: string;
+    className: string;
+};
 
-    if (isSystem) {
-        const isPaymentPrompt = message.content.toLowerCase().includes('métodos de pago');
-        const isAlreadyPaid = transactionStatus !== 'awaiting_payment';
-        if (isPaymentPrompt && (isAlreadyPaid || !isBorrower)) return null;
-
-        return (
-            <div className="flex justify-center w-full my-2">
-                <div className="max-w-md px-6 py-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-sm text-center shadow-sm">
-                    <p className="font-medium">{message.content}</p>
-                    {isPaymentPrompt && isBorrower && !isAlreadyPaid && (
-                        <button
-                            onClick={(e) => { e.preventDefault(); onOpenPayment(); }}
-                            className="mt-3 w-full bg-[var(--accent)] text-white px-6 py-2.5 rounded-full text-sm font-bold hover:brightness-95 transition-all shadow-md active:scale-95"
-                        >
-                            💳 Confirmar y Pagar fianza
-                        </button>
-                    )}
-                </div>
-            </div>
-        );
+function getStatusBadge(status?: TransactionStatus): StatusBadge | null {
+    switch (status) {
+        case 'pending':
+            return {
+                label: 'PENDIENTE',
+                className: 'border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]',
+            };
+        case 'awaiting_payment':
+            return {
+                label: 'PAGO PENDIENTE',
+                className: 'border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]',
+            };
+        case 'agreed':
+            return {
+                label: 'CONFIRMADO',
+                className: 'border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)]',
+            };
+        case 'pending_review':
+            return {
+                label: 'EN REVISIÓN',
+                className: 'border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]',
+            };
+        case 'returned':
+            return {
+                label: 'FINALIZADO',
+                className: 'border-[var(--border)] bg-[var(--surface-strong)] text-[var(--muted)]',
+            };
+        case 'cancelled':
+            return {
+                label: 'DENEGADO',
+                className: 'border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]',
+            };
+        default:
+            return null;
     }
-
-    return (
-        <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${isMe
-                ? 'bg-[var(--accent-2)] text-white rounded-br-sm'
-                : 'bg-white border border-[var(--border)] text-gray-800 rounded-bl-sm'
-                }`}>
-                <p>{message.content}</p>
-                <p className={`text-xs mt-1 ${isMe ? 'text-white/70' : 'text-[var(--muted)]'}`}>
-                    {new Date(message.created_at).toLocaleTimeString('es-ES', {
-                        hour: '2-digit', minute: '2-digit'
-                    })}
-                </p>
-            </div>
-        </div>
-    );
-}
-
-function EleccionModal({
-    onClose, onAccept, onReject, loading
-}: {
-    onClose: () => void;
-    onAccept: () => void;
-    onReject: () => void;
-    loading: boolean;
-}) {
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-5">
-                <div>
-                    <h2 className="text-base font-bold text-gray-900 mb-1">Tomar una decisión</h2>
-                    <div>
-                        Texto
-                        <p className="text-sm text-gray-500">¿Deseas aceptar o rechazar esta solicitud?</p>
-                    </div>
-                </div>
-                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                    <span className="text-amber-500 text-base mt-0.5">⚠️</span>
-                    <p className="text-xs text-amber-700 leading-relaxed">Esta decisión no se podrá deshacer después.</p>
-                </div>
-                <div className="flex gap-3">
-                    <button onClick={onAccept} disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2.5 rounded-xl transition disabled:opacity-50">Aceptar</button>
-                    <button onClick={onReject} disabled={loading} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold py-2.5 rounded-xl transition disabled:opacity-50">Rechazar</button>
-                </div>
-                <button onClick={onClose} disabled={loading} className="text-xs text-gray-400 hover:text-gray-600 text-center transition">Cancelar</button>
-            </div>
-        </div>
-    );
-}
-
-// ── FUERA de ChatDetailPage ──
-function TransactionInfoPanel({
-    listing,
-    transaction,
-    owner,
-    borrower,
-}: {
-    listing: Listing;
-    transaction: Transaction;
-    owner: User | null;
-    borrower: User | null;
-}) {
-    const start = transaction.start_date ? new Date(transaction.start_date) : null;
-    const end = transaction.end_date ? new Date(transaction.end_date) : null;
-    const days = start && end
-        ? Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000))
-        : null;
-    const totalEuros = transaction.total_charged_cents
-        ? (transaction.total_charged_cents / 100).toFixed(2)
-        : days
-            ? ((days * listing.deposit_amount) + 2).toFixed(2)
-            : '—';
-
-    const formatDate = (d: Date) =>
-        d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-    return (
-        <div className="w-64 flex-shrink-0 border-r border-[var(--border)] bg-white p-5 flex flex-col gap-5 overflow-y-auto">
-            <h2 className="text-sm font-bold text-[var(--text)] uppercase tracking-wide">Detalles</h2>
-
-            <div className="flex items-center gap-3">
-                {listing.photos?.[0] ? (
-                    <img src={listing.photos[0]} alt={listing.title} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
-                ) : (
-                    <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center text-xl flex-shrink-0">📦</div>
-                )}
-                <p className="text-sm font-semibold text-[var(--text)] leading-tight">{listing.title}</p>
-            </div>
-
-            <div className="h-px bg-[var(--border)]" />
-
-            <div className="flex flex-col gap-3">
-                <div>
-                    <p className="text-xs text-[var(--muted)] mb-0.5">Prestador</p>
-                    <p className="text-sm font-medium text-[var(--text)]">{owner?.name ?? '—'}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-[var(--muted)] mb-0.5">Solicitante</p>
-                    <p className="text-sm font-medium text-[var(--text)]">{borrower?.name ?? '—'}</p>
-                </div>
-            </div>
-
-            <div className="h-px bg-[var(--border)]" />
-
-            <div className="flex flex-col gap-3">
-                <div>
-                    <p className="text-xs text-[var(--muted)] mb-0.5">Fechas</p>
-                    {start && end ? (
-                        <p className="text-sm font-medium text-[var(--text)]">{formatDate(start)} → {formatDate(end)}</p>
-                    ) : (
-                        <p className="text-sm text-[var(--muted)]">No definidas</p>
-                    )}
-                </div>
-                <div>
-                    <p className="text-xs text-[var(--muted)] mb-0.5">Días</p>
-                    <p className="text-sm font-medium text-[var(--text)]">{days ?? '—'}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-[var(--muted)] mb-0.5">Precio total</p>
-                    <p className="text-base font-bold text-[var(--accent)]">{totalEuros} €</p>
-                </div>
-            </div>
-        </div>
-    );
 }
 
 export default function ChatDetailPage() {
@@ -192,16 +77,25 @@ export default function ChatDetailPage() {
     const [decisionLoading, setDecisionLoading] = useState(false);
     const [refundPercentage, setRefundPercentage] = useState(50);
     const [showRefundSlider, setShowRefundSlider] = useState(false);
+    const [showResolveConfirm, setShowResolveConfirm] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const initialScrollDone = useRef(false);
 
-    const isOwner = listing?.owner_id === user?.id;
+    if (!user) return null;
+
+    const isOwner = listing?.owner_id === user.id;
+    const isBorrower = transaction?.borrower_id === user.id;
+    const transactionStatus = transaction?.status;
+    const statusBadge = getStatusBadge(transactionStatus);
+    const otherParticipant = isOwner ? borrower : owner;
+    const refundAvailable = transaction?.dispute_refund_points === undefined;
 
     useEffect(() => {
         if (!transactionId) return;
         api.get<{ data: Transaction }>(`/transactions/${transactionId}`)
-            .then(r => {
+            .then((r) => {
                 setTransaction(r.data);
                 return listingsApi.getById(r.data.listing_id);
             })
@@ -211,35 +105,43 @@ export default function ChatDetailPage() {
 
     useEffect(() => {
         if (!listing || !transaction) return;
-        usersApi.getUser(listing.owner_id).then(r => setOwner(r));
-        usersApi.getUser(transaction.borrower_id).then(r => setBorrower(r));
+        usersApi.getUser(listing.owner_id).then((r) => setOwner(r));
+        usersApi.getUser(transaction.borrower_id).then((r) => setBorrower(r));
     }, [listing, transaction]);
 
-    useEffect(() => {
-        if (transaction?.status === 'awaiting_payment' && !isOwner) {
-            setShowPayment(true);
-        }
-    }, [transaction?.status, isOwner]);
 
     useEffect(() => {
         if (!transactionId) return;
 
-        const fetchMessages = () =>
-            messagesApi.getByTransaction(transactionId)
-                .then(msgs => {
-                    setMessages(msgs);
-                    if (!initialScrollDone.current) {
-                        setTimeout(() => {
-                            bottomRef.current?.scrollIntoView({ behavior: 'instant' });
-                            initialScrollDone.current = true;
-                        }, 50);
-                    }
-                })
-                .catch(() => setError('No se pudieron cargar los mensajes'));
+        const controller = new AbortController();
+        let isActive = true;
+
+        const fetchMessages = async () => {
+            try {
+                const msgs = await messagesApi.getByTransaction(transactionId, controller.signal);
+                if (!isActive) return;
+                setMessages(msgs);
+                if (!initialScrollDone.current) {
+                    setTimeout(() => {
+                        if (!isActive) return;
+                        bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+                        initialScrollDone.current = true;
+                    }, 50);
+                }
+            } catch (err) {
+                if (!isActive) return;
+                if (err instanceof Error && err.name === 'AbortError') return;
+                setError('No se pudieron cargar los mensajes');
+            }
+        };
 
         fetchMessages();
         const interval = setInterval(fetchMessages, POLL_INTERVAL_MS);
-        return () => clearInterval(interval);
+        return () => {
+            isActive = false;
+            controller.abort();
+            clearInterval(interval);
+        };
     }, [transactionId]);
 
     async function handleSend(e: React.FormEvent) {
@@ -250,7 +152,7 @@ export default function ChatDetailPage() {
         setError(null);
         try {
             const newMsg = await messagesApi.create(transactionId, content.trim());
-            setMessages(prev => [...prev, newMsg]);
+            setMessages((prev) => [...prev, newMsg]);
             setContent('');
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
         } catch (err: unknown) {
@@ -271,23 +173,19 @@ export default function ChatDetailPage() {
             await api.post(`/transactions/${transactionId}/decision`, { decision });
 
             if (decision === 'accept') {
-                setTransaction(prev => prev ? { ...prev, status: 'awaiting_payment' } : null);
-                setMessages(prev => [...prev, {
-                    id: crypto.randomUUID(),
-                    transaction_id: transactionId,
-                    sender_id: '00000000-0000-0000-0000-000000000000',
-                    content: 'El prestador ha aceptado las condiciones propuestas, ahora mete los métodos de pago.',
-                    created_at: new Date().toISOString(),
-                }]);
+                setTransaction((prev) => (prev ? { ...prev, status: 'awaiting_payment' } : null));
             } else {
-                setTransaction(prev => prev ? { ...prev, status: 'cancelled' } : null);
-                setMessages(prev => [...prev, {
-                    id: crypto.randomUUID(),
-                    transaction_id: transactionId,
-                    sender_id: '00000000-0000-0000-0000-000000000000',
-                    content: 'El prestador no ha aceptado las condiciones.',
-                    created_at: new Date().toISOString(),
-                }]);
+                setTransaction((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        id: crypto.randomUUID(),
+                        transaction_id: transactionId,
+                        sender_id: '00000000-0000-0000-0000-000000000000',
+                        content: 'El prestador no ha aceptado las condiciones.',
+                        created_at: new Date().toISOString(),
+                    },
+                ]);
             }
         } catch {
             setError('No se pudo guardar la decisión');
@@ -298,22 +196,23 @@ export default function ChatDetailPage() {
 
     async function handleResolveDispute() {
         if (!transactionId) return;
-        if (!window.confirm('¿Estás seguro de que quieres dar por concluida la incidencia? Esto cerrará el caso y marcará la transacción como devuelta.')) {
-            return;
-        }
 
+        setShowResolveConfirm(false);
         setDecisionLoading(true);
         setError(null);
         try {
             await transactionsApi.resolveDispute(transactionId);
-            setTransaction(prev => prev ? { ...prev, status: 'returned' } : null);
-            setMessages(prev => [...prev, {
-                id: crypto.randomUUID(),
-                transaction_id: transactionId,
-                sender_id: '00000000-0000-0000-0000-000000000000',
-                content: 'INCIDENCIA RESUELTA: Un administrador ha cerrado este caso. La transacción se marca como finalizada.',
-                created_at: new Date().toISOString(),
-            }]);
+            setTransaction((prev) => (prev ? { ...prev, status: 'returned' } : null));
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: crypto.randomUUID(),
+                    transaction_id: transactionId,
+                    sender_id: '00000000-0000-0000-0000-000000000000',
+                    content: 'INCIDENCIA RESUELTA: Un administrador ha cerrado este caso. La transacción se marca como finalizada.',
+                    created_at: new Date().toISOString(),
+                },
+            ]);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Error al procesar el reembolso.');
         } finally {
@@ -327,15 +226,25 @@ export default function ChatDetailPage() {
         setError(null);
         try {
             await transactionsApi.refundDisputePoints(transactionId, refundPercentage);
-            setTransaction(prev => prev ? { ...prev, dispute_refund_points: (listing?.deposit_amount || 0) * refundPercentage / 100 } : null);
+            setTransaction((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        dispute_refund_points: ((listing?.deposit_amount || 0) * refundPercentage) / 100,
+                    }
+                    : null
+            );
             setShowRefundSlider(false);
-            setMessages(prev => [...prev, {
-                id: crypto.randomUUID(),
-                transaction_id: transactionId,
-                sender_id: '00000000-0000-0000-0000-000000000000',
-                content: `REEMBOLSO DE PUNTOS: Un administrador ha concedido un reembolso del ${refundPercentage}% del valor del objeto en puntos.`,
-                created_at: new Date().toISOString(),
-            }]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: crypto.randomUUID(),
+                    transaction_id: transactionId,
+                    sender_id: '00000000-0000-0000-0000-000000000000',
+                    content: `REEMBOLSO DE PUNTOS: Un administrador ha concedido un reembolso del ${refundPercentage}% del valor del objeto en puntos.`,
+                    created_at: new Date().toISOString(),
+                },
+            ]);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Error al procesar el reembolso.');
         } finally {
@@ -345,23 +254,36 @@ export default function ChatDetailPage() {
 
     async function handlePaymentSuccess() {
         setShowPayment(false);
-        setTransaction(prev => prev ? { ...prev, status: 'agreed' } : null);
-        setMessages(prev => [...prev, {
-            id: crypto.randomUUID(),
-            transaction_id: transactionId!,
-            sender_id: '00000000-0000-0000-0000-000000000000',
-            content: '¡Pago completado! La reserva ahora está confirmada.',
-            created_at: new Date().toISOString(),
-        }]);
+        setTransaction((prev) => (prev ? { ...prev, status: 'agreed' } : null));
+        setMessages((prev) => [
+            ...prev,
+            {
+                id: crypto.randomUUID(),
+                transaction_id: transactionId!,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                content: '¡Pago completado! La reserva ahora está confirmada.',
+                created_at: new Date().toISOString(),
+            },
+        ]);
     }
 
-    if (!user) return null;
-    const transactionStatus = transaction?.status;
+    const handleOpenPayment = async () => {
+        if (!transactionId || !isBorrower) return;
+        try {
+            const t = await transactionsApi.getById(transactionId);
+            setTransaction(t);
+            if (t.status === 'awaiting_payment') setShowPayment(true);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'No se pudo abrir el pago');
+        }
+    };
+
+    const canShowDetails = Boolean(listing && transaction);
 
     return (
         <>
             {showEleccion && (
-                <EleccionModal
+                <DecisionModal
                     onClose={() => setShowEleccion(false)}
                     onAccept={() => handleDecision('accept')}
                     onReject={() => handleDecision('reject')}
@@ -369,7 +291,18 @@ export default function ChatDetailPage() {
                 />
             )}
 
-            {showPayment && transaction && listing && (
+            {showResolveConfirm && (
+                <ConfirmModal
+                    title="Resolver incidencia"
+                    description="¿Seguro que quieres cerrar la incidencia? Esto marcará la transacción como finalizada."
+                    confirmLabel="Confirmar"
+                    loading={decisionLoading}
+                    onConfirm={handleResolveDispute}
+                    onCancel={() => setShowResolveConfirm(false)}
+                />
+            )}
+
+            {showPayment && isBorrower && transaction && listing && (
                 <PaymentModal
                     transactionId={transactionId!}
                     depositAmount={listing.deposit_amount}
@@ -380,130 +313,103 @@ export default function ChatDetailPage() {
                 />
             )}
 
-            {/* ── Contenedor principal: panel izq + chat ── */}
-            <div className="flex fixed inset-x-0 bottom-0" style={{ top: '4rem' }}>
+            {/* Panel de detalles — drawer flotante, fuera del flex del chat */}
+            {showDetails && listing && transaction && (
+                <TransactionInfoPanel
+                    listing={listing}
+                    transaction={transaction}
+                    owner={owner}
+                    borrower={borrower}
+                    otherParticipant={otherParticipant}
+                    onClose={() => setShowDetails(false)}
+                />
+            )}
 
-                {/* Panel lateral izquierdo */}
-                {listing && transaction && (
-                    <TransactionInfoPanel
-                        listing={listing}
-                        transaction={transaction}
-                        owner={owner}
-                        borrower={borrower}
-                    />
-                )}
+            <div className="flex flex-1 min-h-0 flex-col">
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                    <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex flex-col gap-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/chats')}
+                                    className="text-sm text-[var(--muted)] hover:text-[var(--text)]"
+                                >
+                                    ←
+                                </button>
 
-                {/* Chat */}
-                <div className="flex-1 flex flex-col min-w-0">
-                    {/* Header */}
-                    <div className="px-6 py-4 border-b border-[var(--border)] bg-white flex items-center gap-3">
-                        <button onClick={() => navigate('/chats')} className="text-sm text-[var(--muted)] hover:text-[var(--text)] mr-1">←</button>
-
-                        {listing?.photos?.[0] ? (
-                            <img src={listing.photos[0]} alt={listing.title} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
-                        ) : (
-                            <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-xl flex-shrink-0">📦</div>
-                        )}
-
-                        <div className="flex-1 min-w-0">
-                            <h1 className="text-base font-semibold text-[var(--text)]">{listing?.title ?? 'Chat'}</h1>
-                            <p className="text-xs text-[var(--muted)]">Transacción {transactionId?.slice(0, 8)}…</p>
-                        </div>
-
-                        {isOwner && transactionStatus === 'pending' && (
-                            <button onClick={() => setShowEleccion(true)} className="flex-shrink-0 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:brightness-95 transition">Elección</button>
-                        )}
-                        {transactionStatus === 'awaiting_payment' && (
-                            <div className="flex-shrink-0 rounded-full border border-green-300 bg-green-100 px-3 py-2 text-xs font-bold text-green-700">ACEPTADO</div>
-                        )}
-                        {transactionStatus === 'pending_review' && (
-                            <div className="flex-shrink-0 rounded-full border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">EN REVISIÓN</div>
-                        )}
-                        {transactionStatus === 'returned' && (
-                            <div className="flex-shrink-0 rounded-full border border-gray-300 bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">FINALIZADO</div>
-                        )}
-                        {transactionStatus === 'cancelled' && (
-                            <div className="flex-shrink-0 rounded-full border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">DENEGADO</div>
-                        )}
-
-                        {user.role === 'admin' && transactionStatus === 'pending_review' && (
-                            <button
-                                onClick={handleResolveDispute}
-                                disabled={decisionLoading}
-                                className="flex-shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50"
-                            >
-                                {decisionLoading ? 'Cerrando...' : 'Resolver Incidencia'}
-                            </button>
-                        )}
-
-                        {user.role === 'admin' && (transactionStatus === 'pending_review' || transactionStatus === 'returned') && transaction?.dispute_refund_points === undefined && (
-                            <div className="flex items-center gap-2">
-                                {showRefundSlider ? (
-                                    <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 shadow-inner">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Reembolso</span>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="range"
-                                                    min="0"
-                                                    max="100"
-                                                    step="5"
-                                                    value={refundPercentage}
-                                                    onChange={(e) => setRefundPercentage(parseInt(e.target.value))}
-                                                    className="w-24 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                                />
-                                                <span className="text-xs font-bold text-amber-600 w-8">{refundPercentage}%</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-1 border-l border-gray-200 pl-2">
-                                            <button
-                                                onClick={handleRefundPoints}
-                                                disabled={decisionLoading}
-                                                className="p-1.5 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition disabled:opacity-50"
-                                                title="Confirmar reembolso"
-                                            >
-                                                <span className="text-[10px] font-bold">OK</span>
-                                            </button>
-                                            <button
-                                                onClick={() => setShowRefundSlider(false)}
-                                                disabled={decisionLoading}
-                                                className="p-1.5 rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition"
-                                                title="Cancelar"
-                                            >
-                                                <span className="text-[10px] font-bold">✕</span>
-                                            </button>
-                                        </div>
-                                    </div>
+                                {listing?.photos?.[0] ? (
+                                    <img
+                                        src={listing.photos[0]}
+                                        alt={listing.title}
+                                        className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                                    />
                                 ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-[var(--surface-strong)] flex items-center justify-center text-[var(--muted)] flex-shrink-0">
+                                        <span className="text-sm font-semibold">NL</span>
+                                    </div>
+                                )}
+
+                                <div className="flex-1 min-w-0">
+                                    <h1 className="text-base font-semibold text-[var(--text)] truncate">
+                                        {listing?.title ?? 'Chat'}
+                                    </h1>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+                                {statusBadge && (
+                                    <div className={`rounded-full border px-3 py-2 text-xs font-bold ${statusBadge.className}`}>
+                                        {statusBadge.label}
+                                    </div>
+                                )}
+                                {isOwner && transactionStatus === 'pending' && (
                                     <button
-                                        onClick={() => setShowRefundSlider(true)}
-                                        className="flex-shrink-0 rounded-full bg-amber-100 border border-amber-200 px-4 py-2 text-xs font-bold text-amber-700 hover:bg-amber-200 transition"
+                                        type="button"
+                                        onClick={() => setShowEleccion(true)}
+                                        className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:brightness-95 transition"
                                     >
-                                        💰 Devolver en Puntos
+                                        Elección
                                     </button>
                                 )}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDetails((prev) => !prev)}
+                                    disabled={!canShowDetails}
+                                    className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-strong)] transition disabled:opacity-50"
+                                >
+                                    {showDetails ? 'Ocultar detalles' : 'Ver detalles'}
+                                </button>
                             </div>
+                        </div>
+
+                        {user.role === 'admin' && (
+                            <AdminToolbar
+                                transactionStatus={transactionStatus}
+                                decisionLoading={decisionLoading}
+                                showRefundSlider={showRefundSlider}
+                                refundPercentage={refundPercentage}
+                                refundAvailable={refundAvailable}
+                                onResolveDisputeRequest={() => setShowResolveConfirm(true)}
+                                onShowRefundSlider={() => setShowRefundSlider(true)}
+                                onHideRefundSlider={() => setShowRefundSlider(false)}
+                                onRefundPercentageChange={setRefundPercentage}
+                                onConfirmRefund={handleRefundPoints}
+                            />
                         )}
                     </div>
 
-                    {/* Mensajes */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 bg-[var(--surface-strong)]">
+                    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 flex flex-col gap-3 bg-[var(--surface-strong)]">
                         {messages.length === 0 && (
-                            <p className="text-sm text-[var(--muted)] text-center mt-8">No hay mensajes aún. ¡Empieza la conversación!</p>
+                            <p className="text-sm text-[var(--muted)] text-center mt-8">
+                                No hay mensajes aún. ¡Empieza la conversación!
+                            </p>
                         )}
                         {messages.map((msg) => (
                             <MessageBubble
                                 key={msg.id}
                                 message={msg}
                                 isMe={msg.sender_id === user.id}
-                                isBorrower={!isOwner}
-                                transactionStatus={transactionStatus}
-                                onOpenPayment={async () => {
-                                    if (!transactionId) return;
-                                    const t = await transactionsApi.getById(transactionId);
-                                    setTransaction(t);
-                                    if (t.status === 'awaiting_payment') setShowPayment(true);
-                                }}
                             />
                         ))}
                         <div ref={bottomRef} />
@@ -512,9 +418,26 @@ export default function ChatDetailPage() {
                     {error && (
                         <p className="bg-red-50 py-1 text-center text-xs text-red-500">{error}</p>
                     )}
+                    {/* Banner fijo de pago — solo visible para el borrower cuando status = awaiting_payment */}
+                    {transactionStatus === 'awaiting_payment' && isBorrower && (
+                        <div className="px-6 py-3 border-t border-amber-200 bg-amber-50 flex items-center justify-between gap-4">
+                            <p className="text-sm text-amber-800 font-medium">
+                                💳 Tienes un pago pendiente para confirmar esta reserva
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleOpenPayment}
+                                className="flex-shrink-0 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white hover:brightness-95 transition active:scale-95"
+                            >
+                                Pagar fianza
+                            </button>
+                        </div>
+                    )}
 
-                    {/* Input */}
-                    <form onSubmit={handleSend} className="px-6 py-4 border-t border-[var(--border)] bg-white flex gap-3 items-center">
+                    <form
+                        onSubmit={handleSend}
+                        className="px-6 py-4 border-t border-[var(--border)] bg-white flex gap-3 items-center"
+                    >
                         <input
                             type="text"
                             value={content}
@@ -532,7 +455,6 @@ export default function ChatDetailPage() {
                         </button>
                     </form>
                 </div>
-
             </div>
         </>
     );

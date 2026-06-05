@@ -17,6 +17,12 @@
     --accent: #146a5a;
     --accent-2: #146a5a;
     --accent-3: #2b3d62;
+    --success: #0f766e;
+    --success-soft: #def3ef;
+    --warning: #b45309;
+    --warning-soft: #fef3c7;
+    --danger: #b42318;
+    --danger-soft: #fee4e2;
     --ring: #146a5a33;
 }
 
