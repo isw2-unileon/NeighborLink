@@ -6,7 +6,9 @@ import (
 
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/paymentintent"
+	"github.com/stripe/stripe-go/v76/payout"
 	"github.com/stripe/stripe-go/v76/refund"
+	"github.com/stripe/stripe-go/v76/transfer"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
@@ -67,6 +69,30 @@ func (c *Client) ConstructEvent(payload []byte, sigHeader, secret string) (strip
 		return stripe.Event{}, fmt.Errorf("stripe: invalid webhook signature: %w", err)
 	}
 	return event, nil
+}
+
+// PayoutToConnectedAccount transfers amountCents from the platform Stripe account to
+// the given Stripe Connect account, then initiates a payout to that account's bank.
+func (c *Client) PayoutToConnectedAccount(accountID string, amountCents int64, currency string) error {
+	_, err := transfer.New(&stripe.TransferParams{
+		Amount:      stripe.Int64(amountCents),
+		Currency:    stripe.String(currency),
+		Destination: stripe.String(accountID),
+	})
+	if err != nil {
+		return fmt.Errorf("stripe: transfer failed: %w", err)
+	}
+
+	params := &stripe.PayoutParams{
+		Amount:   stripe.Int64(amountCents),
+		Currency: stripe.String(currency),
+	}
+	params.SetStripeAccount(accountID)
+	_, err = payout.New(params)
+	if err != nil {
+		return fmt.Errorf("stripe: payout failed: %w", err)
+	}
+	return nil
 }
 
 // ReleaseDeposit issues a partial refund of refundAmountCents to the borrower.
