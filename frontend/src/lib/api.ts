@@ -33,7 +33,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
 
     if (response.status === 204) {
-        return undefined as any as T;
+        return undefined as unknown as T;
     }
 
     return response.json() as Promise<T>;
@@ -48,7 +48,7 @@ export const api = {
         request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
     patch: <T>(path: string, body?: unknown): Promise<T> =>
         request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
-    delete: <T>(path: string, options?: { body?: unknown }): Promise<T> =>
+    delete: <T = void>(path: string, options?: { body?: unknown }): Promise<T> =>
         request<T>(path, { 
             method: 'DELETE', 
             body: options?.body ? JSON.stringify(options.body) : undefined 
