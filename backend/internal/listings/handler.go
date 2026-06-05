@@ -14,6 +14,7 @@ type NotificationCreator interface {
 	Create(ctx context.Context, userID, typ string, payload map[string]any) error
 }
 
+// AdminChecker defines the interface for checking if a user has administrative privileges.
 type AdminChecker interface {
 	IsAdmin(ctx context.Context, userID string) (bool, error)
 }

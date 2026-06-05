@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { api, isAxiosError } from '../../lib/api';
 import { usersApi } from '../../lib/users';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
@@ -213,7 +214,7 @@ export default function ChatDetailPage() {
         if (!listing || !transaction) return;
         usersApi.getUser(listing.owner_id).then(r => setOwner(r));
         usersApi.getUser(transaction.borrower_id).then(r => setBorrower(r));
-    }, [listing?.owner_id, transaction?.borrower_id]);
+    }, [listing, transaction]);
 
     useEffect(() => {
         if (transaction?.status === 'awaiting_payment' && !isOwner) {
@@ -314,8 +315,12 @@ export default function ChatDetailPage() {
                 content: 'INCIDENCIA RESUELTA: Un administrador ha cerrado este caso. La transacción se marca como finalizada.',
                 created_at: new Date().toISOString(),
             }]);
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Error al resolver la incidencia.');
+        } catch (err: unknown) {
+            let msg = 'Error al resolver la incidencia.';
+            if (isAxiosError(err) && err.response?.data?.error) {
+                msg = err.response.data.error;
+            }
+            setError(msg);
         } finally {
             setDecisionLoading(false);
         }
@@ -336,8 +341,12 @@ export default function ChatDetailPage() {
                 content: `REEMBOLSO DE PUNTOS: Un administrador ha concedido un reembolso del ${refundPercentage}% del valor del objeto en puntos.`,
                 created_at: new Date().toISOString(),
             }]);
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Error al procesar el reembolso.');
+        } catch (err: unknown) {
+            let msg = 'Error al procesar el reembolso.';
+            if (axios.isAxiosError(err) && err.response?.data?.error) {
+                msg = err.response.data.error;
+            }
+            setError(msg);
         } finally {
             setDecisionLoading(false);
         }

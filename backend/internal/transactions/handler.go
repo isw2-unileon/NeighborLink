@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -410,40 +411,21 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	// ✅ Llamada al helper — sustituye TODO el bloque de parseo/validación
 	startDate, endDate, ok := h.validateReserveDates(c, input)
 	if !ok {
 		return
 	}
 
-	// ✅ A partir de aquí ya NO hay más código de fechas — solo la comprobación de solapamiento
-	blocked, err := h.repo.FindBlockedDates(c.Request.Context(), listingID)
+	// ✅ Llamada al helper solapamiento
+	overlap, err := h.checkDateOverlap(c.Request.Context(), listingID, startDate, endDate)
 	if err != nil {
 		slog.Error("failed to check availability", "listing_id", listingID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	for _, dr := range blocked {
-		if dr.StartDate == "" || dr.EndDate == "" {
-			continue
-		}
-
-		blockedStart, err := time.Parse("2006-01-02", dr.StartDate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-			return
-		}
-
-		blockedEnd, err := time.Parse("2006-01-02", dr.EndDate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-			return
-		}
-
-		if startDate.Before(blockedEnd) && endDate.After(blockedStart) {
-			c.JSON(http.StatusConflict, gin.H{"error": "selected dates overlap with an existing reservation"})
-			return
-		}
+	if overlap {
+		c.JSON(http.StatusConflict, gin.H{"error": "selected dates overlap with an existing reservation"})
+		return
 	}
 
 	t, err := h.repo.Reserve(c.Request.Context(), Transaction{
@@ -459,22 +441,55 @@ func (h *Handler) reserveListing(c *gin.Context) {
 		return
 	}
 
-	if h.notifSvc != nil {
-		go func() {
-			ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
-			if notifErr != nil {
-				slog.Error("failed to fetch listing owner for notification", "listing_id", listingID, "error", notifErr)
-				return
-			}
-			_ = h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
-				"listing_title": listingTitle,
-				"borrower_id":   userID.(string),
-			})
-		}()
-	}
+	h.notifyOwnerOfChat(listingID, userID.(string))
 
 	c.JSON(http.StatusCreated, gin.H{"data": t})
 }
+
+func (h *Handler) checkDateOverlap(ctx context.Context, listingID string, start, end time.Time) (bool, error) {
+	blocked, err := h.repo.FindBlockedDates(ctx, listingID)
+	if err != nil {
+		return false, fmt.Errorf("check availability: %w", err)
+	}
+	for _, dr := range blocked {
+		if dr.StartDate == "" || dr.EndDate == "" {
+			continue
+		}
+
+		blockedStart, err := time.Parse("2006-01-02", dr.StartDate)
+		if err != nil {
+			return false, fmt.Errorf("parse blocked start: %w", err)
+		}
+
+		blockedEnd, err := time.Parse("2006-01-02", dr.EndDate)
+		if err != nil {
+			return false, fmt.Errorf("parse blocked end: %w", err)
+		}
+
+		if start.Before(blockedEnd) && end.After(blockedStart) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (h *Handler) notifyOwnerOfChat(listingID, borrowerID string) {
+	if h.notifSvc == nil {
+		return
+	}
+	go func() {
+		ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
+		if notifErr != nil {
+			slog.Error("failed to fetch listing owner for notification", "listing_id", listingID, "error", notifErr)
+			return
+		}
+		_ = h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
+			"listing_title": listingTitle,
+			"borrower_id":   borrowerID,
+		})
+	}()
+}
+
 
 func (h *Handler) validateReserveDates(c *gin.Context, input ReserveInput) (start, end time.Time, ok bool) {
 	var err error

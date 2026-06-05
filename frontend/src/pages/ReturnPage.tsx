@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, isAxiosError } from '../lib/api';
 import { transactionsApi } from '../lib/transactions';
 
 export default function ReturnPage() {
@@ -61,8 +61,12 @@ export default function ReturnPage() {
             await transactionsApi.reportIssue(transactionId);
             setSuccess(true);
             setTimeout(() => navigate(`/transactions/${transactionId}/chat`), 1500);
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Error al reportar la incidencia.');
+        } catch (err: unknown) {
+            let msg = 'Error al reportar la incidencia.';
+            if (isAxiosError(err) && err.response?.data?.error) {
+                msg = err.response.data.error;
+            }
+            setError(msg);
         } finally {
             setReporting(false);
         }

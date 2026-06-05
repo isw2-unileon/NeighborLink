@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import notificacionIcon from '../assets/notificacion.jpg';
 import { notificationsApi } from '../lib/notifications';
 import type { Notification } from '../types';
@@ -73,12 +73,7 @@ export default function Layout() {
         return () => clearInterval(interval);
     }, [user]);
 
-    useEffect(() => {
-        if (!user) return;
-        loadNotifications();
-    }, [user]);
-
-    async function loadNotifications() {
+    const loadNotifications = useCallback(async () => {
         if (!user) return;
         try {
             setLoadingNotifications(true);
@@ -93,7 +88,12 @@ export default function Layout() {
         } finally {
             setLoadingNotifications(false);
         }
-    }
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        loadNotifications();
+    }, [user, loadNotifications]);
 
     async function handleOpenNotifications() {
         const nextOpen = !isNotificationsOpen;
