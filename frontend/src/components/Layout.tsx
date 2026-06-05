@@ -15,6 +15,12 @@ function formatNotificationText(notification: Notification): string {
             return `Han rechazado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
         case 'chat_opened':
             return `Se ha abierto un chat para reservar tu objeto: ${String(notification.payload.listing_title ?? 'tu listing')}`;
+        case 'points_refunded':
+            return `¡Reembolso recibido! Has recibido ${notification.payload.points} puntos por una incidencia en: ${notification.payload.listing_title}`;
+        case 'dispute_created':
+            return `Nueva incidencia reportada en: ${notification.payload.listing_title}. Revisión requerida.`;
+        case 'listing_deleted_by_admin':
+            return `Tu anuncio '${notification.payload.listing_title}' ha sido eliminado por un administrador. Motivo: ${notification.payload.reason}`;
         case 'message_received':
             return 'Tienes un nuevo mensaje';
         default:

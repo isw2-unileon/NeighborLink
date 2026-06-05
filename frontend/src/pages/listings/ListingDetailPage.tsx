@@ -172,6 +172,21 @@ export default function ListingDetailPage() {
         }
     }
 
+    async function handleAdminDelete() {
+        if (!id) return;
+        const reason = window.prompt('Por favor, indica la razón del borrado (se le notificará al usuario):', 'Incumplimiento de las normas de la comunidad.');
+        if (reason === null) return; // Cancelado
+
+        if (!confirm('¿Seguro que quieres borrar este artículo como administrador?')) return;
+
+        try {
+            await listingsApi.deleteAsAdmin(id, reason);
+            navigate('/listings');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Error al borrar como administrador');
+        }
+    }
+
     async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file || !id) return;
@@ -234,8 +249,8 @@ export default function ListingDetailPage() {
                             </span>
                         </div>
 
-                        {/* Botón reservar — visible si no eres el owner y el listing está available */}
-                        {!isOwner && listing.status === 'available' && (
+                        {/* Botón reservar — visible si no eres el owner, no eres admin y el listing está available */}
+                        {!isOwner && user?.role !== 'admin' && listing.status === 'available' && (
                             <button
                                 onClick={() => setShowReserve(true)}
                                 className="w-full rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:brightness-95"
@@ -301,6 +316,18 @@ export default function ListingDetailPage() {
                                         disabled={uploading}
                                     />
                                 </label>
+                            </div>
+                        )}
+
+                        {!isOwner && user?.role === 'admin' && (
+                            <div className="flex flex-wrap gap-3 border-t border-red-50 pt-4 mt-2">
+                                <div className="w-full text-xs font-bold text-red-400 uppercase tracking-widest mb-1">Acciones de Administrador</div>
+                                <button
+                                    onClick={handleAdminDelete}
+                                    className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition shadow-sm"
+                                >
+                                    Eliminar anuncio (Moderación)
+                                </button>
                             </div>
                         )}
                     </div>

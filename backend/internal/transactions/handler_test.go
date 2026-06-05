@@ -2,10 +2,8 @@ package transactions_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,197 +11,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/middleware"
 	"github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
-type noopPointsAdder struct{}
-
-func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
-
-type noopNotificationCreator struct{}
-
-func (noopNotificationCreator) Create(_ context.Context, _ string, _ string, _ map[string]any) error {
-	return nil
-}
-
-type noopListingUpdater struct{}
-
-func (noopListingUpdater) UpdateStatus(_ context.Context, _ string, _ string) error { return nil }
-
-type fakeRepository struct {
-	transactions         []transactions.Transaction
-	err                  error
-	ownerByTransactionID map[string]string
-	blockedDates         []transactions.DateRange
-	reserved             *transactions.Transaction
-}
-
-func (f *fakeRepository) FindAll(ctx context.Context) ([]transactions.Transaction, error) {
-	return f.transactions, f.err
-}
-
-func (f *fakeRepository) FindByID(ctx context.Context, id string) (*transactions.Transaction, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	for _, t := range f.transactions {
-		if t.ID == id {
-			return &t, nil
-		}
-	}
-	return nil, nil
-}
-
-func (f *fakeRepository) FindByListing(ctx context.Context, listingID string) ([]transactions.Transaction, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	var result []transactions.Transaction
-	for _, t := range f.transactions {
-		if t.ListingID == listingID {
-			result = append(result, t)
-		}
-	}
-	return result, nil
-}
-
-func (f *fakeRepository) FindByBorrower(ctx context.Context, borrowerID string) ([]transactions.BorrowerTransaction, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	var result []transactions.BorrowerTransaction
-	for _, t := range f.transactions {
-		if t.BorrowerID == borrowerID {
-			result = append(result, transactions.BorrowerTransaction{Transaction: t})
-		}
-	}
-	return result, nil
-}
-
-func (f *fakeRepository) FindListingOwnerByTransactionID(ctx context.Context, id string) (string, error) {
-	if f.err != nil {
-		return "", f.err
-	}
-	if f.ownerByTransactionID != nil {
-		if ownerID, ok := f.ownerByTransactionID[id]; ok {
-			return ownerID, nil
-		}
-	}
-	return "", fmt.Errorf("transaction %s not found", id)
-}
-
-func (f *fakeRepository) FindListingOwnerAndTitle(ctx context.Context, id string) (string, string, error) {
-	if f.err != nil {
-		return "", "", f.err
-	}
-	if f.ownerByTransactionID != nil {
-		if ownerID, ok := f.ownerByTransactionID[id]; ok {
-			return ownerID, "listing-title", nil
-		}
-	}
-	return "", "", fmt.Errorf("transaction %s not found", id)
-}
-
-func (f *fakeRepository) Create(ctx context.Context, t transactions.Transaction) (*transactions.Transaction, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	t.ID = fmt.Sprintf("fake-%d", len(f.transactions)+1)
-	t.Status = "pending"
-	f.transactions = append(f.transactions, t)
-	created := f.transactions[len(f.transactions)-1]
-	return &created, nil
-}
-
-func (f *fakeRepository) UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string, totalChargedCents int64) error {
-	if f.err != nil {
-		return f.err
-	}
-	now := time.Now()
-	for i, t := range f.transactions {
-		if t.ID == id {
-			f.transactions[i].StripePaymentIntentID = paymentIntentID
-			f.transactions[i].PaymentMethodID = paymentMethodID
-			f.transactions[i].Status = "agreed"
-			f.transactions[i].AgreedAt = &now
-			return nil
-		}
-	}
-	return fmt.Errorf("transaction %s not found", id)
-}
-
-func (f *fakeRepository) UpdateStatus(ctx context.Context, id string, status string) error {
-	if f.err != nil {
-		return f.err
-	}
-	now := time.Now()
-	for i, t := range f.transactions {
-		if t.ID == id {
-			f.transactions[i].Status = status
-			switch status {
-			case "handed_over":
-				f.transactions[i].HandoverAt = &now
-			case "returned":
-				f.transactions[i].ReturnAt = &now
-			}
-			return nil
-		}
-	}
-	return fmt.Errorf("transaction %s not found", id)
-}
-
-func (f *fakeRepository) Reserve(ctx context.Context, t transactions.Transaction) (*transactions.Transaction, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	t.ID = "new-id"
-	f.reserved = &t
-	return &t, nil
-}
-
-func (f *fakeRepository) FindBlockedDates(ctx context.Context, listingID string) ([]transactions.DateRange, error) {
-	return f.blockedDates, f.err
-}
-
-func (f *fakeRepository) GenerateCode(_ context.Context, _ string, _ string) (string, error) {
-	if f.err != nil {
-		return "", f.err
-	}
-	return "123456", nil
-}
-
-func (f *fakeRepository) ValidateCode(_ context.Context, _ string, _ string, code string) (bool, error) {
-	if f.err != nil {
-		return false, f.err
-	}
-	return code == "123456", nil
-}
-
-func (f *fakeRepository) CancelByPaymentIntentID(_ context.Context, _ string) error {
-	return f.err
-}
-
-const testJWTSecret = "test-secret"
-
-func makeToken(userID string) string {
-	claims := jwt.MapClaims{
-		"sub": userID,
-		"exp": time.Now().Add(time.Hour).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	t, _ := token.SignedString([]byte(testJWTSecret))
-	return "Bearer " + t
-}
-
 func setupRouterWithStripe(repo transactions.Repository, fs *fakeStripe) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	svc := transactions.NewService(repo, fs, noopListingUpdater{})
-  h := transactions.NewHandler(repo, svc, noopPointsAdder{}, noopNotificationCreator{})
+	svc := transactions.NewService(repo, fs, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
+	h := transactions.NewHandler(repo, svc, &noopPointsAdder{}, &noopNotificationCreator{}, &mockAdminChecker{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r

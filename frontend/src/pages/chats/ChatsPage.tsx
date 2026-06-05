@@ -44,7 +44,9 @@ function EmptyChatCard({ message }: { message: Message }) {
                 ? '💳 Aceptado, pendiente de pago'
                 : message.status === 'cancelled'
                     ? '❌ Solicitud rechazada'
-                    : '💬 Inicia la conversación para concretar la entrega';
+                    : message.status === 'pending_review'
+                        ? '⚖️ En revisión por un administrador'
+                        : '💬 Inicia la conversación para concretar la entrega';
 
     const subtitleColor =
         message.status === 'pending'
@@ -53,7 +55,9 @@ function EmptyChatCard({ message }: { message: Message }) {
                 ? 'text-emerald-600'
                 : message.status === 'cancelled'
                     ? 'text-red-500'
-                    : 'text-teal-600';
+                    : message.status === 'pending_review'
+                        ? 'text-red-600'
+                        : 'text-teal-600';
 
     return (
         <Link
@@ -81,8 +85,9 @@ function ChatSection({ chats, currentUserID }: { chats: Message[]; currentUserID
     const pending = chats.filter(c => c.status === 'pending');
     const awaitingPayment = chats.filter(c => c.status === 'awaiting_payment');
     const rejected = chats.filter(c => c.status === 'cancelled');
+    const disputes = chats.filter(c => c.status === 'pending_review');
     const activeNoMsg = chats.filter(c => ['agreed', 'handed_over'].includes(c.status ?? '') && c.content === '');
-    const activeWithMsg = chats.filter(c => ['agreed', 'handed_over'].includes(c.status ?? '') && c.content !== '');
+    const activeWithMsg = chats.filter(c => (['agreed', 'handed_over', 'pending_review'].includes(c.status ?? '')) && c.content !== '');
 
     if (chats.length === 0) {
         return (
@@ -95,6 +100,17 @@ function ChatSection({ chats, currentUserID }: { chats: Message[]; currentUserID
 
     return (
         <div className="flex flex-col gap-4">
+            {disputes.length > 0 && (
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-red-600">Incidencias / Disputas</h2>
+                    {disputes.map(msg => (
+                        msg.content !== "" 
+                        ? <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />
+                        : <EmptyChatCard key={msg.transaction_id} message={msg} />
+                    ))}
+                </div>
+            )}
+
             {pending.length > 0 && (
                 <div className="flex flex-col gap-2">
                     <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pendientes</h2>

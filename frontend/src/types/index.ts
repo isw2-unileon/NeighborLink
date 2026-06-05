@@ -9,6 +9,7 @@ export interface User {
     avatar_url: string;
     reputation_score: number;
     points: number;
+    role: 'user' | 'admin';
     created_at: string;
     lat: number;
     lon: number;
@@ -28,7 +29,7 @@ export interface Listing {
     owner_lon: number;
 }
 
-export type TransactionStatus = 'pending' | 'awaiting_payment' | 'agreed' | 'handed_over' | 'returned' | 'cancelled';
+export type TransactionStatus = 'pending' | 'awaiting_payment' | 'agreed' | 'handed_over' | 'returned' | 'cancelled' | 'pending_review';
 
 export interface Transaction {
     id: string;
@@ -43,6 +44,7 @@ export interface Transaction {
     agreed_at: string | null;
     handover_at: string | null;
     return_at: string | null;
+    dispute_refund_points?: number;
     listing_title?: string;
     listing_photo?: string;
 }

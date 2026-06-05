@@ -14,19 +14,25 @@ type NotificationCreator interface {
 	Create(ctx context.Context, userID, typ string, payload map[string]any) error
 }
 
+type AdminChecker interface {
+	IsAdmin(ctx context.Context, userID string) (bool, error)
+}
+
 // Handler defines the HTTP handlers for listings-related endpoints.
 type Handler struct {
 	repo             Repository
 	storageSvc       StorageService
 	notificationsSvc NotificationCreator
+	adminSvc         AdminChecker
 }
 
 // NewHandler creates a new Handler with the given dependencies.
-func NewHandler(repo Repository, storageSvc StorageService, notificationsSvc NotificationCreator) *Handler {
+func NewHandler(repo Repository, storageSvc StorageService, notificationsSvc NotificationCreator, adminSvc AdminChecker) *Handler {
 	return &Handler{
 		repo:             repo,
 		storageSvc:       storageSvc,
 		notificationsSvc: notificationsSvc,
+		adminSvc:         adminSvc,
 	}
 }
 
@@ -182,7 +188,7 @@ func (h *Handler) updateListing(c *gin.Context) {
 
 func (h *Handler) deleteListing(c *gin.Context) {
 	id := c.Param("id")
-	ownerID, ok := c.Get("userID")
+	userID, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -198,16 +204,42 @@ func (h *Handler) deleteListing(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing not found"})
 		return
 	}
-	if existing.OwnerID != ownerID.(string) {
+
+	isAdmin := false
+	if h.adminSvc != nil {
+		isAdmin, _ = h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	}
+
+	isOwner := existing.OwnerID == userID.(string)
+
+	if !isOwner && !isAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&body) // Optional for owners, recommended for admins
 
 	if err := h.repo.Delete(c.Request.Context(), id); err != nil {
 		slog.Error("failed to delete listing", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+
+	// Notificar al dueño si fue borrado por un administrador
+	if isAdmin && !isOwner && h.notificationsSvc != nil {
+		reason := body.Reason
+		if reason == "" {
+			reason = "Incumplimiento de las normas de la comunidad."
+		}
+		_ = h.notificationsSvc.Create(c.Request.Context(), existing.OwnerID, "listing_deleted_by_admin", map[string]any{
+			"listing_title": existing.Title,
+			"reason":        reason,
+		})
+	}
+
 	c.JSON(http.StatusNoContent, nil)
 }
 

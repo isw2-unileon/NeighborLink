@@ -24,7 +24,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) Repository {
 
 func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, listing_id, borrower_id, status, total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
+		SELECT id, listing_id, borrower_id, status, total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at, dispute_refund_points
 		FROM transactions
 	`)
 	if err != nil {
@@ -35,7 +35,7 @@ func (r *postgresRepository) FindAll(ctx context.Context) ([]Transaction, error)
 	transactions := make([]Transaction, 0)
 	for rows.Next() {
 		var t Transaction
-		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt, &t.DisputeRefundPoints); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)
 		}
 		transactions = append(transactions, t)
@@ -53,12 +53,14 @@ func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transact
 		SELECT id, listing_id, borrower_id, status,
 			COALESCE(stripe_payment_intent_id, '') AS stripe_payment_intent_id,
 			COALESCE(payment_method_id, '')        AS payment_method_id,
-			total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
+			total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at,
+			dispute_refund_points
 		FROM transactions
 		WHERE id = $1
 	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status,
 		&t.StripePaymentIntentID, &t.PaymentMethodID,
-		&t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt)
+		&t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt,
+		&t.DisputeRefundPoints)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -103,7 +105,7 @@ func (r *postgresRepository) scanRows(rows pgx.Rows) ([]Transaction, error) {
 	transactions := make([]Transaction, 0)
 	for rows.Next() {
 		var t Transaction
-		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status, &t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt, &t.DisputeRefundPoints); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)
 		}
 		transactions = append(transactions, t)
@@ -116,7 +118,7 @@ func (r *postgresRepository) scanRows(rows pgx.Rows) ([]Transaction, error) {
 
 func (r *postgresRepository) FindByListing(ctx context.Context, listingID string) ([]Transaction, error) {
 	rows, err := r.pool.Query(ctx, `
-        SELECT id, listing_id, borrower_id, status, total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
+        SELECT id, listing_id, borrower_id, status, total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at, dispute_refund_points
         FROM transactions WHERE listing_id = $1
     `, listingID)
 	if err != nil {
@@ -130,11 +132,11 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 	rows, err := r.pool.Query(ctx, `
 		SELECT t.id, t.listing_id, t.borrower_id, t.status,
 		       t.total_charged_cents, t.start_date, t.end_date, t.agreed_at, t.handover_at, t.return_at,
-		       l.title, l.photos
+		       t.dispute_refund_points, l.title, l.photos
 		FROM transactions t
 		JOIN listings l ON t.listing_id = l.id
 		WHERE t.borrower_id = $1
-		  AND t.status IN ('pending', 'agreed', 'awaiting_payment', 'handed_over', 'returned', 'cancelled')
+		  AND t.status IN ('pending', 'agreed', 'awaiting_payment', 'handed_over', 'returned', 'cancelled', 'pending_review')
 		ORDER BY t.agreed_at DESC NULLS LAST
 	`, borrowerID)
 	if err != nil {
@@ -149,7 +151,7 @@ func (r *postgresRepository) FindByBorrower(ctx context.Context, borrowerID stri
 		if err := rows.Scan(
 			&bt.ID, &bt.ListingID, &bt.BorrowerID, &bt.Status,
 			&bt.TotalChargedCents, &bt.StartDate, &bt.EndDate, &bt.AgreedAt, &bt.HandoverAt, &bt.ReturnAt,
-			&bt.ListingTitle, &photos,
+			&bt.DisputeRefundPoints, &bt.ListingTitle, &photos,
 		); err != nil {
 			return nil, fmt.Errorf("transactions: scan failed: %w", err)
 		}
@@ -169,10 +171,10 @@ func (r *postgresRepository) Create(ctx context.Context, t Transaction) (*Transa
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO transactions (listing_id, borrower_id, payment_method_id, status)
 		VALUES ($1, $2, $3, 'pending')
-		RETURNING id, listing_id, borrower_id, status, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at
+		RETURNING id, listing_id, borrower_id, status, payment_method_id, total_charged_cents, agreed_at, handover_at, return_at, dispute_refund_points
 	`, t.ListingID, t.BorrowerID, t.PaymentMethodID).Scan(
 		&created.ID, &created.ListingID, &created.BorrowerID, &created.Status,
-		&created.PaymentMethodID, &created.TotalChargedCents, &created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
+		&created.PaymentMethodID, &created.TotalChargedCents, &created.AgreedAt, &created.HandoverAt, &created.ReturnAt, &created.DisputeRefundPoints,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("transactions: insert failed: %w", err)
@@ -215,19 +217,33 @@ func (r *postgresRepository) Reserve(ctx context.Context, t Transaction) (*Trans
         INSERT INTO transactions (listing_id, borrower_id, payment_method_id, status, start_date, end_date)
         VALUES ($1, $2, $3, 'pending', $4, $5)
         RETURNING id, listing_id, borrower_id, status, payment_method_id,
-                  total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at
+                  total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at, dispute_refund_points
     `, t.ListingID, t.BorrowerID, t.PaymentMethodID, t.StartDate, t.EndDate,
 	).Scan(
 		&created.ID, &created.ListingID, &created.BorrowerID, &created.Status,
 		&created.PaymentMethodID, &created.TotalChargedCents,
 		&created.StartDate, &created.EndDate,
 		&created.AgreedAt, &created.HandoverAt, &created.ReturnAt,
+		&created.DisputeRefundPoints,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("transactions: reserve failed: %w", err)
 	}
 	return &created, nil
 }
+
+func (r *postgresRepository) UpdateDisputeRefund(ctx context.Context, id string, points int) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions
+		SET dispute_refund_points = $1
+		WHERE id = $2
+	`, points, id)
+	if err != nil {
+		return fmt.Errorf("transactions: update dispute refund failed: %w", err)
+	}
+	return nil
+}
+
 
 func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID string) ([]DateRange, error) {
 	rows, err := r.pool.Query(ctx, `
@@ -305,4 +321,17 @@ func (r *postgresRepository) FindListingOwnerAndTitle(ctx context.Context, listi
 		return "", "", fmt.Errorf("transactions: find listing owner and title failed: %w", err)
 	}
 	return ownerID, title, nil
+}
+
+func (r *postgresRepository) FindListingInfoForRefund(ctx context.Context, listingID string) (string, string, int, error) {
+	var ownerID, title string
+	var deposit int
+	err := r.pool.QueryRow(ctx,
+		`SELECT owner_id, title, deposit_amount FROM listings WHERE id = $1`,
+		listingID,
+	).Scan(&ownerID, &title, &deposit)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("transactions: find listing info for refund failed: %w", err)
+	}
+	return ownerID, title, deposit, nil
 }

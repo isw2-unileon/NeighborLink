@@ -77,7 +77,7 @@ describe('ReturnPage', () => {
         fireEvent.change(screen.getByPlaceholderText('000000'), { target: { value: '654321' } })
         fireEvent.click(screen.getByRole('button', { name: 'Confirmar devolución' }))
         await waitFor(() =>
-            expect(screen.getByText('✓ Devolución confirmada correctamente')).toBeInTheDocument()
+            expect(screen.getByText('✓ Acción procesada correctamente. Redirigiendo...')).toBeInTheDocument()
         )
         await vi.runAllTimersAsync()
         expect(mockNavigate).toHaveBeenCalledWith('/profile')

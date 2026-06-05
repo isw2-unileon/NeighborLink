@@ -10,14 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// pointsAdder is a narrow interface so the transactions package does not import the wallet package.
-type pointsAdder interface {
-	AddPoints(ctx context.Context, userID string, points int) error
-}
-
-// notificationCreator is a narrow interface so transactions doesn't import notifications.
-type notificationCreator interface {
-	Create(ctx context.Context, userID, notifType string, payload map[string]any) error
+type adminChecker interface {
+	IsAdmin(ctx context.Context, userID string) (bool, error)
 }
 
 // Handler holds the HTTP handlers for the transactions module.
@@ -26,11 +20,12 @@ type Handler struct {
 	service   *Service
 	walletSvc pointsAdder
 	notifSvc  notificationCreator
+	adminSvc  adminChecker
 }
 
 // NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
-func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator) *Handler {
-	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc}
+func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
+	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc, adminSvc: adminSvc}
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
@@ -54,6 +49,86 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 	protected.POST("/transactions/:id/generate-return-code", h.generateReturnCode)
 	protected.POST("/transactions/:id/confirm-handover", h.confirmHandover)
 	protected.POST("/transactions/:id/confirm-return", h.confirmReturn)
+	protected.POST("/transactions/:id/report-issue", h.reportIssueTransaction)
+	protected.POST("/transactions/:id/resolve-dispute", h.resolveDisputeTransaction)
+	protected.POST("/transactions/:id/refund-dispute", h.refundDisputePoints)
+}
+
+func (h *Handler) refundDisputePoints(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	isAdmin, err := h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	if err != nil {
+		slog.Error("failed to check admin status", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only administrators can issue refunds"})
+		return
+	}
+
+	id := c.Param("id")
+	var body struct {
+		Percentage int `json:"percentage"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	points, err := h.service.RefundDisputePoints(c.Request.Context(), id, body.Percentage)
+	if err != nil {
+		h.handleServiceError(c, "refund dispute points", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "points": points})
+}
+
+func (h *Handler) resolveDisputeTransaction(c *gin.Context) {
+	userID, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	isAdmin, err := h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	if err != nil {
+		slog.Error("failed to check admin status", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only administrators can resolve disputes"})
+		return
+	}
+
+	id := c.Param("id")
+	if err := h.service.ResolveDispute(c.Request.Context(), id); err != nil {
+		h.handleServiceError(c, "resolve dispute", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) reportIssueTransaction(c *gin.Context) {
+	id := c.Param("id")
+	if !h.requireOwner(c, id) {
+		return
+	}
+
+	if err := h.service.ReportIssue(c.Request.Context(), id); err != nil {
+		h.handleServiceError(c, "report issue", id, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "status": "pending_review"})
 }
 
 func (h *Handler) listTransactions(c *gin.Context) {
@@ -316,6 +391,16 @@ func (h *Handler) reserveListing(c *gin.Context) {
 	userID, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	// Un administrador NO puede reservar objetos
+	isAdmin, err := h.adminSvc.IsAdmin(c.Request.Context(), userID.(string))
+	if err != nil {
+		slog.Error("failed to check admin status during reservation", "error", err)
+	}
+	if isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "administrators cannot reserve listings"})
 		return
 	}
 

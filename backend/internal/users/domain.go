@@ -13,6 +13,7 @@ type User struct {
 	Address         string    `json:"address"`
 	ReputationScore int       `json:"reputation_score"`
 	Points          int       `json:"points"`
+	Role            string    `json:"role"`
 	CreatedAt       time.Time `json:"created_at"`
 	Lat             float64   `json:"lat"`
 	Lon             float64   `json:"lon"`

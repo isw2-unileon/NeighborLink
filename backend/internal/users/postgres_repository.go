@@ -15,7 +15,7 @@ import (
 )
 
 const selectUserFields = `
-	SELECT id, email, name, avatar_url, address, reputation_score, points, created_at,
+	SELECT id, email, name, avatar_url, address, reputation_score, points, role, created_at,
 	       ST_Y(location::geometry) AS lat,
 	       ST_X(location::geometry) AS lon
 `
@@ -38,7 +38,7 @@ func scanUser(row pgx.Row, u *User) error {
 	var avatarURL sql.NullString
 	if err := row.Scan(
 		&u.ID, &u.Email, &u.Name, &avatarURL, &u.Address,
-		&u.ReputationScore, &u.Points, &u.CreatedAt,
+		&u.ReputationScore, &u.Points, &u.Role, &u.CreatedAt,
 		&u.Lat, &u.Lon,
 	); err != nil {
 		return err
@@ -85,13 +85,28 @@ func (r *postgresRepository) FindByID(ctx context.Context, id string) (*User, er
 	return &u, nil
 }
 
+func (r *postgresRepository) FindFirstAdmin(ctx context.Context) (*User, error) {
+	var u User
+	err := scanUser(r.pool.QueryRow(ctx,
+		selectUserFields+` FROM users WHERE role = 'admin' LIMIT 1`,
+	), &u)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("users: find admin failed: %w", err)
+	}
+	return &u, nil
+}
+
 func (r *postgresRepository) Update(ctx context.Context, id string, input UpdateUserInput) (*User, error) {
 	coords, err := geocoder.Geocode(ctx, r.httpClient, input.Address)
 	if err != nil {
 		slog.Warn("geocoding failed on update, saving without location", "address", input.Address, "error", err)
 	}
 
-	returning := ` RETURNING id, email, name, avatar_url, address, reputation_score, points, created_at,
+	returning := ` RETURNING id, email, name, avatar_url, address, reputation_score, points, role, created_at,
 	                          ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon`
 
 	var u User

@@ -79,6 +79,8 @@ func (fakeNotificationCreator) Create(_ context.Context, _ string, _ string, _ m
 
 // --- Helpers ---
 
+
+
 func fakeAuthMiddleware(userID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("userID", userID)
@@ -101,7 +103,7 @@ func setupRouterWithStorage(repo listings.Repository, storage listings.StorageSe
 func setupRouterFull(repo listings.Repository, storage listings.StorageService, auth gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := listings.NewHandler(repo, storage, fakeNotificationCreator{})
+	h := listings.NewHandler(repo, storage, fakeNotificationCreator{}, &mockAdminChecker{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, auth)
 	return r
