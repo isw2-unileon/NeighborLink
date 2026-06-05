@@ -10,8 +10,8 @@ interface MessagesResponse {
 }
 
 export const messagesApi = {
-    getByTransaction: (transactionId: string) =>
-        api.get<MessagesResponse>(`/transactions/${transactionId}/messages`).then(r => r.data),
+    getByTransaction: (transactionId: string, signal?: AbortSignal) =>
+        api.get<MessagesResponse>(`/transactions/${transactionId}/messages`, { signal }).then(r => r.data),
 
     getById: (id: string) =>
         api.get<MessageResponse>(`/messages/${id}`).then(r => r.data),
@@ -19,6 +19,6 @@ export const messagesApi = {
     create: (transactionId: string, content: string) =>
         api.post<MessageResponse>(`/transactions/${transactionId}/messages`, { content }).then(r => r.data),
 
-    getActiveChats: () =>
-        api.get<MessagesResponse>('/chats').then(r => r.data),
+    getActiveChats: (signal?: AbortSignal) =>
+        api.get<MessagesResponse>('/chats', { signal }).then(r => r.data),
 };

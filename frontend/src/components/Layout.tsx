@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import notificacionIcon from '../assets/notificacion.jpg';
@@ -28,10 +28,12 @@ function formatNotificationText(notification: Notification): string {
     }
 }
 
-// Layout — componente estructural que envuelve todas las páginas
 export default function Layout() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout } = useAuth();
+
+    const isChatDetail = /^\/transactions\/[^/]+\/chat/.test(location.pathname);
 
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -127,15 +129,17 @@ export default function Layout() {
     }
 
     return (
-        <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-            <nav className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
+        <div className="flex flex-col h-screen bg-[var(--bg)] text-[var(--text)]">
+
+            {/* ── Navbar ── */}
+            <nav className="flex-shrink-0 sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
                 <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
                     <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
                         <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-white">N</span>
                         <span className="font-editorial text-xl">NeighborLink</span>
                     </Link>
 
-                    <div className="relative flex items-center gap-4" ref={notificationsRef}>
+                    <div className="relative flex items-center gap-3" ref={notificationsRef}>
                         {user ? (
                             <>
                                 {/* Notificaciones */}
@@ -201,6 +205,7 @@ export default function Layout() {
                             </>
                         )}
 
+                        {/* Panel de notificaciones */}
                         {user && isNotificationsOpen && (
                             <div className="absolute right-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-lg">
                                 <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
@@ -229,25 +234,24 @@ export default function Layout() {
                                         </div>
                                     ) : (
                                         <ul className="divide-y divide-gray-100">
-                                            {safeNotifications.map((notification) => (<li
-                                                key={notification.id}
-                                                className={notification.read ? 'bg-white' : 'bg-teal-50'}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleMarkAsRead(notification.id, notification.read)
-                                                    }
-                                                    className="w-full px-4 py-3 text-left transition hover:bg-gray-50"
+                                            {safeNotifications.map((notification) => (
+                                                <li
+                                                    key={notification.id}
+                                                    className={notification.read ? 'bg-white' : 'bg-teal-50'}
                                                 >
-                                                    <p className="text-sm text-gray-800">
-                                                        {formatNotificationText(notification)}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-gray-400">
-                                                        {new Date(notification.created_at).toLocaleString('es-ES')}
-                                                    </p>
-                                                </button>
-                                            </li>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMarkAsRead(notification.id, notification.read)}
+                                                        className="w-full px-4 py-3 text-left transition hover:bg-gray-50"
+                                                    >
+                                                        <p className="text-sm text-gray-800">
+                                                            {formatNotificationText(notification)}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-gray-400">
+                                                            {new Date(notification.created_at).toLocaleString('es-ES')}
+                                                        </p>
+                                                    </button>
+                                                </li>
                                             ))}
                                         </ul>
                                     )}
@@ -258,11 +262,21 @@ export default function Layout() {
                 </div>
             </nav>
 
-            <main className="min-h-screen px-4 py-6">
-                <div className="mx-auto w-full max-w-6xl">
+            {/* ── Contenido principal ── */}
+            {isChatDetail ? (
+                // El chat detail necesita ocupar todo el espacio restante sin padding ni max-width
+                <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
                     <Outlet />
-                </div>
-            </main>
+                </main>
+            ) : (
+                // El resto de páginas usan el layout normal con padding y max-width
+                <main className="flex-1 overflow-y-auto px-4 py-6">
+                    <div className="mx-auto w-full max-w-6xl">
+                        <Outlet />
+                    </div>
+                </main>
+            )}
+
         </div>
     );
 }
