@@ -167,11 +167,12 @@ export default function ListingDetailPage() {
         try {
             await listingsApi.delete(id);
             navigate('/listings');
-        } catch (err: any) {
-            if (err.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
-                setToast(err.response.data.details);
+        } catch (err: unknown) {
+            const apiErr = err as { response?: { data?: { error?: string; code?: string; details?: string } } };
+            if (apiErr.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
+                setToast(apiErr.response.data.details || 'Error al borrar');
             } else {
-                setError(err.response?.data?.error || err.message || 'Error al borrar');
+                setError(apiErr.response?.data?.error || (err as Error).message || 'Error al borrar');
             }
         }
     }
@@ -186,11 +187,12 @@ export default function ListingDetailPage() {
         try {
             await listingsApi.deleteAsAdmin(id, reason);
             navigate('/listings');
-        } catch (err: any) {
-            if (err.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
-                setToast(err.response.data.details);
+        } catch (err: unknown) {
+            const apiErr = err as { response?: { data?: { error?: string; code?: string; details?: string } } };
+            if (apiErr.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
+                setToast(apiErr.response.data.details || 'Error al borrar como administrador');
             } else {
-                setError(err.response?.data?.error || err.message || 'Error al borrar como administrador');
+                setError(apiErr.response?.data?.error || (err as Error).message || 'Error al borrar como administrador');
             }
         }
     }

@@ -220,7 +220,6 @@ func (h *Handler) deleteListing(c *gin.Context) {
 	}
 
 	isOwner := existing.OwnerID == userID.(string)
-
 	if !isOwner && !isAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
@@ -229,21 +228,10 @@ func (h *Handler) deleteListing(c *gin.Context) {
 	var body struct {
 		Reason string `json:"reason"`
 	}
-	_ = c.ShouldBindJSON(&body) // Optional for owners, recommended for admins
+	_ = c.ShouldBindJSON(&body)
 
-	// Verificar transacciones pendientes
-	txs, err := h.txLister.FindByListing(c.Request.Context(), id)
-	if err == nil {
-		for _, tx := range txs {
-			if tx.Status != "returned" && tx.Status != "cancelled" && tx.Status != "pending_review" {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "No se puede eliminar el listing",
-					"details": "El listing tiene transacciones activas (" + tx.Status + "). Solo se pueden eliminar listings sin transacciones pendientes.",
-					"code": "ACTIVE_TRANSACTIONS_EXIST",
-				})
-				return
-			}
-		}
+	if !h.isDeletionAllowed(c, id) {
+		return
 	}
 
 	if err := h.repo.Delete(c.Request.Context(), id); err != nil {
@@ -252,19 +240,42 @@ func (h *Handler) deleteListing(c *gin.Context) {
 		return
 	}
 
-	// Notificar al dueño si fue borrado por un administrador
-	if isAdmin && !isOwner && h.notificationsSvc != nil {
-		reason := body.Reason
-		if reason == "" {
-			reason = "Incumplimiento de las normas de la comunidad."
-		}
-		_ = h.notificationsSvc.Create(c.Request.Context(), existing.OwnerID, "listing_deleted_by_admin", map[string]any{
-			"listing_title": existing.Title,
-			"reason":        reason,
-		})
+	if isAdmin && !isOwner {
+		h.notifyAdminDeletion(c.Request.Context(), existing.OwnerID, existing.Title, body.Reason)
 	}
 
 	c.JSON(http.StatusNoContent, nil)
+}
+
+func (h *Handler) isDeletionAllowed(c *gin.Context, listingID string) bool {
+	txs, err := h.txLister.FindByListing(c.Request.Context(), listingID)
+	if err != nil {
+		return true // Allow if transactions check fails, maintaining previous behavior
+	}
+	for _, tx := range txs {
+		if tx.Status != "returned" && tx.Status != "cancelled" && tx.Status != "pending_review" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "No se puede eliminar el listing",
+				"details": "El listing tiene transacciones activas (" + tx.Status + "). Solo se pueden eliminar listings sin transacciones pendientes.",
+				"code":    "ACTIVE_TRANSACTIONS_EXIST",
+			})
+			return false
+		}
+	}
+	return true
+}
+
+func (h *Handler) notifyAdminDeletion(ctx context.Context, ownerID, listingTitle, reason string) {
+	if h.notificationsSvc == nil {
+		return
+	}
+	if reason == "" {
+		reason = "Incumplimiento de las normas de la comunidad."
+	}
+	_ = h.notificationsSvc.Create(ctx, ownerID, "listing_deleted_by_admin", map[string]any{
+		"listing_title": listingTitle,
+		"reason":        reason,
+	})
 }
 
 func (h *Handler) uploadPhoto(c *gin.Context) {

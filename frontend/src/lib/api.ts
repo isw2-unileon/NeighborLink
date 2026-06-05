@@ -11,6 +11,16 @@ function getAuthHeaders(): HeadersInit {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+interface ApiError extends Error {
+    response: {
+        data: {
+            error?: string;
+            details?: string;
+            code?: string;
+        };
+    };
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`${BASE_URL}${path}`, {
         ...options,
@@ -31,8 +41,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         
         // Creamos un error personalizado que incluye la respuesta completa
-        const err = new Error(errorData.error ?? `HTTP ${response.status}`);
-        (err as any).response = { data: errorData };
+        const err = new Error(errorData.error ?? `HTTP ${response.status}`) as ApiError;
+        err.response = { data: errorData };
         throw err;
     }
 
