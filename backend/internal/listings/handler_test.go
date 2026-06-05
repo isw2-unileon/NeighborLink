@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/isw2-unileon/neighborlink/backend/internal/listings"
+	"github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,6 +78,15 @@ func (fakeNotificationCreator) Create(_ context.Context, _ string, _ string, _ m
 	return nil
 }
 
+type fakeTransactionLister struct {
+	txs []transactions.Transaction
+	err error
+}
+
+func (f *fakeTransactionLister) FindByListing(_ context.Context, _ string) ([]transactions.Transaction, error) {
+	return f.txs, f.err
+}
+
 // --- Helpers ---
 
 
@@ -101,9 +111,13 @@ func setupRouterWithStorage(repo listings.Repository, storage listings.StorageSe
 }
 
 func setupRouterFull(repo listings.Repository, storage listings.StorageService, auth gin.HandlerFunc) *gin.Engine {
+	return setupRouterWithTxs(repo, storage, auth, &fakeTransactionLister{})
+}
+
+func setupRouterWithTxs(repo listings.Repository, storage listings.StorageService, auth gin.HandlerFunc, txLister listings.TransactionLister) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := listings.NewHandler(repo, storage, fakeNotificationCreator{}, &mockAdminChecker{})
+	h := listings.NewHandler(repo, storage, fakeNotificationCreator{}, &mockAdminChecker{}, txLister)
 	api := r.Group("/api")
 	h.RegisterRoutes(api, auth)
 	return r
@@ -455,6 +469,7 @@ func TestDeleteListing(t *testing.T) {
 		listingID  string
 		userID     string
 		listing    *listings.Listing
+		txs        []transactions.Transaction
 		findErr    error
 		deleteErr  error
 		wantStatus int
@@ -465,6 +480,14 @@ func TestDeleteListing(t *testing.T) {
 			userID:     "owner-1",
 			listing:    existing,
 			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "pending transaction prevents deletion",
+			listingID:  "1",
+			userID:     "owner-1",
+			listing:    existing,
+			txs:        []transactions.Transaction{{Status: "pending"}},
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "non-owner gets 403",
@@ -505,7 +528,8 @@ func TestDeleteListing(t *testing.T) {
 				findErr:   tt.findErr,
 				deleteErr: tt.deleteErr,
 			}
-			router := setupRouterWithAuth(repo, fakeAuthMiddleware(tt.userID))
+			txLister := &fakeTransactionLister{txs: tt.txs}
+			router := setupRouterWithTxs(repo, &fakeStorageService{}, fakeAuthMiddleware(tt.userID), txLister)
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodDelete, "/api/listings/"+tt.listingID, nil)

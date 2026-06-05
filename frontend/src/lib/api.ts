@@ -11,6 +11,16 @@ function getAuthHeaders(): HeadersInit {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+interface ApiError extends Error {
+    response: {
+        data: {
+            error?: string;
+            details?: string;
+            code?: string;
+        };
+    };
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`${BASE_URL}${path}`, {
         ...options,
@@ -28,8 +38,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
             localStorage.removeItem('user');
             window.dispatchEvent(new Event('auth:logout'));
         }
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.error ?? `HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Creamos un error personalizado que incluye la respuesta completa
+        const err = new Error(errorData.error ?? `HTTP ${response.status}`) as ApiError;
+        err.response = { data: errorData };
+        throw err;
     }
 
     if (response.status === 204) {

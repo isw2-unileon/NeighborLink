@@ -168,7 +168,12 @@ export default function ListingDetailPage() {
             await listingsApi.delete(id);
             navigate('/listings');
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Error al borrar');
+            const apiErr = err as { response?: { data?: { error?: string; code?: string; details?: string } } };
+            if (apiErr.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
+                setToast(apiErr.response.data.details || 'Error al borrar');
+            } else {
+                setError(apiErr.response?.data?.error || (err as Error).message || 'Error al borrar');
+            }
         }
     }
 
@@ -183,7 +188,12 @@ export default function ListingDetailPage() {
             await listingsApi.deleteAsAdmin(id, reason);
             navigate('/listings');
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Error al borrar como administrador');
+            const apiErr = err as { response?: { data?: { error?: string; code?: string; details?: string } } };
+            if (apiErr.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
+                setToast(apiErr.response.data.details || 'Error al borrar como administrador');
+            } else {
+                setError(apiErr.response?.data?.error || (err as Error).message || 'Error al borrar como administrador');
+            }
         }
     }
 
