@@ -73,7 +73,13 @@ func (c *Client) ConstructEvent(payload []byte, sigHeader, secret string) (strip
 
 // PayoutToConnectedAccount transfers amountCents from the platform Stripe account to
 // the given Stripe Connect account, then initiates a payout to that account's bank.
+// When accountID is "acct_mock_demo" the call is a no-op so the redemption flow works
+// in demo environments before real Stripe Connect onboarding is in place.
 func (c *Client) PayoutToConnectedAccount(accountID string, amountCents int64, currency string) error {
+	if accountID == "acct_mock_demo" {
+		return nil
+	}
+
 	_, err := transfer.New(&stripe.TransferParams{
 		Amount:      stripe.Int64(amountCents),
 		Currency:    stripe.String(currency),
