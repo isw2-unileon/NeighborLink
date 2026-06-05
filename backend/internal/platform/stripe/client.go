@@ -26,8 +26,8 @@ func NewClient(secretKey string) *Client {
 // This reserves the deposit amount on the borrower's card without charging it yet.
 // amountCents is the deposit amount in the smallest currency unit (e.g. cents for EUR).
 // paymentMethodID is the Stripe payment method ID (pm_...) provided by the borrower.
-// Returns the PaymentIntent ID (pi_...) that must be stored in the transactions table.
-func (c *Client) AuthorizeDeposit(amountCents int64, currency string, paymentMethodID string) (string, error) {
+// Returns the PaymentIntent ID (pi_...) and client_secret needed by the frontend for 3DS.
+func (c *Client) AuthorizeDeposit(amountCents int64, currency string, paymentMethodID string) (piID string, clientSecret string, err error) {
 	params := &stripe.PaymentIntentParams{
 		Amount:        stripe.Int64(amountCents),
 		Currency:      stripe.String(currency),
@@ -42,10 +42,10 @@ func (c *Client) AuthorizeDeposit(amountCents int64, currency string, paymentMet
 
 	pi, err := paymentintent.New(params)
 	if err != nil {
-		return "", fmt.Errorf("stripe: failed to authorize deposit: %w", err)
+		return "", "", fmt.Errorf("stripe: failed to authorize deposit: %w", err)
 	}
 
-	return pi.ID, nil
+	return pi.ID, pi.ClientSecret, nil
 }
 
 // CaptureDeposit captures a previously authorized PaymentIntent in full.
