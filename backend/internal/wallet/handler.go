@@ -8,6 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type redeemRequest struct {
+	PointsToRedeem int `json:"points_to_redeem" binding:"required,min=1000"`
+}
+
 // Handler holds the HTTP handlers for the wallet module.
 type Handler struct {
 	svc Service
@@ -27,16 +31,24 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 }
 
 func (h *Handler) redeemPoints(c *gin.Context) {
-	userID := c.MustGet("userID").(string)
+	var req redeemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	redemption, err := h.svc.RedeemPoints(c.Request.Context(), userID)
+	userID := c.MustGet("userID").(string)
+	redemption, err := h.svc.RedeemPoints(c.Request.Context(), userID, req.PointsToRedeem)
 	if err != nil {
-		if errors.Is(err, ErrInsufficientPoints) {
+		switch {
+		case errors.Is(err, ErrInsufficientPoints):
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
+		case errors.Is(err, ErrNoConnectedAccount):
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		default:
+			slog.Error("failed to redeem points", "user_id", userID, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		}
-		slog.Error("failed to redeem points", "user_id", userID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
