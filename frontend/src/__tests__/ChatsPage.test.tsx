@@ -67,7 +67,7 @@ describe('ChatsPage', () => {
     it('muestra el estado de carga inicial', () => {
         vi.mocked(messagesApi.getActiveChats).mockReturnValue(new Promise(() => { }));
         renderPage();
-        expect(screen.getByText('Cargando chats…')).toBeInTheDocument();
+        expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
     });
 
     it('renderiza los chats cuando la API responde', async () => {
