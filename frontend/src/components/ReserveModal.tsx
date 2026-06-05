@@ -55,8 +55,17 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
 
     async function handleConfirm() {
         if (!range) return;
-        const startDate = range.from.toISOString().split('T')[0] ?? '';
-        const endDate = range.to.toISOString().split('T')[0] ?? '';
+        
+        // Función auxiliar para obtener YYYY-MM-DD en hora local
+        const formatDateLocal = (date: Date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const startDate = formatDateLocal(range.from);
+        const endDate = formatDateLocal(range.to);
         setSubmitting(true);
         setError(null);
         try {
