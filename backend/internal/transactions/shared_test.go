@@ -42,10 +42,11 @@ type fakeStripe struct {
 	capturedAmount int64
 	releasedAmount int64
 	captureCalled  bool
+	clientSecret   string
 }
-func (f *fakeStripe) AuthorizeDeposit(amountCents int64, _, _ string) (string, error) {
+func (f *fakeStripe) AuthorizeDeposit(amountCents int64, _, _ string) (string, string, error) {
 	f.capturedAmount = amountCents
-	return "pi_fake", nil
+	return "pi_fake", f.clientSecret, nil
 }
 func (f *fakeStripe) CaptureDeposit(_ string) error {
 	f.captureCalled = true
