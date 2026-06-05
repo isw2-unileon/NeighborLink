@@ -28,8 +28,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
             localStorage.removeItem('user');
             window.dispatchEvent(new Event('auth:logout'));
         }
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.error ?? `HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Creamos un error personalizado que incluye la respuesta completa
+        const err = new Error(errorData.error ?? `HTTP ${response.status}`);
+        (err as any).response = { data: errorData };
+        throw err;
     }
 
     if (response.status === 204) {

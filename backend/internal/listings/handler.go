@@ -236,7 +236,11 @@ func (h *Handler) deleteListing(c *gin.Context) {
 	if err == nil {
 		for _, tx := range txs {
 			if tx.Status != "returned" && tx.Status != "cancelled" && tx.Status != "pending_review" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "No se puede eliminar el listing porque tiene transacciones pendientes"})
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "No se puede eliminar el listing",
+					"details": "El listing tiene transacciones activas (" + tx.Status + "). Solo se pueden eliminar listings sin transacciones pendientes.",
+					"code": "ACTIVE_TRANSACTIONS_EXIST",
+				})
 				return
 			}
 		}

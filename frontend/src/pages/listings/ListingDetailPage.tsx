@@ -182,8 +182,12 @@ export default function ListingDetailPage() {
         try {
             await listingsApi.deleteAsAdmin(id, reason);
             navigate('/listings');
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Error al borrar como administrador');
+        } catch (err: any) {
+            if (err.response?.data?.code === 'ACTIVE_TRANSACTIONS_EXIST') {
+                setToast(err.response.data.details);
+            } else {
+                setError(err.response?.data?.error || err.message || 'Error al borrar como administrador');
+            }
         }
     }
 
