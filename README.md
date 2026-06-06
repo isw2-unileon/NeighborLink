@@ -394,15 +394,25 @@ Valid types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `style`
 
 | Document | Description |
 |---|---|
+| [`docs/architecture.md`](./docs/architecture.md) | Modular monolith overview, module responsibilities, dependency wiring and transaction lifecycle |
+| [`docs/data-model.md`](./docs/data-model.md) | Full database schema with tables, columns, types and entity relationships |
 | [`docs/getting-started.md`](./docs/getting-started.md) | Detailed setup and configuration guide |
 | [`docs/payments.md`](./docs/payments.md) | Full Stripe deposit lifecycle and commission logic |
 | [`docs/monorepo.md`](./docs/monorepo.md) | Rationale for the monorepo structure |
 | [`docs/golang.md`](./docs/golang.md) | Go conventions and best practices used in this project |
 | [`docs/adr/`](./docs/adr/) | Architecture Decision Records |
 
-To add a new Architecture Decision Record:
+### Architecture Decision Records
+
+| ADR | Decision |
+|---|---|
+| [ADR-001](./docs/adr/001-monorepo-structure.md) | Monorepo with Go backend and React frontend |
+| [ADR-002](./docs/adr/002-go-gin-framwork.md) | Go with Gin as the backend framework |
+| [ADR-003](./docs/adr/003-nominatim-geocoding.md) | Nominatim (OpenStreetMap) for geocoding |
+| [ADR-004](./docs/adr/004-jwt-authentication.md) | Custom JWT authentication |
+
+To add a new ADR:
 
 ```bash
 cp docs/adr/000-template.md docs/adr/00X-your-decision-title.md
 ```
-
