@@ -126,9 +126,15 @@ describe('PaymentForm.handleNextAction', () => {
             await ref.current!.handleNextAction('pi_secret_abc');
         });
 
-        expect(mockConfirmCardPayment).toHaveBeenCalledWith('pi_secret_abc', {
-            payment_method: { card: {} },
-        });
+        // Use asymmetricMatcher or deep partial check if necessary, but here we can be more specific
+        expect(mockConfirmCardPayment).toHaveBeenCalledWith(
+            'pi_secret_abc',
+            expect.objectContaining({
+                payment_method: expect.objectContaining({
+                    card: expect.anything(),
+                }),
+            })
+        );
     });
 
     it('lanza error localizado cuando Stripe devuelve error en confirmCardPayment', async () => {

@@ -16,6 +16,14 @@ import (
 
 // --- Fakes ---
 
+type fakeAdminChecker struct {
+	isAdmin bool
+}
+
+func (f *fakeAdminChecker) IsAdmin(_ context.Context, _ string) (bool, error) {
+	return f.isAdmin, nil
+}
+
 type fakeRepository struct {
 	messages []messages.Message
 	err      error
