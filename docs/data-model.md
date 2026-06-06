@@ -197,5 +197,5 @@ pending → awaiting_payment → agreed → handed_over → returned
 ## Points System
 
 Points are stored as euro-cents in `users.points`. 1000 points = €10.00. The minimum balance to redeem is 1000 points. Points are earned by lenders when a return is confirmed — the amount is proportional to the deposit and the number of days borrowed. Payouts are sent to the lender's Stripe Connect account (`users.stripe_connect_account_id`).
-```
+
 

@@ -405,4 +405,4 @@ To add a new Architecture Decision Record:
 ```bash
 cp docs/adr/000-template.md docs/adr/00X-your-decision-title.md
 ```
-```
+
