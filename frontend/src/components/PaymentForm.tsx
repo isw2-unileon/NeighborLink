@@ -75,15 +75,11 @@ const PaymentFormInner = forwardRef<PaymentFormHandle, Props>(({ totalEuros }, r
             return paymentMethod!.id;
         },
         async handleNextAction(clientSecret: string): Promise<void> {
-            if (!stripe || !elements) throw new Error('Stripe no está disponible.');
-            
-            const cardElement = elements.getElement(CardNumberElement);
-            if (!cardElement) throw new Error('Stripe no está disponible.');
-
-            const { error } = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: { card: cardElement },
-            });
-            
+            if (!stripe) throw new Error('Stripe no está disponible.');
+            const { paymentIntent, error: retrieveError } = await stripe.retrievePaymentIntent(clientSecret);
+            if (retrieveError) throw new Error(mapStripeError(retrieveError));
+            if (paymentIntent?.status !== 'requires_action') return;
+            const { error } = await stripe.handleNextAction({ clientSecret });
             if (error) throw new Error(mapStripeError(error));
         },
     }));
