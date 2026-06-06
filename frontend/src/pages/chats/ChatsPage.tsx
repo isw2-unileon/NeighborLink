@@ -312,53 +312,60 @@ export default function ChatsPage() {
 
     const ownerChats = useMemo(() => chats.filter((c) => c.owner_id === user?.id), [chats, user]);
     const borrowerChats = useMemo(() => chats.filter((c) => c.borrower_id === user?.id), [chats, user]);
-    const scopedChats = activeTab === 'owner' ? ownerChats : borrowerChats;
+    const adminDisputes = useMemo(() => chats.filter((c) => c.status === 'pending_review'), [chats]);
+    
+    // Si es admin, mostramos solo incidencias
+    const isAdmin = user?.role === 'admin';
+    const scopedChats = isAdmin ? adminDisputes : (activeTab === 'owner' ? ownerChats : borrowerChats);
     const groupedChats = useMemo(() => classifyChats(scopedChats), [scopedChats]);
 
     if (!user) return null;
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-4">
-            <h1 className="font-editorial text-3xl font-semibold">Mis chats</h1>
+            <h1 className="font-editorial text-3xl font-semibold">{isAdmin ? 'Incidencias' : 'Mis chats'}</h1>
 
-            <div className="flex border-b border-[var(--border)]">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('owner')}
-                    className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'owner'
-                        ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-                        : 'text-[var(--muted)] hover:text-[var(--text)]'
-                        }`}
-                >
-                    <span className="inline-flex items-center justify-center gap-2">
-                        <Home className="h-4 w-4" />
-                        Presto mi objeto
-                    </span>
-                    {!loading && ownerChats.length > 0 && (
-                        <span className="ml-2 text-xs bg-[var(--surface-strong)] text-[var(--accent)] rounded-full px-1.5 py-0.5">
-                            {ownerChats.length}
+            {!isAdmin && (
+                <div className="flex border-b border-[var(--border)]">
+                    {/* Botones de owner y borrower */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('owner')}
+                        className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'owner'
+                            ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+                            : 'text-[var(--muted)] hover:text-[var(--text)]'
+                            }`}
+                    >
+                        <span className="inline-flex items-center justify-center gap-2">
+                            <Home className="h-4 w-4" />
+                            Presto mi objeto
                         </span>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('borrower')}
-                    className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'borrower'
-                        ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-                        : 'text-[var(--muted)] hover:text-[var(--text)]'
-                        }`}
-                >
-                    <span className="inline-flex items-center justify-center gap-2">
-                        <Search className="h-4 w-4" />
-                        Quiero alquilar
-                    </span>
-                    {!loading && borrowerChats.length > 0 && (
-                        <span className="ml-2 text-xs bg-[var(--surface-strong)] text-[var(--accent)] rounded-full px-1.5 py-0.5">
-                            {borrowerChats.length}
+                        {!loading && ownerChats.length > 0 && (
+                            <span className="ml-2 text-xs bg-[var(--surface-strong)] text-[var(--accent)] rounded-full px-1.5 py-0.5">
+                                {ownerChats.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('borrower')}
+                        className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'borrower'
+                            ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+                            : 'text-[var(--muted)] hover:text-[var(--text)]'
+                            }`}
+                    >
+                        <span className="inline-flex items-center justify-center gap-2">
+                            <Search className="h-4 w-4" />
+                            Quiero alquilar
                         </span>
-                    )}
-                </button>
-            </div>
+                        {!loading && borrowerChats.length > 0 && (
+                            <span className="ml-2 text-xs bg-[var(--surface-strong)] text-[var(--accent)] rounded-full px-1.5 py-0.5">
+                                {borrowerChats.length}
+                            </span>
+                        )}
+                    </button>
+                </div>
+            )}
 
             {loading && <ChatListSkeleton count={4} />}
 

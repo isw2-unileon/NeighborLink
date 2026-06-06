@@ -124,6 +124,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 	messagesModule.NewHandler(
 		messageRepo,
 		adapters.NewTxReaderAdapter(transactionRepo),
+		&adminCheckAdapter{repo: userRepo},
 	).RegisterRoutes(api, authMiddleware)
 
 	// Reviews

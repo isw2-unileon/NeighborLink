@@ -96,16 +96,26 @@ func (r *postgresRepository) UpdateRedemptionStatus(ctx context.Context, redempt
 
 func (r *postgresRepository) GetPointsHistory(ctx context.Context, userID string) ([]PointsHistoryEntry, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT t.id, l.title, t.return_at,
-		       FLOOR(
-		         (t.total_charged_cents - 200) *
-		         (GREATEST(1, LEAST(7, (t.return_at::date - t.handover_at::date))) + 4)
-		         / 100.0
-		       ) AS points_earned
-		FROM transactions t
-		JOIN listings l ON t.listing_id = l.id
-		WHERE l.owner_id = $1 AND t.status = 'returned'
-		ORDER BY t.return_at DESC
+        SELECT transaction_id, listing_title, completed_at, points_earned::int as points_earned
+        FROM (
+            SELECT t.id as transaction_id, l.title as listing_title, t.return_at as completed_at,
+                   FLOOR(
+                     (t.total_charged_cents - 200) *
+                     (GREATEST(1, LEAST(7, (t.return_at::date - t.handover_at::date))) + 4)
+                     / 100.0
+                   ) AS points_earned
+            FROM transactions t
+            JOIN listings l ON t.listing_id = l.id
+            WHERE l.owner_id = $1 AND t.status = 'returned'
+            
+            UNION ALL
+
+            SELECT t.id as transaction_id, l.title as listing_title, COALESCE(t.agreed_at, NOW()) as completed_at, (t.dispute_refund_points * 100)::int as points_earned
+            FROM transactions t
+            JOIN listings l ON t.listing_id = l.id
+            WHERE l.owner_id = $1 AND t.dispute_refund_points IS NOT NULL
+        ) AS history
+        ORDER BY completed_at DESC
 	`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("wallet: query history failed: %w", err)

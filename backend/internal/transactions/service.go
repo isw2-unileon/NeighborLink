@@ -304,9 +304,15 @@ func (s *Service) RefundDisputePoints(ctx context.Context, transactionID string,
 		return 0, fmt.Errorf("service: get listing info: %w", err)
 	}
 
+	// Obtener el owner para asignarle los puntos
+	ownerID, _, _, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
+	if err != nil {
+		return 0, fmt.Errorf("service: get listing owner: %w", err)
+	}
+
 	points := (deposit * percentage) / 100
 	if points > 0 {
-		if err := s.walletSvc.AddPoints(ctx, t.BorrowerID, points); err != nil {
+		if err := s.walletSvc.AddPoints(ctx, ownerID, points); err != nil {
 			return 0, fmt.Errorf("service: add points failed: %w", err)
 		}
 	}
@@ -315,13 +321,13 @@ func (s *Service) RefundDisputePoints(ctx context.Context, transactionID string,
 		return 0, fmt.Errorf("service: record refund failed: %w", err)
 	}
 
-	content := fmt.Sprintf("REEMBOLSO DE PUNTOS: Un administrador ha concedido un reembolso de %d puntos (equivalente al %d%% del valor de '%s') al arrendatario.", points, percentage, listingTitle)
+	content := fmt.Sprintf("REEMBOLSO DE PUNTOS: Un administrador ha concedido un reembolso de %d puntos (equivalente al %d%% del valor de '%s') al propietario.", points, percentage, listingTitle)
 	if err := s.msgRepo.CreateSystemMessage(ctx, transactionID, content); err != nil {
 		return 0, fmt.Errorf("service: create refund message: %w", err)
 	}
 
 	if s.notifSvc != nil {
-		_ = s.notifSvc.Create(ctx, t.BorrowerID, "points_refunded", map[string]any{
+		_ = s.notifSvc.Create(ctx, ownerID, "points_refunded", map[string]any{
 			"points":        points,
 			"listing_title": listingTitle,
 		})

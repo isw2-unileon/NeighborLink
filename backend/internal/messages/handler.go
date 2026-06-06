@@ -1,31 +1,36 @@
 package messages
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Handler holds the HTTP handlers for the messages module.
-type Handler struct {
-	repo     Repository
-	txReader TransactionReader
+type adminChecker interface {
+	IsAdmin(ctx context.Context, userID string) (bool, error)
 }
 
-// NewHandler creates a new Handler injecting the Repository and transactionReader interfaces.
-func NewHandler(repo Repository, txReader TransactionReader) *Handler {
-	return &Handler{repo: repo, txReader: txReader}
+// Handler holds the HTTP handlers for the messages module.
+type Handler struct {
+	repo         Repository
+	txReader     TransactionReader
+	adminChecker adminChecker
+}
+
+// NewHandler creates a new Handler injecting the Repository, transactionReader and adminChecker interfaces.
+func NewHandler(repo Repository, txReader TransactionReader, adminChecker adminChecker) *Handler {
+	return &Handler{repo: repo, txReader: txReader, adminChecker: adminChecker}
 }
 
 // RegisterRoutes attaches the messages routes to a Gin router group.
 // authMiddleware must extract the userID from the JWT and set it as "userID" in the context.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	rg.GET("/transactions/:id/messages", h.listByTransaction)
-	rg.GET("/messages/:id", h.getMessage)
-
 	// Protected routes — require authentication.
 	auth := rg.Group("/", authMiddleware)
+	auth.GET("/transactions/:id/messages", h.listByTransaction)
+	auth.GET("/messages/:id", h.getMessage)
 	auth.POST("/transactions/:id/messages", h.createMessage)
 	auth.GET("/chats", h.listActiveChats)
 	auth.POST("/transactions/:id/decision", h.decideTransaction)
@@ -34,6 +39,37 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 // listByTransaction returns all messages for a given transaction, ordered by time.
 func (h *Handler) listByTransaction(c *gin.Context) {
 	transactionID := c.Param("id")
+	userID, _ := c.Get("userID") // Optional: may be nil
+	uid, _ := userID.(string)
+
+	tx, err := h.txReader.FindByID(c.Request.Context(), transactionID)
+	if err != nil {
+		slog.Error("failed to find transaction", "transaction_id", transactionID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if tx == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+
+	isAdmin, _ := h.adminChecker.IsAdmin(c.Request.Context(), uid)
+
+	// Regla de acceso:
+	// Si estado es pending_review: Solo Owner o Admin pueden ver.
+	// Si estado es otro: Owner, Borrower o Admin pueden ver.
+	if tx.Status == "pending_review" {
+		if !isAdmin && uid != tx.OwnerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	} else {
+		// Normal chat: require auth
+		if uid == "" || (uid != tx.BorrowerID && uid != tx.OwnerID && !isAdmin) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	}
 
 	messages, err := h.repo.FindByTransaction(c.Request.Context(), transactionID)
 	if err != nil {
