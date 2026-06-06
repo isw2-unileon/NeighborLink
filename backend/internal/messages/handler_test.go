@@ -16,6 +16,14 @@ import (
 
 // --- Fakes ---
 
+type fakeAdminChecker struct {
+	isAdmin bool
+}
+
+func (f *fakeAdminChecker) IsAdmin(_ context.Context, _ string) (bool, error) {
+	return f.isAdmin, nil
+}
+
 type fakeRepository struct {
 	messages []messages.Message
 	err      error
@@ -88,7 +96,8 @@ func injectUser(userID string) gin.HandlerFunc {
 func setupRouter(repo messages.Repository, txReader messages.TransactionReader) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := messages.NewHandler(repo, txReader)
+	// Default to non-admin
+	h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: false})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, injectUser("user-1"))
 	return r
@@ -129,7 +138,16 @@ func TestListByTransaction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(&fakeRepository{messages: tt.repoData, err: tt.repoErr}, &fakeTxReader{})
+			// Mock a valid transaction so authorization logic passes
+			txReader := &fakeTxReader{
+				summary: &messages.TransactionSummary{
+					ID:         tt.transactionID,
+					BorrowerID: "user-1",
+					OwnerID:    "user-2",
+					Status:     "agreed",
+				},
+			}
+			router := setupRouter(&fakeRepository{messages: tt.repoData, err: tt.repoErr}, txReader)
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/transactions/"+tt.transactionID+"/messages", nil)
@@ -259,7 +277,8 @@ func TestCreateMessage(t *testing.T) {
 
 			gin.SetMode(gin.TestMode)
 			r := gin.New()
-			h := messages.NewHandler(repo, txReader)
+			// Default to non-admin
+			h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: false})
 			api := r.Group("/api")
 			h.RegisterRoutes(api, injectUser(tt.senderID))
 
