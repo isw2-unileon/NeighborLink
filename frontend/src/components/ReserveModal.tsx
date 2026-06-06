@@ -37,7 +37,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
     });
 
     const days = range ? Math.round((range.to.getTime() - range.from.getTime()) / 86400000) : 0;
-    const total = days * depositAmount;
+    const total = depositAmount;
 
     function handleRangeSelect(r: DayPickerRange | undefined) {
         if (!r?.from || !r?.to) {
@@ -55,7 +55,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
 
     async function handleConfirm() {
         if (!range) return;
-        
+
         // Función auxiliar para obtener YYYY-MM-DD en hora local
         const formatDateLocal = (date: Date) => {
             const year = date.getFullYear();
@@ -110,7 +110,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                 {days > 0 && (
                     <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
                         <div className="flex justify-between">
-                            <span className="text-[var(--muted)]">{days} días × {depositAmount} €</span>
+                            <span className="text-[var(--muted)]">{days} días</span>
                             <span className="font-semibold">{total} €</span>
                         </div>
                     </div>

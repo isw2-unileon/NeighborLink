@@ -27,8 +27,8 @@ export default function TransactionInfoPanel({
             : null;
     const totalEuros = transaction.total_charged_cents
         ? (transaction.total_charged_cents / 100).toFixed(2)
-        : days
-            ? (days * listing.deposit_amount + 2).toFixed(2)
+        : listing.deposit_amount
+            ? (listing.deposit_amount + 2).toFixed(2)
             : '—';
 
     const formatDate = (d: Date) =>

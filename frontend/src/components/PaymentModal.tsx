@@ -27,7 +27,7 @@ export default function PaymentModal({
     const end = new Date(endDate);
     const diffMs = end.getTime() - start.getTime();
     const days = Math.max(1, Math.round(diffMs / 86400000)) || 1; // Default to 1 day if invalid
-    const depositCents = Math.round(days * Number(depositAmount) * 100) || 0;
+    const depositCents = Math.round(Number(depositAmount) * 100) || 0;
     const totalEuros = (depositCents + 200) / 100;
 
     async function handlePay() {
