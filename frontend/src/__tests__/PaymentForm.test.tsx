@@ -5,7 +5,7 @@ import React from 'react';
 import PaymentForm, { type PaymentFormHandle } from '../components/PaymentForm';
 
 const mockCreatePaymentMethod = vi.fn();
-const mockHandleNextAction = vi.fn();
+const mockConfirmCardPayment = vi.fn();
 
 vi.mock('@stripe/stripe-js', () => ({
     loadStripe: vi.fn().mockResolvedValue(null),
@@ -16,8 +16,8 @@ vi.mock('@stripe/react-stripe-js', () => ({
     CardNumberElement: () => <div data-testid="card-number" />,
     CardExpiryElement: () => <div data-testid="card-expiry" />,
     CardCvcElement: () => <div data-testid="card-cvc" />,
-    useStripe: () => ({ createPaymentMethod: mockCreatePaymentMethod, handleNextAction: mockHandleNextAction }),
-    useElements: () => ({ getElement: vi.fn().mockReturnValue({}) }),
+    useStripe: () => ({ createPaymentMethod: mockCreatePaymentMethod, confirmCardPayment: mockConfirmCardPayment }),
+    useElements: () => ({ getElement: vi.fn().mockReturnValue({ getElement: vi.fn() }) }),
 }));
 
 beforeEach(() => {
@@ -118,7 +118,7 @@ describe('PaymentForm.createPaymentMethod', () => {
 
 describe('PaymentForm.handleNextAction', () => {
     it('resuelve sin error cuando no se requiere acción adicional', async () => {
-        mockHandleNextAction.mockResolvedValueOnce({ paymentIntent: { status: 'requires_capture' } });
+        mockConfirmCardPayment.mockResolvedValueOnce({ paymentIntent: { status: 'requires_capture' } });
 
         const ref = renderPaymentForm();
 
@@ -126,11 +126,13 @@ describe('PaymentForm.handleNextAction', () => {
             await ref.current!.handleNextAction('pi_secret_abc');
         });
 
-        expect(mockHandleNextAction).toHaveBeenCalledWith({ clientSecret: 'pi_secret_abc' });
+        expect(mockConfirmCardPayment).toHaveBeenCalledWith('pi_secret_abc', {
+            payment_method: { card: {} },
+        });
     });
 
-    it('lanza error localizado cuando Stripe devuelve error en handleNextAction', async () => {
-        mockHandleNextAction.mockResolvedValueOnce({
+    it('lanza error localizado cuando Stripe devuelve error en confirmCardPayment', async () => {
+        mockConfirmCardPayment.mockResolvedValueOnce({
             error: { code: 'card_declined', message: 'Your card was declined.' },
         });
 

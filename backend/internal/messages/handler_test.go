@@ -88,7 +88,8 @@ func injectUser(userID string) gin.HandlerFunc {
 func setupRouter(repo messages.Repository, txReader messages.TransactionReader) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := messages.NewHandler(repo, txReader)
+	// Default to non-admin
+	h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: false})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, injectUser("user-1"))
 	return r
@@ -259,7 +260,8 @@ func TestCreateMessage(t *testing.T) {
 
 			gin.SetMode(gin.TestMode)
 			r := gin.New()
-			h := messages.NewHandler(repo, txReader)
+			// Default to non-admin
+			h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: false})
 			api := r.Group("/api")
 			h.RegisterRoutes(api, injectUser(tt.senderID))
 
