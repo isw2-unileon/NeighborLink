@@ -15,11 +15,11 @@ The frontend is a React 19 single-page application that communicates exclusively
 ┌────────────────────▼────────────────────────────────────┐
 │                  Go HTTP Server (Gin)                   │
 │                                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐  │
-│  │   auth   │ │  users   │ │listings  │ │  wallet   │  │
-│  ├──────────┤ ├──────────┤ ├──────────┤ ├───────────┤  │
-│  │messages  │ │  notifs  │ │  reviews │ │transactions│ │
-│  └──────────┘ └──────────┘ └──────────┘ └───────────┘  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐   │
+│  │   auth   │ │  users   │ │listings  │ │  wallet   │   │
+│  ├──────────┤ ├──────────┤ ├──────────┤ ├───────────┤   │
+│  │messages  │ │  notifs  │              │transactions│  │
+│  └──────────┘ └──────────┘              └───────────┘   │
 │                                                         │
 │  platform/  database · stripe · geocoder · middleware   │
 └──────────────────┬──────────────────────────┬───────────┘
@@ -66,7 +66,6 @@ This structure enforces the **Dependency Inversion Principle**: handlers and ser
 | `messages` | Per-transaction chat; participant and admin access rules |
 | `notifications` | In-app notification creation, listing, and read state management |
 | `wallet` | Points accumulation, history, and cash redemption via Stripe Connect |
-| `reviews` | Read-only access to transaction reviews |
 | `platform/database` | pgxpool connection pool initialisation |
 | `platform/stripe` | Stripe client wrapping `AuthorizeDeposit`, `CaptureDeposit`, `ReleaseDeposit` |
 | `platform/geocoder` | Nominatim HTTP client — resolves a text address to lat/lng coordinates |
