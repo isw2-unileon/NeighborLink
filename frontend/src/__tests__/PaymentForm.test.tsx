@@ -5,7 +5,8 @@ import React from 'react';
 import PaymentForm, { type PaymentFormHandle } from '../components/PaymentForm';
 
 const mockCreatePaymentMethod = vi.fn();
-const mockConfirmCardPayment = vi.fn();
+const mockHandleNextAction = vi.fn();
+const mockRetrievePaymentIntent = vi.fn();
 
 vi.mock('@stripe/stripe-js', () => ({
     loadStripe: vi.fn().mockResolvedValue(null),
@@ -16,8 +17,12 @@ vi.mock('@stripe/react-stripe-js', () => ({
     CardNumberElement: () => <div data-testid="card-number" />,
     CardExpiryElement: () => <div data-testid="card-expiry" />,
     CardCvcElement: () => <div data-testid="card-cvc" />,
-    useStripe: () => ({ createPaymentMethod: mockCreatePaymentMethod, confirmCardPayment: mockConfirmCardPayment }),
-    useElements: () => ({ getElement: vi.fn().mockReturnValue({ getElement: vi.fn() }) }),
+    useStripe: () => ({
+        createPaymentMethod: mockCreatePaymentMethod,
+        handleNextAction: mockHandleNextAction,
+        retrievePaymentIntent: mockRetrievePaymentIntent,
+    }),
+    useElements: () => ({ getElement: vi.fn().mockReturnValue({}) }),
 }));
 
 beforeEach(() => {
@@ -117,8 +122,8 @@ describe('PaymentForm.createPaymentMethod', () => {
 });
 
 describe('PaymentForm.handleNextAction', () => {
-    it('resuelve sin error cuando no se requiere acción adicional', async () => {
-        mockConfirmCardPayment.mockResolvedValueOnce({ paymentIntent: { status: 'requires_capture' } });
+    it('resuelve sin llamar a handleNextAction cuando el PI está en requires_capture', async () => {
+        mockRetrievePaymentIntent.mockResolvedValueOnce({ paymentIntent: { status: 'requires_capture' } });
 
         const ref = renderPaymentForm();
 
@@ -126,19 +131,26 @@ describe('PaymentForm.handleNextAction', () => {
             await ref.current!.handleNextAction('pi_secret_abc');
         });
 
-        // Use asymmetricMatcher or deep partial check if necessary, but here we can be more specific
-        expect(mockConfirmCardPayment).toHaveBeenCalledWith(
-            'pi_secret_abc',
-            expect.objectContaining({
-                payment_method: expect.objectContaining({
-                    card: expect.anything(),
-                }),
-            })
-        );
+        expect(mockRetrievePaymentIntent).toHaveBeenCalledWith('pi_secret_abc');
+        expect(mockHandleNextAction).not.toHaveBeenCalled();
     });
 
-    it('lanza error localizado cuando Stripe devuelve error en confirmCardPayment', async () => {
-        mockConfirmCardPayment.mockResolvedValueOnce({
+    it('llama a handleNextAction cuando el PI está en requires_action', async () => {
+        mockRetrievePaymentIntent.mockResolvedValueOnce({ paymentIntent: { status: 'requires_action' } });
+        mockHandleNextAction.mockResolvedValueOnce({ paymentIntent: { status: 'requires_capture' } });
+
+        const ref = renderPaymentForm();
+
+        await act(async () => {
+            await ref.current!.handleNextAction('pi_secret_abc');
+        });
+
+        expect(mockHandleNextAction).toHaveBeenCalledWith({ clientSecret: 'pi_secret_abc' });
+    });
+
+    it('lanza error localizado cuando Stripe devuelve error en el paso 3DS', async () => {
+        mockRetrievePaymentIntent.mockResolvedValueOnce({ paymentIntent: { status: 'requires_action' } });
+        mockHandleNextAction.mockResolvedValueOnce({
             error: { code: 'card_declined', message: 'Your card was declined.' },
         });
 
