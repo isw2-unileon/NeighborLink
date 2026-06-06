@@ -138,7 +138,16 @@ func TestListByTransaction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(&fakeRepository{messages: tt.repoData, err: tt.repoErr}, &fakeTxReader{})
+			// Mock a valid transaction so authorization logic passes
+			txReader := &fakeTxReader{
+				summary: &messages.TransactionSummary{
+					ID:         tt.transactionID,
+					BorrowerID: "user-1",
+					OwnerID:    "user-2",
+					Status:     "agreed",
+				},
+			}
+			router := setupRouter(&fakeRepository{messages: tt.repoData, err: tt.repoErr}, txReader)
 
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/transactions/"+tt.transactionID+"/messages", nil)
