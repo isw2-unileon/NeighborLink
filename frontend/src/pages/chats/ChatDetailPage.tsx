@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usersApi } from '../../lib/users';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,7 +62,7 @@ export default function ChatDetailPage() {
     const { id: transactionId } = useParams<{ id: string }>();
     const { user, updateUser, refreshUser } = useAuth();
     const navigate = useNavigate();
-
+    const location = useLocation();
     const [messages, setMessages] = useState<Message[]>([]);
     const [listing, setListing] = useState<Listing | null>(null);
     const [transaction, setTransaction] = useState<Transaction | null>(null);
@@ -136,7 +136,7 @@ export default function ChatDetailPage() {
 
     useEffect(() => {
         if (!transactionId) return;
-        messagesApi.markAsRead(transactionId).catch(() => {});
+        messagesApi.markAsRead(transactionId).catch(() => { });
     }, [transactionId]);
 
     if (!user) return null;
@@ -348,7 +348,7 @@ export default function ChatDetailPage() {
                             <div className="flex items-center gap-3 min-w-0">
                                 <button
                                     type="button"
-                                    onClick={() => navigate('/chats')}
+                                    onClick={() => navigate('/chats', { state: { tab: location.state?.fromTab ?? 'owner' } })}
                                     className="text-sm text-[var(--muted)] hover:text-[var(--text)]"
                                 >
                                     ←

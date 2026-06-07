@@ -324,13 +324,6 @@ All endpoints are prefixed with `/api`. Protected routes require an `Authorizati
 | `PATCH` | `/api/notifications/:id/read` | Yes | Mark a notification as read |
 | `PATCH` | `/api/notifications/read-all` | Yes | Mark all notifications as read |
 
-### Reviews
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/transactions/:id/reviews` | No | List reviews for a transaction |
-| `GET` | `/api/users/:id/reviews` | No | List reviews received by a user |
-| `GET` | `/api/reviews/:id` | No | Get a single review |
 
 ### Health
 

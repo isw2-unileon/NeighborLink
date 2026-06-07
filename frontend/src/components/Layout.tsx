@@ -84,11 +84,11 @@ export default function Layout() {
     useEffect(() => {
         if (!user) return;
         const fetchUnreadChats = () =>
-            messagesApi.getUnreadCount().then(setUnreadChatsCount).catch(() => {});
+            messagesApi.getUnreadCount().then(setUnreadChatsCount).catch(() => { });
         fetchUnreadChats();
-        const interval = setInterval(fetchUnreadChats, 30_000);
+        const interval = setInterval(fetchUnreadChats, 3_000);
         return () => clearInterval(interval);
-    }, [user]);
+    }, [user, location.pathname]);
 
     const loadNotifications = useCallback(async () => {
         if (!user) return;

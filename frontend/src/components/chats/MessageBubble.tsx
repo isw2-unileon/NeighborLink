@@ -10,8 +10,8 @@ interface MessageBubbleProps {
 export default function MessageBubble({ message, isMe }: MessageBubbleProps) {
     if (message.sender_id === SYSTEM_SENDER_ID) {
         return (
-            <div className="flex justify-center my-4">
-                <div className="max-w-[80%] px-6 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium text-center shadow-sm">
+            <div className="flex justify-center my-1">
+                <div className="max-w-sm px-4 py-2 rounded-2xl text-xs font-medium text-center bg-amber-50 border border-amber-200 text-amber-800">
                     {message.content}
                 </div>
             </div>

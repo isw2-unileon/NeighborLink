@@ -51,7 +51,7 @@ describe('ReturnPage', () => {
     it('vuelve a /profile al pulsar ← Volver', () => {
         renderPage()
         fireEvent.click(screen.getByText('← Volver'))
-        expect(mockNavigate).toHaveBeenCalledWith('/profile')
+        expect(mockNavigate).toHaveBeenCalledWith('/profile', { state: { tab: 'listings' } })
     })
 
     it('muestra error con código incorrecto', async () => {
@@ -89,7 +89,7 @@ describe('ReturnPage', () => {
             expect(screen.getByText('✓ Acción procesada correctamente. Redirigiendo...')).toBeInTheDocument()
         )
         await vi.runAllTimersAsync()
-        expect(mockNavigate).toHaveBeenCalledWith('/profile')
+        expect(mockNavigate).toHaveBeenCalledWith('/profile', { state: { tab: 'listings' } })
         vi.useRealTimers()
     })
 })

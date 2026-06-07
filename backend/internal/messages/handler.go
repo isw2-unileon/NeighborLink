@@ -324,7 +324,7 @@ func (h *Handler) loadPendingTransactionForDecision(c *gin.Context, transactionI
 func (h *Handler) resolveDecision(decision string, c *gin.Context) (nextStatus, systemMessage, notifType string, ok bool) {
 	switch decision {
 	case "accept":
-		return "awaiting_payment", "El prestador ha aceptado las condiciones propuestas, ahora mete los métodos de pago.", "transaction_accepted", true
+		return "awaiting_payment", "", "transaction_accepted", true
 	case "reject":
 		return "cancelled", "El prestador no ha aceptado las condiciones.", "transaction_rejected", true
 	default:
@@ -344,6 +344,10 @@ func (h *Handler) updateDecisionStatus(c *gin.Context, transactionID, nextStatus
 }
 
 func (h *Handler) createDecisionSystemMessage(c *gin.Context, transactionID, systemMessage string) bool {
+	if systemMessage == "" {
+		return true
+	}
+
 	_, err := h.repo.Create(c.Request.Context(), Message{
 		TransactionID: transactionID,
 		SenderID:      SystemUserID,
@@ -374,9 +378,6 @@ func (h *Handler) createDecisionNotification(c *gin.Context, tx *TransactionSumm
 		"listing_id":     tx.ListingID,
 		"listing_title":  listingTitle,
 	}
-
-	// Si TransactionSummary sí tiene el campo correcto del propietario, añádelo aquí con ese nombre real.
-	// data["owner_id"] = tx.<campo_real>
 
 	if err := h.notifSvc.Create(c.Request.Context(), tx.BorrowerID, notifType, data); err != nil {
 		slog.Error("failed to create decision notification", "transaction_id", transactionID, "error", err)

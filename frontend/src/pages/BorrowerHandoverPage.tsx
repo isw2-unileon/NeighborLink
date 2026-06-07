@@ -39,7 +39,7 @@ export default function BorrowerHandoverPage() {
                 </div>
             )}
             <div className="glass-panel rounded-3xl p-8">
-                <button onClick={() => navigate('/profile')}
+                <button onClick={() => navigate('/profile', { state: { tab: 'reservations' } })}
                     className="text-sm text-[var(--muted)] hover:text-[var(--text)] mb-6 block">
                     ← Volver
                 </button>

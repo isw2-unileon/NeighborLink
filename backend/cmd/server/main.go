@@ -20,7 +20,6 @@ import (
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/database"
 	"github.com/isw2-unileon/neighborlink/backend/internal/platform/middleware"
 	stripeplatform "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
-	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
 	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
 	walletModule "github.com/isw2-unileon/neighborlink/backend/internal/wallet"
@@ -128,9 +127,6 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 		&adminCheckAdapter{repo: userRepo},
 		notificationsSvc,
 	).RegisterRoutes(api, authMiddleware)
-
-	// Reviews
-	reviewsModule.NewHandler(reviewsModule.NewPostgresRepository(pool)).RegisterRoutes(api)
 }
 
 // runServer arranca el servidor HTTP y espera señal de shutdown.
