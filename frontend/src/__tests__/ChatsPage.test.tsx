@@ -61,6 +61,7 @@ describe('ChatsPage', () => {
             login: vi.fn(),
             logout: vi.fn(),
             updateUser: vi.fn(),
+            refreshUser: vi.fn().mockResolvedValue(undefined),
         });
     });
 

@@ -35,6 +35,7 @@ function renderPage(user: User | null = fakeUser, token: string | null = 'tok') 
         updateUser: mockUpdateUser,
         login: vi.fn(),
         logout: vi.fn(),
+        refreshUser: vi.fn().mockResolvedValue(undefined),
     })
     return render(
         <MemoryRouter>
