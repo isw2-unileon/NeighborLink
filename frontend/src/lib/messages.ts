@@ -23,8 +23,8 @@ export const messagesApi = {
         api.get<MessagesResponse>('/chats', { signal }).then(r => r.data),
 
     markAsRead: (transactionId: string) =>
-        api.post(`/transactions/${transactionId}/messages/read`).then(() => {}),
+        api.post(`/transactions/${transactionId}/messages/read`, {}).then(() => {}),
 
     getUnreadCount: (signal?: AbortSignal) =>
-        api.get<{ count: number }>('/chats/unread-count', { signal }).then(r => r.data.count),
+        api.get<{ count: number }>('/chats/unread-count', { signal }).then(r => r.count),
 };
