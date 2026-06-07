@@ -30,11 +30,11 @@ type Handler struct {
 	userSvc   userNameGetter
 }
 
-// NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
+// NewHandler creates a new Handler injecting the Repository, Service, and a pointsWallet.
 func NewHandler(
 	repo Repository,
 	service *Service,
-	walletSvc pointsAdder,
+	walletSvc pointsWallet,
 	notifSvc notificationCreator,
 	adminSvc adminChecker,
 	userSvc userNameGetter,
