@@ -185,8 +185,8 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run("", func(t *testing.T) {
-			handoverAt := time.Now().UTC()
 			startDate := time.Now().UTC().AddDate(0, 0, -tc.days)
+			handoverAt := startDate // handover ocurrió cuando empezó el préstamo
 			endDate := time.Now().UTC()
 			repo := &fakeRepository{
 				transactions: []transactions.Transaction{
@@ -218,8 +218,8 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 
 func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 	deposit := int64(10000)
-	handoverAt := time.Now().UTC()
 	startDate := time.Now().UTC().AddDate(0, 0, -1)
+	handoverAt := startDate
 	endDate := time.Now().UTC()
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
@@ -248,8 +248,8 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 
 func TestReturn_DaysClamped(t *testing.T) {
 	t.Run("same-day return clamps to 1", func(t *testing.T) {
-		handoverAt := time.Now().UTC()
 		startDate := time.Now().UTC()
+		handoverAt := startDate
 		endDate := time.Now().UTC()
 		repo := &fakeRepository{
 			transactions: []transactions.Transaction{
@@ -277,8 +277,8 @@ func TestReturn_DaysClamped(t *testing.T) {
 	})
 
 	t.Run("over-7-day return clamps to 7", func(t *testing.T) {
-		handoverAt := time.Now().UTC()
 		startDate := time.Now().UTC().AddDate(0, 0, -10)
+		handoverAt := startDate
 		endDate := time.Now().UTC()
 		repo := &fakeRepository{
 			transactions: []transactions.Transaction{
