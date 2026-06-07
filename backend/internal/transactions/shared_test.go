@@ -94,10 +94,6 @@ type fakeRepository struct {
 	ownerByTransactionID map[string]string
 	blockedDates         []transactions.DateRange
 	reserved             *transactions.Transaction
-	listingOwnerAndTitle map[string]struct {
-		OwnerID string
-		Title   string
-	}
 }
 
 func (f *fakeRepository) FindAll(_ context.Context) ([]transactions.Transaction, error) {

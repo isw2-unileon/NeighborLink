@@ -309,97 +309,149 @@ func (h *Handler) payTransaction(c *gin.Context) {
 		return
 	}
 
-	var body struct {
-		DepositAmountCents int64  `json:"deposit_amount_cents"`
-		PaymentMethodID    string `json:"payment_method_id"`
-		PaymentMethod      string `json:"payment_method"`
+	body, ok := h.parsePayTransactionBody(c)
+	if !ok {
+		return
 	}
+
+	clientSecret, err := h.service.ConfirmPayment(
+		c.Request.Context(),
+		id,
+		body.DepositAmountCents,
+		body.PaymentMethodID,
+		body.PaymentMethod,
+	)
+	if err != nil {
+		h.handleConfirmPaymentError(c, id, err)
+		return
+	}
+
+	h.notifyPaymentAccepted(c, id)
+
+	c.JSON(http.StatusOK, gin.H{"client_secret": clientSecret})
+}
+
+type payTransactionBody struct {
+	DepositAmountCents int64  `json:"deposit_amount_cents"`
+	PaymentMethodID    string `json:"payment_method_id"`
+	PaymentMethod      string `json:"payment_method"`
+}
+
+func (h *Handler) parsePayTransactionBody(c *gin.Context) (payTransactionBody, bool) {
+	var body payTransactionBody
+
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Error("failed to parse pay transaction body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		return body, false
 	}
+
 	if body.PaymentMethod == "" {
 		body.PaymentMethod = "card"
 	}
 
-	clientSecret, err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID, body.PaymentMethod)
-	if err != nil {
-		if errors.Is(err, ErrInsufficientPoints) {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
-			return
-		}
-		h.handleServiceError(c, "pay", id, err)
+	return body, true
+}
+
+func (h *Handler) handleConfirmPaymentError(c *gin.Context, id string, err error) {
+	if errors.Is(err, ErrInsufficientPoints) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.handleServiceError(c, "pay", id, err)
+}
+
+func (h *Handler) notifyPaymentAccepted(c *gin.Context, id string) {
+	if h.notifSvc == nil {
+		return
+	}
+
+	t, ok := h.fetchTransactionAfterPayment(c, id)
+	if !ok {
+		return
+	}
+
+	ownerID, listingTitle := h.fetchListingNotificationInfo(c, t.ListingID)
+	startDate, endDate := formatTransactionDates(t)
+	borrowerName := h.resolveUserName(c, t.BorrowerID, "solicitante", "failed to fetch borrower name", "borrower_id")
+
+	ownerName := "prestador"
+	if ownerID != "" {
+		ownerName = h.resolveUserName(c, ownerID, "prestador", "failed to fetch owner name", "owner_id")
+	}
+
+	data := map[string]any{
+		"transaction_id": t.ID,
+		"listing_id":     t.ListingID,
+		"listing_title":  listingTitle,
+		"borrower_name":  borrowerName,
+		"owner_name":     ownerName,
+		"start_date":     startDate,
+		"end_date":       endDate,
+	}
+
+	for _, recipientID := range paymentNotificationRecipients(t.BorrowerID, ownerID) {
+		if err := h.notifSvc.Create(c.Request.Context(), recipientID, "transaction_terms_accepted", data); err != nil {
+			slog.Error("failed to create payment notification", "transaction_id", t.ID, "recipient_id", recipientID, "error", err)
+		}
+	}
+}
+
+func (h *Handler) fetchTransactionAfterPayment(c *gin.Context, id string) (*Transaction, bool) {
 	t, err := h.repo.FindByID(c.Request.Context(), id)
 	if err != nil || t == nil {
 		slog.Error("failed to fetch transaction after payment", "id", id, "error", err)
-		c.JSON(http.StatusOK, gin.H{"client_secret": clientSecret})
-		return
+		return nil, false
 	}
 
-	if h.notifSvc != nil {
-		ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(c.Request.Context(), t.ListingID)
-		if notifErr != nil {
-			slog.Error("failed to fetch listing owner/title for payment notification", "listing_id", t.ListingID, "error", notifErr)
-			listingTitle = "el objeto"
-			ownerID = ""
-		}
+	return t, true
+}
 
-		startDate := ""
-		endDate := ""
-		if t.StartDate != nil {
-			startDate = t.StartDate.Format("2006-01-02")
-		}
-		if t.EndDate != nil {
-			endDate = t.EndDate.Format("2006-01-02")
-		}
-
-		borrowerName := "solicitante"
-		if h.userSvc != nil {
-			name, err := h.userSvc.GetUserNameByID(c.Request.Context(), t.BorrowerID)
-			if err != nil {
-				slog.Error("failed to fetch borrower name", "borrower_id", t.BorrowerID, "error", err)
-			} else if name != "" {
-				borrowerName = name
-			}
-		}
-
-		ownerName := "prestador"
-		if h.userSvc != nil && ownerID != "" {
-			name, err := h.userSvc.GetUserNameByID(c.Request.Context(), ownerID)
-			if err != nil {
-				slog.Error("failed to fetch owner name", "owner_id", ownerID, "error", err)
-			} else if name != "" {
-				ownerName = name
-			}
-		}
-
-		data := map[string]any{
-			"transaction_id": t.ID,
-			"listing_id":     t.ListingID,
-			"listing_title":  listingTitle,
-			"borrower_name":  borrowerName,
-			"owner_name":     ownerName,
-			"start_date":     startDate,
-			"end_date":       endDate,
-		}
-
-		recipients := []string{t.BorrowerID}
-		if ownerID != "" && ownerID != t.BorrowerID {
-			recipients = append(recipients, ownerID)
-		}
-
-		for _, recipientID := range recipients {
-			if err := h.notifSvc.Create(c.Request.Context(), recipientID, "transaction_terms_accepted", data); err != nil {
-				slog.Error("failed to create payment notification", "transaction_id", t.ID, "recipient_id", recipientID, "error", err)
-			}
-		}
+func (h *Handler) fetchListingNotificationInfo(c *gin.Context, listingID string) (ownerID, listingTitle string) {
+	ownerID, listingTitle, err := h.repo.FindListingOwnerAndTitle(c.Request.Context(), listingID)
+	if err != nil {
+		slog.Error("failed to fetch listing owner/title for payment notification", "listing_id", listingID, "error", err)
+		return "", "el objeto"
 	}
 
-	c.JSON(http.StatusOK, gin.H{"client_secret": clientSecret})
+	return ownerID, listingTitle
+}
+
+func formatTransactionDates(t *Transaction) (startDate, endDate string) {
+	if t.StartDate != nil {
+		startDate = t.StartDate.Format("2006-01-02")
+	}
+	if t.EndDate != nil {
+		endDate = t.EndDate.Format("2006-01-02")
+	}
+
+	return startDate, endDate
+}
+
+func (h *Handler) resolveUserName(c *gin.Context, userID, fallback, logMsg, logKey string) string {
+	if h.userSvc == nil || userID == "" {
+		return fallback
+	}
+
+	name, err := h.userSvc.GetUserNameByID(c.Request.Context(), userID)
+	if err != nil {
+		slog.Error(logMsg, logKey, userID, "error", err)
+		return fallback
+	}
+	if name == "" {
+		return fallback
+	}
+
+	return name
+}
+
+func paymentNotificationRecipients(borrowerID, ownerID string) []string {
+	recipients := []string{borrowerID}
+	if ownerID != "" && ownerID != borrowerID {
+		recipients = append(recipients, ownerID)
+	}
+	return recipients
 }
 
 func (h *Handler) acceptTransaction(c *gin.Context) {
@@ -613,69 +665,6 @@ func (h *Handler) notifyOwnerOfChat(listingID, borrowerID string) {
 			"listing_id", listingID,
 			"user_id", ownerID,
 			"type", "chat_opened",
-		)
-	}()
-}
-
-func (h *Handler) notifyBorrowerOfDecision(transactionID, notifType string) {
-	if h.notifSvc == nil {
-		slog.Warn("notification service is nil", "transaction_id", transactionID, "type", notifType)
-		return
-	}
-
-	go func() {
-		t, err := h.repo.FindByID(context.Background(), transactionID)
-		if err != nil {
-			slog.Error(
-				"failed to fetch transaction for notification",
-				"transaction_id", transactionID,
-				"type", notifType,
-				"error", err,
-			)
-			return
-		}
-		if t == nil {
-			slog.Error(
-				"transaction not found for notification",
-				"transaction_id", transactionID,
-				"type", notifType,
-			)
-			return
-		}
-
-		_, listingTitle, err := h.repo.FindListingOwnerAndTitle(context.Background(), t.ListingID)
-		if err != nil {
-			slog.Error(
-				"failed to fetch listing title for notification",
-				"transaction_id", transactionID,
-				"listing_id", t.ListingID,
-				"borrower_id", t.BorrowerID,
-				"type", notifType,
-				"error", err,
-			)
-			return
-		}
-
-		if err := h.notifSvc.Create(context.Background(), t.BorrowerID, notifType, map[string]any{
-			"listing_title": listingTitle,
-		}); err != nil {
-			slog.Error(
-				"failed to create notification",
-				"transaction_id", transactionID,
-				"listing_id", t.ListingID,
-				"user_id", t.BorrowerID,
-				"type", notifType,
-				"error", err,
-			)
-			return
-		}
-
-		slog.Info(
-			"notification created",
-			"transaction_id", transactionID,
-			"listing_id", t.ListingID,
-			"user_id", t.BorrowerID,
-			"type", notifType,
 		)
 	}()
 }
