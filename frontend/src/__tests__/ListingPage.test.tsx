@@ -39,6 +39,7 @@ function renderPage(user: User | null = null) {
         login: vi.fn(),
         logout: vi.fn(),
         updateUser: vi.fn(),
+        refreshUser: vi.fn().mockResolvedValue(undefined),
     })
 
     return render(

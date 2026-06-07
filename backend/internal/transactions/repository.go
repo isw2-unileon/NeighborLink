@@ -53,6 +53,6 @@ type Repository interface {
 	// FindListingOwnerAndTitle returns the owner_id and title of the listing associated with the given listingID.
 	FindListingOwnerAndTitle(ctx context.Context, listingID string) (ownerID string, title string, err error)
 	// FindListingInfoForRefund returns owner_id, title and deposit_amount.
-	FindListingInfoForRefund(ctx context.Context, listingID string) (ownerID string, title string, depositAmount int, err error)
+	FindListingInfoForRefund(ctx context.Context, listingID string) (ownerID string, title string, depositAmount float64, err error)
 	UpdateDisputeRefund(ctx context.Context, id string, points int) error
 }

@@ -72,16 +72,10 @@ func (h *Handler) listByTransaction(c *gin.Context) {
 
 	isAdmin, _ := h.adminChecker.IsAdmin(c.Request.Context(), uid)
 
-	if tx.Status == "pending_review" {
-		if !isAdmin && uid != tx.OwnerID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			return
-		}
-	} else {
-		if uid == "" || (uid != tx.BorrowerID && uid != tx.OwnerID && !isAdmin) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			return
-		}
+	isParticipant := uid == tx.BorrowerID || uid == tx.OwnerID
+	if !isParticipant && !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
 	}
 
 	messages, err := h.repo.FindByTransaction(c.Request.Context(), transactionID)
@@ -152,7 +146,13 @@ func (h *Handler) createMessage(c *gin.Context) {
 	}
 
 	uid := senderID.(string)
-	if uid != tx.BorrowerID && uid != tx.OwnerID {
+	isAdmin, err := h.adminChecker.IsAdmin(c.Request.Context(), uid)
+	if err != nil {
+		slog.Error("failed to check admin status", "user_id", uid, "error", err)
+		isAdmin = false // fallback
+	}
+
+	if uid != tx.BorrowerID && uid != tx.OwnerID && !isAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "you are not a participant of this transaction"})
 		return
 	}
