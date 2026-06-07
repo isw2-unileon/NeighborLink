@@ -8,7 +8,15 @@ interface MessageBubbleProps {
 }
 
 export default function MessageBubble({ message, isMe }: MessageBubbleProps) {
-    if (message.sender_id === SYSTEM_SENDER_ID) return null;
+    if (message.sender_id === SYSTEM_SENDER_ID) {
+        return (
+            <div className="flex justify-center my-1">
+                <div className="max-w-sm px-4 py-2 rounded-2xl text-xs font-medium text-center bg-amber-50 border border-amber-200 text-amber-800">
+                    {message.content}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
