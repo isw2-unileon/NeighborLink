@@ -981,6 +981,8 @@ func TestHandoverTransaction_SkipsStripe_WhenPointsPayment(t *testing.T) {
 
 func TestReturnTransaction_SkipsStripeAndRefundsPoints_WhenPointsPayment(t *testing.T) {
 	handoverAt := time.Now().Add(-24 * time.Hour)
+	startDate := handoverAt
+	endDate := time.Now()
 	fs := &fakeStripe{}
 	repo := &fakeRepository{
 		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
@@ -988,6 +990,7 @@ func TestReturnTransaction_SkipsStripeAndRefundsPoints_WhenPointsPayment(t *test
 			{
 				ID: "tx-1", Status: "handed_over", PaymentMethod: "points",
 				BorrowerID: "borrower-1", ListingID: "lst-1", HandoverAt: &handoverAt,
+				StartDate: &startDate, EndDate: &endDate,
 			},
 		},
 	}
@@ -1003,5 +1006,5 @@ func TestReturnTransaction_SkipsStripeAndRefundsPoints_WhenPointsPayment(t *test
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, int64(0), fs.releasedAmount) // Stripe NOT called
-	assert.Greater(t, wallet.added, 0)            // borrower received points refund
+	assert.Greater(t, wallet.added, 0)           // borrower received points refund
 }

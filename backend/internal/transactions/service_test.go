@@ -393,6 +393,8 @@ func TestHandover_SkipsStripeForPointsPayment(t *testing.T) {
 
 func TestReturn_RefundsPointsWhenPaidWithPoints(t *testing.T) {
 	handoverAt := time.Now().UTC().AddDate(0, 0, -1) // 1 day borrowed
+	startDate := time.Now().UTC().AddDate(0, 0, -1)
+	endDate := time.Now().UTC()
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
 			{
@@ -402,6 +404,8 @@ func TestReturn_RefundsPointsWhenPaidWithPoints(t *testing.T) {
 				BorrowerID:    "borrower-1",
 				ListingID:     "lst-1",
 				HandoverAt:    &handoverAt,
+				StartDate:     &startDate,
+				EndDate:       &endDate,
 			},
 		},
 	}

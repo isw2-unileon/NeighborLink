@@ -18,8 +18,6 @@ interface Props {
 export default function PaymentModal({
     transactionId,
     depositAmount,
-    startDate,
-    endDate,
     userPoints,
     onClose,
     onSuccess,

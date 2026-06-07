@@ -200,7 +200,6 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 	if t == nil || t.Status != "handed_over" {
 		return nil, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
 	}
-
 	effectiveStart := *t.StartDate
 	if t.HandoverAt != nil && t.HandoverAt.After(effectiveStart) {
 		effectiveStart = *t.HandoverAt
