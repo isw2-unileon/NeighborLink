@@ -19,4 +19,5 @@ type Message struct {
 	ListingPhoto  string    `json:"listing_photo,omitempty"`
 	BorrowerID    string    `json:"borrower_id,omitempty"`
 	OwnerID       string    `json:"owner_id,omitempty"`
+	HasUnread     bool      `json:"has_unread,omitempty"`
 }
