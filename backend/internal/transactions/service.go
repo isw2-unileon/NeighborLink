@@ -69,7 +69,9 @@ func (s *Service) decideRequest(
 	if t == nil {
 		return fmt.Errorf("service: transaction %s not found", transactionID)
 	}
-
+	if t.Status != "pending" {
+		return fmt.Errorf("service: transaction %s is not pending", transactionID)
+	}
 	if err := repoAction(ctx, transactionID); err != nil {
 		return fmt.Errorf("service: %s: %w", logMsg, err)
 	}
