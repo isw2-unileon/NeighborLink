@@ -117,6 +117,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 		walletSvc,
 		notificationsSvc,
 		&adminCheckAdapter{repo: userRepo},
+		&userNameAdapter{repo: userRepo},
 	).RegisterRoutes(api, authMiddleware)
 	transactionsModule.NewWebhookHandler(stripeClient, transactionRepo, cfg.StripeWebhookSecret).RegisterRoutes(api)
 
@@ -125,6 +126,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 		messageRepo,
 		adapters.NewTxReaderAdapter(transactionRepo),
 		&adminCheckAdapter{repo: userRepo},
+		notificationsSvc,
 	).RegisterRoutes(api, authMiddleware)
 
 	// Reviews
@@ -205,3 +207,17 @@ func (a *adminCheckAdapter) IsAdmin(ctx context.Context, userID string) (bool, e
 	return u.Role == "admin", nil
 }
 
+type userNameAdapter struct {
+	repo usersModule.Repository
+}
+
+func (a *userNameAdapter) GetUserNameByID(ctx context.Context, userID string) (string, error) {
+	u, err := a.repo.FindByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if u == nil {
+		return "", nil
+	}
+	return u.Name, nil
+}

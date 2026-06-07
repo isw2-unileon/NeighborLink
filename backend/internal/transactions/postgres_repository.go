@@ -261,7 +261,6 @@ func (r *postgresRepository) UpdateDisputeRefund(ctx context.Context, id string,
 	return nil
 }
 
-
 func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID string) ([]DateRange, error) {
 	rows, err := r.pool.Query(ctx, `
         SELECT start_date, end_date
@@ -288,6 +287,24 @@ func (r *postgresRepository) FindBlockedDates(ctx context.Context, listingID str
 		return nil, fmt.Errorf("transactions: iteration failed: %w", err)
 	}
 	return ranges, nil
+}
+
+func (r *postgresRepository) AcceptRequest(ctx context.Context, transactionID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions
+		SET status = 'accepted'
+		WHERE id = $1
+	`, transactionID)
+	return err
+}
+
+func (r *postgresRepository) RejectRequest(ctx context.Context, transactionID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions
+		SET status = 'rejected'
+		WHERE id = $1
+	`, transactionID)
+	return err
 }
 
 func (r *postgresRepository) GenerateCode(ctx context.Context, transactionID string, field string) (string, error) {

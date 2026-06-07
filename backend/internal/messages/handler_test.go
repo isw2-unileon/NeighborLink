@@ -24,6 +24,21 @@ func (f *fakeAdminChecker) IsAdmin(_ context.Context, _ string) (bool, error) {
 	return f.isAdmin, nil
 }
 
+type fakeNotificationCreator struct{}
+
+func (f *fakeNotificationCreator) Create(
+	_ context.Context,
+	_ string,
+	_ string,
+	_ map[string]any,
+) error {
+	return nil
+}
+
+func (f *fakeNotificationCreator) CreateNotification(_ context.Context, _ string, _ string, _ string) error {
+	return nil
+}
+
 type fakeRepository struct {
 	messages []messages.Message
 	err      error
@@ -94,6 +109,10 @@ func (f *fakeTxReader) FindByID(_ context.Context, _ string) (*messages.Transact
 	return f.summary, f.err
 }
 
+func (f *fakeTxReader) FindListingOwnerAndTitle(_ context.Context, _ string) (string, string, error) {
+	return "user-2", "Taladro Bosch", nil
+}
+
 // --- Setup ---
 
 // injectUser es un middleware de test que inyecta un userID fijo en el contexto.
@@ -107,8 +126,8 @@ func injectUser(userID string) gin.HandlerFunc {
 func setupRouter(repo messages.Repository, txReader messages.TransactionReader) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// Default to non-admin
-	h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: false})
+	adminSvc := &fakeAdminChecker{isAdmin: false}
+	h := messages.NewHandler(repo, txReader, adminSvc, &fakeNotificationCreator{})
 	api := r.Group("/api")
 	h.RegisterRoutes(api, injectUser("user-1"))
 	return r
@@ -156,7 +175,6 @@ func TestListByTransaction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Mock a valid transaction so authorization logic passes
 			txReader := &fakeTxReader{
 				summary: &messages.TransactionSummary{
 					ID:         tt.transactionID,
@@ -302,9 +320,9 @@ func TestCreateMessage(t *testing.T) {
 
 			gin.SetMode(gin.TestMode)
 			r := gin.New()
-			
+
 			isAdmin := tt.senderID == "admin-1"
-			h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: isAdmin})
+			h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: isAdmin}, &fakeNotificationCreator{})
 			api := r.Group("/api")
 			h.RegisterRoutes(api, injectUser(tt.senderID))
 

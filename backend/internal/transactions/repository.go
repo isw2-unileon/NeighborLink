@@ -10,6 +10,12 @@ type Repository interface {
 	FindByListing(ctx context.Context, listingID string) ([]Transaction, error)
 	FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error)
 
+	// AcceptRequest set the transaction status to agreed
+	AcceptRequest(ctx context.Context, transactionID string) error
+
+	// RejectRequest set the transaction status to cancelled
+	RejectRequest(ctx context.Context, transactionID string) error
+
 	// Create inserts a new transaction and returns it with the generated ID.
 	Create(ctx context.Context, t Transaction) (*Transaction, error)
 
@@ -43,7 +49,7 @@ type Repository interface {
 
 	// CancelByPaymentIntentID sets status to cancelled for the transaction with the given Stripe PaymentIntent ID.
 	CancelByPaymentIntentID(ctx context.Context, paymentIntentID string) error
-  
+
 	// FindListingOwnerAndTitle returns the owner_id and title of the listing associated with the given listingID.
 	FindListingOwnerAndTitle(ctx context.Context, listingID string) (ownerID string, title string, err error)
 	// FindListingInfoForRefund returns owner_id, title and deposit_amount.

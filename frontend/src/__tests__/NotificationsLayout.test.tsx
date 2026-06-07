@@ -104,7 +104,7 @@ describe('Layout — Notificaciones', () => {
         fireEvent.click(screen.getByRole('button', { name: /ver notificaciones/i }));
 
         await waitFor(() => {
-            expect(screen.getByText(/han aceptado una solicitud de taladro bosch/i)).toBeInTheDocument();
+            expect(screen.getByText(/ha aceptado la solicitud sobre "taladro bosch"/i)).toBeInTheDocument();
         });
     });
 
@@ -117,7 +117,7 @@ describe('Layout — Notificaciones', () => {
         fireEvent.click(screen.getByRole('button', { name: /ver notificaciones/i }));
 
         await waitFor(() => {
-            const li = screen.getByText(/han aceptado/i).closest('li');
+            const li = screen.getByText(/ha aceptado/i).closest('li');
             expect(li).toHaveClass('bg-teal-50');
         });
     });
@@ -131,7 +131,7 @@ describe('Layout — Notificaciones', () => {
         fireEvent.click(screen.getByRole('button', { name: /ver notificaciones/i }));
 
         await waitFor(() => {
-            const li = screen.getByText(/han aceptado/i).closest('li');
+            const li = screen.getByText(/ha aceptado/i).closest('li');
             expect(li).toHaveClass('bg-white');
         });
     });
@@ -144,8 +144,8 @@ describe('Layout — Notificaciones', () => {
         renderLayout();
         fireEvent.click(screen.getByRole('button', { name: /ver notificaciones/i }));
 
-        await waitFor(() => screen.getByText(/han aceptado/i));
-        fireEvent.click(screen.getByText(/han aceptado/i));
+        await waitFor(() => screen.getByText(/ha aceptado/i));
+        fireEvent.click(screen.getByText(/ha aceptado/i));
 
         await waitFor(() => {
             expect(notificationsLib.notificationsApi.markAsRead).toHaveBeenCalledWith('notif-1');
