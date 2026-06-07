@@ -428,7 +428,10 @@ export default function ProfilePage() {
             {tab === 'wallet' && (
                 <WalletTab
                     points={user.points ?? 0}
-                    onRedeem={() => updateUser({ ...user, points: 0 })}
+                    onRedeem={async () => {
+                        const updated = await usersApi.getMe();
+                        updateUser(updated);
+                    }}
                 />
             )}
         </div>
