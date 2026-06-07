@@ -120,6 +120,10 @@ func (f *fakeRepository) AcceptRequest(_ context.Context, _ string) error {
 	return nil
 }
 
+func (f *fakeRepository) RejectRequest(_ context.Context, _ string) error {
+	return nil
+}
+
 func (f *fakeRepository) FindByListing(_ context.Context, listingID string) ([]transactions.Transaction, error) {
 	if f.err != nil {
 		return nil, f.err

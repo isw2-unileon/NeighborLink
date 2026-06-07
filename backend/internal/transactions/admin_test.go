@@ -15,7 +15,7 @@ import (
 
 type noopUserNameGetter struct{}
 
-func (noopUserNameGetter) GetUserName(_ context.Context, _ string) (string, error) {
+func (noopUserNameGetter) GetUserNameByID(_ context.Context, _ string) (string, error) {
 	return "Usuario", nil
 }
 

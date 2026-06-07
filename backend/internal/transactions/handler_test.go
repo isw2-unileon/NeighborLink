@@ -996,25 +996,6 @@ func setupRouterWithWallet(repo transactions.Repository, fs *fakeStripe, wallet 
 }
 
 // ---- Points payment integration tests ----
-
-func setupRouterWithWallet(repo transactions.Repository, fs *fakeStripe, wallet *mockPointsWallet) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(gin.Recovery())
-	svc := transactions.NewService(repo, fs, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, wallet, &noopNotificationCreator{})
-	h := transactions.NewHandler(
-		repo,
-		svc,
-		&noopPointsAdder{},
-		notif,
-		&mockAdminChecker{},
-		userSvc,
-	)
-	api := r.Group("/api")
-	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
-	return r
-}
-
 func TestPayTransaction_WithPoints_Success(t *testing.T) {
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
