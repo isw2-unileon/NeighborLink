@@ -147,6 +147,23 @@ func (f *fakeRepository) UpdatePaymentIntent(_ context.Context, id string, payme
 		if t.ID == id {
 			f.transactions[i].StripePaymentIntentID = paymentIntentID
 			f.transactions[i].PaymentMethodID = paymentMethodID
+			f.transactions[i].TotalChargedCents = totalChargedCents
+			f.transactions[i].PaymentMethod = "card"
+			f.transactions[i].Status = "agreed"
+			f.transactions[i].AgreedAt = &now
+			return nil
+		}
+	}
+	return fmt.Errorf("transaction %s not found", id)
+}
+
+func (f *fakeRepository) SetAgreedWithPoints(_ context.Context, id string, totalChargedCents int64) error {
+	if f.err != nil { return f.err }
+	now := time.Now()
+	for i, t := range f.transactions {
+		if t.ID == id {
+			f.transactions[i].TotalChargedCents = totalChargedCents
+			f.transactions[i].PaymentMethod = "points"
 			f.transactions[i].Status = "agreed"
 			f.transactions[i].AgreedAt = &now
 			return nil
