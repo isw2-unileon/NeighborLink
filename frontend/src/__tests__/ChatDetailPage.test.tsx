@@ -65,6 +65,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     currentUserId = BORROWER_ID; // por defecto: borrower
     vi.mocked(messagesLib.messagesApi.getByTransaction).mockResolvedValue([]);
+    vi.mocked(messagesLib.messagesApi.markAsRead).mockResolvedValue(undefined);
     vi.mocked(messagesLib.messagesApi.create).mockResolvedValue({
         id: 'msg-new',
         transaction_id: TX_ID,
