@@ -116,6 +116,10 @@ func (f *fakeRepository) FindByID(_ context.Context, id string) (*transactions.T
 	return nil, nil
 }
 
+func (f *fakeRepository) AcceptRequest(_ context.Context, _ string) error {
+	return nil
+}
+
 func (f *fakeRepository) FindByListing(_ context.Context, listingID string) ([]transactions.Transaction, error) {
 	if f.err != nil {
 		return nil, f.err
@@ -196,7 +200,9 @@ func (f *fakeRepository) UpdatePaymentIntent(_ context.Context, id string, payme
 }
 
 func (f *fakeRepository) SetAgreedWithPoints(_ context.Context, id string, totalChargedCents int64) error {
-	if f.err != nil { return f.err }
+	if f.err != nil {
+		return f.err
+	}
 	now := time.Now()
 	for i, t := range f.transactions {
 		if t.ID == id {
