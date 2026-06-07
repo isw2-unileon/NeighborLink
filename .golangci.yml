@@ -2,6 +2,7 @@ version: "2"
 
 run:
   timeout: 5m
+  relative-path-mode: cfg
 
 linters:
   enable:
@@ -80,6 +81,8 @@ linters:
     presets:
       - std-error-handling
       - common-false-positives
+    paths:
+      - frontend/node_modules/
     rules:
       - path: "_test\\.go$"
         linters:
