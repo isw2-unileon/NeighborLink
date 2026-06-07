@@ -108,7 +108,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
 
                 {days > 0 && (() => {
                     const refundPct = Math.max(89, 96 - days);
-                    const refundAmount = (((depositAmount + 2) * refundPct) / 100).toFixed(2);
+                    const refundAmount = ((depositAmount * refundPct) / 100).toFixed(2);
                     return (
                         <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm flex flex-col gap-2">
                             <div className="flex justify-between">
