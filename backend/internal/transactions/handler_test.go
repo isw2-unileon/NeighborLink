@@ -18,13 +18,7 @@ import (
 )
 
 func setupRouter(repo transactions.Repository) *gin.Engine {
-	// usamos el fakeStripe y las dependencias por defecto
-	return setupRouterWithDeps(
-		repo,
-		&fakeStripe{},
-		nil, // notif por defecto
-		nil, // userSvc por defecto
-	)
+	return setupRouterWithDeps(repo, &fakeStripe{}, nil, nil)
 }
 
 func setupRouterWithDeps(
@@ -43,6 +37,38 @@ func setupRouterWithDeps(
 	if userSvc == nil {
 		userSvc = &fakeUserNameGetter{names: map[string]string{}}
 	}
+
+	svc := transactions.NewService(
+		repo,
+		fs,
+		&noopListingUpdater{},
+		&mockAdminFinder{},
+		&mockMessageCreator{},
+		&noopPointsAdder{},
+		notif,
+	)
+
+	h := transactions.NewHandler(
+		repo,
+		svc,
+		&noopPointsAdder{},
+		notif,
+		&mockAdminChecker{},
+		userSvc,
+	)
+
+	api := r.Group("/api")
+	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
+	return r
+}
+
+func setupRouterWithStripe(repo transactions.Repository, fs *fakeStripe) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	notif := &recordingNotificationCreator{}
+	userSvc := &fakeUserNameGetter{names: map[string]string{}}
 
 	svc := transactions.NewService(
 		repo,
@@ -982,12 +1008,10 @@ func setupRouterWithWallet(repo transactions.Repository, fs *fakeStripe, wallet 
 	h := transactions.NewHandler(
 		repo,
 		svc,
-		wallet,                     // pointsAdder
-		&noopNotificationCreator{}, // notif
-		&mockAdminChecker{},        // adminChecker
-		&fakeUserNameGetter{ // userSvc (puede ser nil, pero mejor fake)
-			names: map[string]string{},
-		},
+		wallet,
+		&noopNotificationCreator{},
+		&mockAdminChecker{},
+		&fakeUserNameGetter{names: map[string]string{}},
 	)
 
 	api := r.Group("/api")
