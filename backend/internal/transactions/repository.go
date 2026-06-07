@@ -9,7 +9,11 @@ type Repository interface {
 	FindByID(ctx context.Context, id string) (*Transaction, error)
 	FindByListing(ctx context.Context, listingID string) ([]Transaction, error)
 	FindByBorrower(ctx context.Context, borrowerID string) ([]BorrowerTransaction, error)
+
+	// AcceptRequest set the transaction status to agreed
 	AcceptRequest(ctx context.Context, transactionID string) error
+
+	// RejectRequest set the transaction status to cancelled
 	RejectRequest(ctx context.Context, transactionID string) error
 
 	// Create inserts a new transaction and returns it with the generated ID.

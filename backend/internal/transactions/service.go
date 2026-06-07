@@ -54,9 +54,14 @@ func NewService(repo Repository, stripe stripeDepositor, listingSvc listingStatu
 	return &Service{repo: repo, stripe: stripe, listingSvc: listingSvc, adminRepo: adminRepo, msgRepo: msgRepo, walletSvc: walletSvc, notifSvc: notifSvc}
 }
 
-// AcceptRequest marca la transacción como awaiting_payment.
-// El owner acepta la solicitud pero el borrower aún no ha pagado.
-func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error {
+// decideRequest is a helper method to handle the common flow of accepting or rejecting a request, reducing code duplication between AcceptRequest and RejectRequest.
+func (s *Service) decideRequest(
+	ctx context.Context,
+	transactionID string,
+	repoAction func(context.Context, string) error,
+	notifType string,
+	logMsg string,
+) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
 		return fmt.Errorf("service: find transaction: %w", err)
@@ -65,8 +70,8 @@ func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error
 		return fmt.Errorf("service: transaction %s not found", transactionID)
 	}
 
-	if err := s.repo.AcceptRequest(ctx, transactionID); err != nil {
-		return fmt.Errorf("service: accept transaction: %w", err)
+	if err := repoAction(ctx, transactionID); err != nil {
+		return fmt.Errorf("service: %s: %w", logMsg, err)
 	}
 
 	if s.notifSvc != nil {
@@ -75,14 +80,36 @@ func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error
 			return fmt.Errorf("service: get listing info: %w", err)
 		}
 
-		if err := s.notifSvc.Create(ctx, t.BorrowerID, "transaction_accepted", map[string]any{
+		if err := s.notifSvc.Create(ctx, t.BorrowerID, notifType, map[string]any{
 			"listing_title": listingTitle,
 		}); err != nil {
-			slog.Error("failed to create accepted notification", "transaction_id", transactionID, "error", err)
+			slog.Error("failed to create decision notification", "transaction_id", transactionID, "error", err)
 		}
 	}
 
 	return nil
+}
+
+// AcceptRequest accepts a pending transaction.
+func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error {
+	return s.decideRequest(
+		ctx,
+		transactionID,
+		s.repo.AcceptRequest,
+		"transaction_accepted",
+		"accept transaction",
+	)
+}
+
+// RejectRequest cancels a pending transaction and updates its status to cancelled.
+func (s *Service) RejectRequest(ctx context.Context, transactionID string) error {
+	return s.decideRequest(
+		ctx,
+		transactionID,
+		s.repo.RejectRequest,
+		"transaction_rejected",
+		"reject transaction",
+	)
 }
 
 // ConfirmPayment authorises the deposit and moves the transaction to agreed.
@@ -135,36 +162,6 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 	}
 
 	return clientSecret, nil
-}
-
-// Reject cancels a pending transaction and updates its status to cancelled.
-func (s *Service) RejectRequest(ctx context.Context, transactionID string) error {
-	t, err := s.repo.FindByID(ctx, transactionID)
-	if err != nil {
-		return fmt.Errorf("service: find transaction: %w", err)
-	}
-	if t == nil {
-		return fmt.Errorf("service: transaction %s not found", transactionID)
-	}
-
-	if err := s.repo.RejectRequest(ctx, transactionID); err != nil {
-		return fmt.Errorf("service: reject transaction: %w", err)
-	}
-
-	if s.notifSvc != nil {
-		_, listingTitle, _, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
-		if err != nil {
-			return fmt.Errorf("service: get listing info: %w", err)
-		}
-
-		if err := s.notifSvc.Create(ctx, t.BorrowerID, "transaction_rejected", map[string]any{
-			"listing_title": listingTitle,
-		}); err != nil {
-			slog.Error("failed to create rejected notification", "transaction_id", transactionID, "error", err)
-		}
-	}
-
-	return nil
 }
 
 // isDevPaymentIntent returns true for fake payment intents used in local development.
