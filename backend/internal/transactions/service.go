@@ -344,6 +344,23 @@ func (s *Service) ResolveDispute(ctx context.Context, transactionID string) erro
 		return fmt.Errorf("service: update status: %w", err)
 	}
 
+	// Calculate and award points to the owner (reward for the loan)
+	ownerID, err := s.repo.FindListingOwnerByTransactionID(ctx, transactionID)
+	if err == nil {
+		effectiveStart := *t.StartDate
+		if t.HandoverAt != nil && t.HandoverAt.After(effectiveStart) {
+			effectiveStart = *t.HandoverAt
+		}
+		days := calcDaysBorrowed(effectiveStart, time.Now())
+		depositAmountCents := t.TotalChargedCents - PlatformFeeCents
+		pointsEarned := int(depositAmountCents * int64(days+4) / 100)
+
+		if pointsEarned > 0 {
+			// We log the error but don't fail the resolution if wallet update fails
+			_ = s.walletSvc.AddPoints(ctx, ownerID, pointsEarned)
+		}
+	}
+
 	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil {
 		return fmt.Errorf("service: update listing status: %w", err)
 	}
@@ -356,7 +373,7 @@ func (s *Service) ResolveDispute(ctx context.Context, transactionID string) erro
 	return nil
 }
 
-// RefundDisputePoints allows an admin to refund a percentage of the listing's value in points.
+// RefundDisputePoints allows an admin to refund a percentage of the listing's value in points to the borrower.
 func (s *Service) RefundDisputePoints(ctx context.Context, transactionID string, percentage int) (int, error) {
 	if percentage < 0 || percentage > 100 {
 		return 0, fmt.Errorf("service: percentage must be between 0 and 100")
@@ -379,18 +396,13 @@ func (s *Service) RefundDisputePoints(ctx context.Context, transactionID string,
 		return 0, fmt.Errorf("service: points can only be refunded for transactions in dispute or finalized")
 	}
 
-	_, listingTitle, deposit, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
+	ownerID, listingTitle, deposit, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
 	if err != nil {
 		return 0, fmt.Errorf("service: get listing info: %w", err)
 	}
 
-	// Obtener el owner para asignarle los puntos
-	ownerID, _, _, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
-	if err != nil {
-		return 0, fmt.Errorf("service: get listing owner: %w", err)
-	}
-
-	points := (deposit * percentage) / 100
+	// Calculate points: deposit is in Euros, so we multiply by 100 to get points/cents.
+	points := int(deposit * 100) * percentage / 100
 	if points > 0 {
 		if err := s.walletSvc.AddPoints(ctx, ownerID, points); err != nil {
 			return 0, fmt.Errorf("service: add points failed: %w", err)

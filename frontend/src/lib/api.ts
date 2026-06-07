@@ -57,14 +57,29 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
     get: <T>(path: string, options?: RequestInit): Promise<T> => request<T>(path, options),
     post: <T>(path: string, body: unknown): Promise<T> =>
-        request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+        request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+            .then(res => {
+                window.dispatchEvent(new Event('auth:refresh'));
+                return res;
+            }),
     put: <T>(path: string, body: unknown): Promise<T> =>
-        request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+        request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
+            .then(res => {
+                window.dispatchEvent(new Event('auth:refresh'));
+                return res;
+            }),
     patch: <T>(path: string, body?: unknown): Promise<T> =>
-        request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+        request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined })
+            .then(res => {
+                window.dispatchEvent(new Event('auth:refresh'));
+                return res;
+            }),
     delete: <T = void>(path: string, options?: { body?: unknown }): Promise<T> =>
         request<T>(path, {
             method: 'DELETE',
             body: options?.body ? JSON.stringify(options.body) : undefined
+        }).then(res => {
+            window.dispatchEvent(new Event('auth:refresh'));
+            return res;
         }),
 };

@@ -120,7 +120,7 @@ func (r *postgresRepository) GetPointsHistory(ctx context.Context, userID string
             
             UNION ALL
 
-            SELECT t.id as transaction_id, l.title as listing_title, COALESCE(t.agreed_at, NOW()) as completed_at, (t.dispute_refund_points * 100)::int as points_earned
+            SELECT t.id as transaction_id, l.title as listing_title, COALESCE(t.agreed_at, NOW()) as completed_at, t.dispute_refund_points::int as points_earned
             FROM transactions t
             JOIN listings l ON t.listing_id = l.id
             WHERE l.owner_id = $1 AND t.dispute_refund_points IS NOT NULL
