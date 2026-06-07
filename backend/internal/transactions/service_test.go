@@ -306,3 +306,123 @@ func TestReturn_FailsIfNotHandedOver(t *testing.T) {
 
 	assert.Error(t, err)
 }
+
+// --- Points payment unit tests ---
+
+func TestConfirmPayment_WithPoints_ExactBalance(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", ListingID: "lst-1"},
+		},
+	}
+	fs := &fakeStripe{}
+	lsvc := &fakeListingSvc{}
+	wallet := &mockPointsWallet{points: 700} // exactly deposit(500) + fee(200)
+	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, wallet, &noopNotificationCreator{})
+
+	cs, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "", "points")
+
+	assert.NoError(t, err)
+	assert.Empty(t, cs)
+	assert.False(t, fs.captureCalled)
+	assert.Equal(t, int64(700), wallet.deducted)
+	assert.Equal(t, "agreed", repo.transactions[0].Status)
+	assert.Equal(t, "points", repo.transactions[0].PaymentMethod)
+	assert.Equal(t, "pending_handover", lsvc.updatedStatus)
+}
+
+func TestConfirmPayment_WithPoints_InsufficientFunds(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", ListingID: "lst-1"},
+		},
+	}
+	wallet := &mockPointsWallet{points: 699} // one point short of deposit(500)+fee(200)
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, wallet, &noopNotificationCreator{})
+
+	cs, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "", "points")
+
+	assert.ErrorIs(t, err, transactions.ErrInsufficientPoints)
+	assert.Empty(t, cs)
+	assert.Equal(t, "awaiting_payment", repo.transactions[0].Status)
+}
+
+func TestConfirmPayment_WithPoints_ZeroBalance(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", ListingID: "lst-1"},
+		},
+	}
+	wallet := &mockPointsWallet{points: 0}
+	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, wallet, &noopNotificationCreator{})
+
+	_, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "", "points")
+
+	assert.ErrorIs(t, err, transactions.ErrInsufficientPoints)
+}
+
+func TestHandover_SkipsStripeForPointsPayment(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "agreed", PaymentMethod: "points", ListingID: "lst-1"},
+		},
+	}
+	fs := &fakeStripe{}
+	lsvc := &fakeListingSvc{}
+	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
+
+	err := svc.Handover(context.Background(), "tx-1")
+
+	assert.NoError(t, err)
+	assert.False(t, fs.captureCalled)
+	assert.Equal(t, "handed_over", repo.transactions[0].Status)
+}
+
+func TestReturn_RefundsPointsWhenPaidWithPoints(t *testing.T) {
+	handoverAt := time.Now().UTC().AddDate(0, 0, -1) // 1 day borrowed
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{
+				ID:            "tx-1",
+				Status:        "handed_over",
+				PaymentMethod: "points",
+				BorrowerID:    "borrower-1",
+				ListingID:     "lst-1",
+				HandoverAt:    &handoverAt,
+			},
+		},
+	}
+	fs := &fakeStripe{}
+	lsvc := &fakeListingSvc{}
+	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
+
+	res, err := svc.Return(context.Background(), "tx-1", 10000)
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), fs.releasedAmount) // Stripe NOT called
+	assert.Equal(t, "points", res.PaymentMethod)
+	assert.Equal(t, "borrower-1", res.BorrowerID)
+	assert.Equal(t, int64(9500), res.RefundAmountCents) // 95% of 10000
+	assert.Equal(t, "available", lsvc.updatedStatus)
+}
+
+// mockPointsWallet tracks deductions for assertions.
+type mockPointsWallet struct {
+	points   int
+	deducted int64
+	added    int
+}
+
+func (m *mockPointsWallet) AddPoints(_ context.Context, _ string, pts int) error {
+	m.added += pts
+	return nil
+}
+
+func (m *mockPointsWallet) DeductPoints(_ context.Context, _ string, amount int) (bool, error) {
+	if m.points < amount {
+		return false, nil
+	}
+	m.points -= amount
+	m.deducted = int64(amount)
+	return true, nil
+}

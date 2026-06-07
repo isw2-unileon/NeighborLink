@@ -899,3 +899,105 @@ func TestHandoverTransaction_WrongStatus_Returns409(t *testing.T) {
 
 	assert.Equal(t, http.StatusConflict, w.Code)
 }
+
+// ---- Points payment integration tests ----
+
+func setupRouterWithWallet(repo transactions.Repository, fs *fakeStripe, wallet *mockPointsWallet) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+	svc := transactions.NewService(repo, fs, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, wallet, &noopNotificationCreator{})
+	h := transactions.NewHandler(repo, svc, wallet, &noopNotificationCreator{}, &mockAdminChecker{})
+	api := r.Group("/api")
+	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
+	return r
+}
+
+func TestPayTransaction_WithPoints_Success(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", ListingID: "lst-1"},
+		},
+	}
+	wallet := &mockPointsWallet{points: 1000} // enough for deposit(800)+fee(200)
+
+	router := setupRouterWithWallet(repo, &fakeStripe{}, wallet)
+
+	body := `{"deposit_amount_cents":800,"payment_method":"points"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "agreed", repo.transactions[0].Status)
+	assert.Equal(t, "points", repo.transactions[0].PaymentMethod)
+}
+
+func TestPayTransaction_WithPoints_InsufficientFunds_Returns422(t *testing.T) {
+	repo := &fakeRepository{
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "awaiting_payment", BorrowerID: "borrower-1", ListingID: "lst-1"},
+		},
+	}
+	wallet := &mockPointsWallet{points: 500} // not enough for deposit(800)+fee(200)=1000
+
+	router := setupRouterWithWallet(repo, &fakeStripe{}, wallet)
+
+	body := `{"deposit_amount_cents":800,"payment_method":"points"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/transactions/tx-1/pay", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("borrower-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Equal(t, "awaiting_payment", repo.transactions[0].Status)
+}
+
+func TestHandoverTransaction_SkipsStripe_WhenPointsPayment(t *testing.T) {
+	fs := &fakeStripe{}
+	repo := &fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions: []transactions.Transaction{
+			{ID: "tx-1", Status: "agreed", PaymentMethod: "points", ListingID: "lst-1"},
+		},
+	}
+	router := setupRouterWithWallet(repo, fs, &mockPointsWallet{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/handover", bytes.NewReader([]byte{}))
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.False(t, fs.captureCalled)
+}
+
+func TestReturnTransaction_SkipsStripeAndRefundsPoints_WhenPointsPayment(t *testing.T) {
+	handoverAt := time.Now().Add(-24 * time.Hour)
+	fs := &fakeStripe{}
+	repo := &fakeRepository{
+		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
+		transactions: []transactions.Transaction{
+			{
+				ID: "tx-1", Status: "handed_over", PaymentMethod: "points",
+				BorrowerID: "borrower-1", ListingID: "lst-1", HandoverAt: &handoverAt,
+			},
+		},
+	}
+	wallet := &mockPointsWallet{}
+	router := setupRouterWithWallet(repo, fs, wallet)
+
+	body := `{"deposit_amount_cents":5000}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/return", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", makeToken("owner-1"))
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, int64(0), fs.releasedAmount) // Stripe NOT called
+	assert.Greater(t, wallet.added, 0)            // borrower received points refund
+}
