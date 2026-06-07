@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import notificacionIcon from '../assets/notificacion.jpg';
 import { notificationsApi } from '../lib/notifications';
+import { messagesApi } from '../lib/messages';
 import type { Notification } from '../types';
 
 function formatNotificationText(notification: Notification): string {
@@ -38,6 +39,7 @@ export default function Layout() {
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [unreadChatsCount, setUnreadChatsCount] = useState(0);
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const notificationsRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +74,15 @@ export default function Layout() {
                 // silencioso
             }
         }, 30_000);
+        return () => clearInterval(interval);
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        const fetchUnreadChats = () =>
+            messagesApi.getUnreadCount().then(setUnreadChatsCount).catch(() => {});
+        fetchUnreadChats();
+        const interval = setInterval(fetchUnreadChats, 30_000);
         return () => clearInterval(interval);
     }, [user]);
 
@@ -160,12 +171,17 @@ export default function Layout() {
                                 {/* Chats */}
                                 <Link
                                     to="/chats"
-                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-800 hover:bg-gray-100"
+                                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-800 hover:bg-gray-100"
                                     aria-label="Chats"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.52 3.66 1.424 5.168L2.1 21.1a.75.75 0 00.943.943l3.932-1.324A9.956 9.956 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zM8 13a1 1 0 110-2 1 1 0 010 2zm4 0a1 1 0 110-2 1 1 0 010 2zm4 0a1 1 0 110-2 1 1 0 010 2z" />
                                     </svg>
+                                    {unreadChatsCount > 0 && (
+                                        <span className="absolute top-2 right-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] text-white ring-2 ring-white">
+                                            {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
+                                        </span>
+                                    )}
                                 </Link>
 
                                 {/* Perfil */}
