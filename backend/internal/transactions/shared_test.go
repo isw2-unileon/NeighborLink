@@ -125,9 +125,9 @@ func (f *fakeRepository) FindListingOwnerAndTitle(_ context.Context, id string) 
 	return "", "", fmt.Errorf("transaction %s not found", id)
 }
 
-func (f *fakeRepository) FindListingInfoForRefund(_ context.Context, _ string) (string, string, int, error) {
+func (f *fakeRepository) FindListingInfoForRefund(_ context.Context, _ string) (string, string, float64, error) {
 	if f.err != nil { return "", "", 0, f.err }
-	return "owner-1", "listing-title", 10000, nil
+	return "owner-1", "listing-title", 100.0, nil
 }
 
 func (f *fakeRepository) UpdateDisputeRefund(_ context.Context, _ string, _ int) error {

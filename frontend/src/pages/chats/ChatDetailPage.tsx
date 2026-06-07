@@ -60,7 +60,7 @@ function getStatusBadge(status?: TransactionStatus): StatusBadge | null {
 
 export default function ChatDetailPage() {
     const { id: transactionId } = useParams<{ id: string }>();
-    const { user, updateUser } = useAuth();
+    const { user, updateUser, refreshUser } = useAuth();
     const navigate = useNavigate();
 
     const [messages, setMessages] = useState<Message[]>([]);
@@ -207,6 +207,10 @@ export default function ChatDetailPage() {
         try {
             await transactionsApi.resolveDispute(transactionId);
             setTransaction((prev) => (prev ? { ...prev, status: 'returned' } : null));
+
+            // Refrescar puntos por si el admin es el beneficiario
+            await refreshUser();
+
             setMessages((prev) => [
                 ...prev,
                 {
@@ -238,6 +242,10 @@ export default function ChatDetailPage() {
                     }
                     : null
             );
+
+            // Refrescar el perfil para actualizar la cartera si el admin es el beneficiario
+            await refreshUser();
+
             setShowRefundSlider(false);
             setMessages((prev) => [
                 ...prev,

@@ -145,6 +145,13 @@ func TestListByTransaction(t *testing.T) {
 			transactionID: "tx-1",
 			wantStatus:    http.StatusInternalServerError,
 		},
+		{
+			name:          "borrower can list messages in pending_review",
+			repoData:      []messages.Message{{ID: "1", TransactionID: "tx-1"}},
+			transactionID: "tx-1",
+			wantStatus:    http.StatusOK,
+			wantLen:       1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -279,6 +286,13 @@ func TestCreateMessage(t *testing.T) {
 			body:       map[string]string{"content": "Hola"},
 			wantStatus: http.StatusInternalServerError,
 		},
+		{
+			name:       "admin sends message in any active transaction",
+			senderID:   "admin-1",
+			txSummary:  &messages.TransactionSummary{BorrowerID: "user-1", OwnerID: "user-2", Status: "agreed"},
+			body:       map[string]string{"content": "Admin content"},
+			wantStatus: http.StatusCreated,
+		},
 	}
 
 	for _, tt := range tests {
@@ -288,8 +302,9 @@ func TestCreateMessage(t *testing.T) {
 
 			gin.SetMode(gin.TestMode)
 			r := gin.New()
-			// Default to non-admin
-			h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: false})
+			
+			isAdmin := tt.senderID == "admin-1"
+			h := messages.NewHandler(repo, txReader, &fakeAdminChecker{isAdmin: isAdmin})
 			api := r.Group("/api")
 			h.RegisterRoutes(api, injectUser(tt.senderID))
 

@@ -340,9 +340,9 @@ func (r *postgresRepository) FindListingOwnerAndTitle(ctx context.Context, listi
 	return ownerID, title, nil
 }
 
-func (r *postgresRepository) FindListingInfoForRefund(ctx context.Context, listingID string) (string, string, int, error) {
+func (r *postgresRepository) FindListingInfoForRefund(ctx context.Context, listingID string) (string, string, float64, error) {
 	var ownerID, title string
-	var deposit int
+	var deposit float64
 	err := r.pool.QueryRow(ctx,
 		`SELECT owner_id, title, deposit_amount FROM listings WHERE id = $1`,
 		listingID,
