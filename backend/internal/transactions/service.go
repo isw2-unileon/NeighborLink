@@ -165,7 +165,7 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 		return fmt.Errorf("service: transaction %s must be in agreed status to hand over", transactionID)
 	}
 
-	if !isDevPaymentIntent(t.StripePaymentIntentID) {
+	if t.PaymentMethod != "points" && !isDevPaymentIntent(t.StripePaymentIntentID) {
 		if err := s.stripe.CaptureDeposit(t.StripePaymentIntentID); err != nil {
 			return fmt.Errorf("service: capture deposit: %w", err)
 		}
@@ -181,40 +181,54 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 	return nil
 }
 
+// ReturnResult holds the outcome of a Return call so the handler can apply post-return actions.
+type ReturnResult struct {
+	DaysBorrowed      int
+	RefundAmountCents int64
+	PaymentMethod     string
+	BorrowerID        string
+}
+
 // Return refunds a variable percentage of the deposit to the borrower based on days borrowed,
 // marks the transaction as returned, and updates the listing status back to available.
-// Returns the number of days borrowed so the caller can compute the lender's points.
-func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) (int, error) {
+// Returns a ReturnResult so the caller can apply wallet credits or Stripe release.
+func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) (*ReturnResult, error) {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
-		return 0, fmt.Errorf("service: find transaction: %w", err)
+		return nil, fmt.Errorf("service: find transaction: %w", err)
 	}
 	if t == nil || t.Status != "handed_over" {
-		return 0, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
+		return nil, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
 	}
 
 	daysBorrowed := calcDaysBorrowed(*t.HandoverAt, time.Now())
 	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
 
-	// Stripe requires at least 1 cent for refunds.
-	if refundAmountCents < 1 {
-		refundAmountCents = 1
-	}
-
-	if !isDevPaymentIntent(t.StripePaymentIntentID) {
-		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {
-			return 0, fmt.Errorf("service: release deposit: %w", err)
+	if t.PaymentMethod != "points" {
+		// Stripe requires at least 1 cent for refunds.
+		if refundAmountCents < 1 {
+			refundAmountCents = 1
+		}
+		if !isDevPaymentIntent(t.StripePaymentIntentID) {
+			if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {
+				return nil, fmt.Errorf("service: release deposit: %w", err)
+			}
 		}
 	}
 
 	if err := s.repo.UpdateStatus(ctx, transactionID, "returned"); err != nil {
-		return 0, fmt.Errorf("service: update status: %w", err)
+		return nil, fmt.Errorf("service: update status: %w", err)
 	}
 
 	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil {
-		return 0, fmt.Errorf("service: update listing status: %w", err)
+		return nil, fmt.Errorf("service: update listing status: %w", err)
 	}
-	return daysBorrowed, nil
+	return &ReturnResult{
+		DaysBorrowed:      daysBorrowed,
+		RefundAmountCents: refundAmountCents,
+		PaymentMethod:     t.PaymentMethod,
+		BorrowerID:        t.BorrowerID,
+	}, nil
 }
 
 // ReportIssue transitions a transaction to pending_review and opens a chat with an admin.

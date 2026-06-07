@@ -201,10 +201,10 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 			lsvc := &fakeListingSvc{}
 			svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-			daysBorrowed, err := svc.Return(context.Background(), "tx-1", tc.deposit)
+			res, err := svc.Return(context.Background(), "tx-1", tc.deposit)
 
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantDayReturned, daysBorrowed)
+			assert.Equal(t, tc.wantDayReturned, res.DaysBorrowed)
 			assert.Equal(t, tc.wantRefund, fs.releasedAmount)
 			assert.Equal(t, "lst-1", lsvc.updatedListingID)
 			assert.Equal(t, "available", lsvc.updatedStatus)
@@ -232,11 +232,12 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 	lsvc := &fakeListingSvc{}
 	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-	_, err := svc.Return(context.Background(), "tx-1", deposit)
+	res, err := svc.Return(context.Background(), "tx-1", deposit)
 
 	assert.NoError(t, err)
 	// refundAmount must be strictly less than the deposit (fee not refunded, and lender keeps a share)
 	assert.Less(t, fs.releasedAmount, deposit)
+	assert.NotNil(t, res)
 	assert.Equal(t, "lst-1", lsvc.updatedListingID)
 	assert.Equal(t, "available", lsvc.updatedStatus)
 }
@@ -259,10 +260,10 @@ func TestReturn_DaysClamped(t *testing.T) {
 		lsvc := &fakeListingSvc{}
 		svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-		daysBorrowed, err := svc.Return(context.Background(), "tx-1", 10000)
+		res, err := svc.Return(context.Background(), "tx-1", 10000)
 
 		assert.NoError(t, err)
-		assert.Equal(t, 1, daysBorrowed)
+		assert.Equal(t, 1, res.DaysBorrowed)
 		assert.Equal(t, "lst-1", lsvc.updatedListingID)
 		assert.Equal(t, "available", lsvc.updatedStatus)
 	})
@@ -284,10 +285,10 @@ func TestReturn_DaysClamped(t *testing.T) {
 		lsvc := &fakeListingSvc{}
 		svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-		daysBorrowed, err := svc.Return(context.Background(), "tx-1", 10000)
+		res, err := svc.Return(context.Background(), "tx-1", 10000)
 
 		assert.NoError(t, err)
-		assert.Equal(t, 7, daysBorrowed)
+		assert.Equal(t, 7, res.DaysBorrowed)
 		assert.Equal(t, "lst-1", lsvc.updatedListingID)
 		assert.Equal(t, "available", lsvc.updatedStatus)
 	})

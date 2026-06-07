@@ -370,16 +370,22 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 		return
 	}
 
-	daysBorrowed, err := h.service.Return(c.Request.Context(), id, depositAmountCents)
+	result, err := h.service.Return(c.Request.Context(), id, depositAmountCents)
 	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
 
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(depositAmountCents * int64(daysBorrowed+4) / 100)
+	pointsEarned := int(depositAmountCents * int64(result.DaysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
+	}
+
+	if result.PaymentMethod == "points" {
+		if err := h.walletSvc.AddPoints(c.Request.Context(), result.BorrowerID, int(result.RefundAmountCents)); err != nil {
+			slog.Error("failed to refund points to borrower after return", "transaction_id", id, "error", err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
@@ -609,15 +615,20 @@ func (h *Handler) confirmReturn(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid return code"})
 		return
 	}
-	daysBorrowed, err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents)
+	result, err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents)
 	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(body.DepositAmountCents * int64(daysBorrowed+4) / 100)
+	pointsEarned := int(body.DepositAmountCents * int64(result.DaysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
+	}
+	if result.PaymentMethod == "points" {
+		if err := h.walletSvc.AddPoints(c.Request.Context(), result.BorrowerID, int(result.RefundAmountCents)); err != nil {
+			slog.Error("failed to refund points to borrower after return", "transaction_id", id, "error", err)
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
