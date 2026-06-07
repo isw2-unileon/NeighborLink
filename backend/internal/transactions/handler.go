@@ -507,7 +507,7 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.Return(c.Request.Context(), id, depositAmountCents)
+	result, err := h.service.Return(c.Request.Context(), id, depositAmountCents-PlatformFeeCents)
 	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return

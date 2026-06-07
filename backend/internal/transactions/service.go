@@ -248,7 +248,7 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 		effectiveEnd = now
 	}
 	daysBorrowed := calcDaysBorrowed(effectiveStart, effectiveEnd)
-	refundAmountCents := (depositAmountCents - PlatformFeeCents) * int64(96-daysBorrowed) / 100
+	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
 
 	if t.PaymentMethod != "points" {
 		// Stripe requires at least 1 cent for refunds.
