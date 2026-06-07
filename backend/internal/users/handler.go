@@ -32,8 +32,24 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 
 	protected := rg.Group("/")
 	protected.Use(authMiddleware)
+	protected.GET("/users/me", h.getMe)
 	protected.PUT("/users/me", h.updateMe)
 	protected.POST("/users/me/avatar", h.uploadAvatar)
+}
+
+func (h *Handler) getMe(c *gin.Context) {
+	userID := c.MustGet("userID").(string)
+	user, err := h.repo.FindByID(c.Request.Context(), userID)
+	if err != nil {
+		slog.Error("failed to get current user", "id", userID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": user})
 }
 
 func (h *Handler) listUsers(c *gin.Context) {

@@ -17,6 +17,9 @@ export const usersApi = {
     getUser: (id: string) =>
         api.get<ApiResponse<User>>(`/users/${id}`).then(r => r.data),
 
+    getMe: () =>
+        api.get<ApiResponse<User>>('/users/me').then(r => r.data),
+
     updateMe: (input: UpdateMeInput) =>
         api.put<ApiResponse<User>>('/users/me', input).then(r => r.data),
 

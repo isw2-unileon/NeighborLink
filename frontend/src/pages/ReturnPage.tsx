@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { transactionsApi } from '../lib/transactions';
+import { usersApi } from '../lib/users';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ReturnPage() {
     const navigate = useNavigate();
     const { id: listingId } = useParams<{ id: string }>();
+    const { updateUser } = useAuth();
 
     const [transactionId, setTransactionId] = useState<string | null>(null);
     const [depositAmountCents, setDepositAmountCents] = useState<number>(0);
@@ -41,6 +44,7 @@ export default function ReturnPage() {
                 deposit_amount_cents: depositAmountCents,
             });
             setSuccess(true);
+            usersApi.getMe().then(me => updateUser(me)).catch(() => {});
             setTimeout(() => navigate('/profile'), 1500);
         } catch {
             setError('Código incorrecto o error al confirmar. Inténtalo de nuevo.');
