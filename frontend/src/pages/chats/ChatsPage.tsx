@@ -17,14 +17,7 @@ import type { Message } from '../../types';
 
 type Tab = 'owner' | 'borrower';
 
-type ChatGroups = {
-    disputes: Message[];
-    pending: Message[];
-    awaitingPayment: Message[];
-    rejected: Message[];
-    activeNoMsg: Message[];
-    activeWithMsg: Message[];
-};
+const ACTIVE_STATUSES = ['agreed', 'handed_over', 'returned'];
 
 const STATUS_META = {
     pending: {
@@ -57,72 +50,17 @@ const STATUS_META = {
 const sortByDateDesc = (a: Message, b: Message) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 
-function classifyChats(chats: Message[]): ChatGroups {
-    const groups: ChatGroups = {
-        disputes: [],
-        pending: [],
-        awaitingPayment: [],
-        rejected: [],
-        activeNoMsg: [],
-        activeWithMsg: [],
-    };
-
-    chats.forEach((chat) => {
-        const status = chat.status ?? '';
-        const hasMessage = chat.content.trim() !== '';
-
-        if (status === 'pending_review') {
-            groups.disputes.push(chat);
-            return;
-        }
-        if (status === 'pending') {
-            groups.pending.push(chat);
-            return;
-        }
-        if (status === 'awaiting_payment') {
-            groups.awaitingPayment.push(chat);
-            return;
-        }
-        if (status === 'cancelled') {
-            groups.rejected.push(chat);
-            return;
-        }
-
-        const isActive = ['agreed', 'handed_over', 'returned'].includes(status);
-        if (isActive && hasMessage) {
-            groups.activeWithMsg.push(chat);
-            return;
-        }
-        if (isActive && !hasMessage) {
-            groups.activeNoMsg.push(chat);
-            return;
-        }
-
-        if (hasMessage) {
-            groups.activeWithMsg.push(chat);
-        } else {
-            groups.activeNoMsg.push(chat);
-        }
-    });
-
-    groups.disputes.sort(sortByDateDesc);
-    groups.pending.sort(sortByDateDesc);
-    groups.awaitingPayment.sort(sortByDateDesc);
-    groups.rejected.sort(sortByDateDesc);
-    groups.activeNoMsg.sort(sortByDateDesc);
-    groups.activeWithMsg.sort(sortByDateDesc);
-
-    return groups;
-}
-
 function ChatCard({ message, currentUserID }: { message: Message; currentUserID: string }) {
     const isMe = message.sender_id === currentUserID;
 
     return (
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
-            className="flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="relative flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
         >
+            {message.has_unread && (
+                <span className="absolute top-3 right-3 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
+            )}
             {message.listing_photo ? (
                 <img
                     src={message.listing_photo}
@@ -208,16 +146,8 @@ function ChatListSkeleton({ count = 4 }: { count?: number }) {
     );
 }
 
-function ChatSection({ groups, currentUserID }: { groups: ChatGroups; currentUserID: string }) {
-    const total =
-        groups.disputes.length +
-        groups.pending.length +
-        groups.awaitingPayment.length +
-        groups.rejected.length +
-        groups.activeNoMsg.length +
-        groups.activeWithMsg.length;
-
-    if (total === 0) {
+function ChatList({ chats, currentUserID }: { chats: Message[]; currentUserID: string }) {
+    if (chats.length === 0) {
         return (
             <div className="text-center py-16 text-[var(--muted)]">
                 <MessageCircle className="h-10 w-10 mx-auto mb-3 text-[var(--accent-3)]" />
@@ -228,63 +158,14 @@ function ChatSection({ groups, currentUserID }: { groups: ChatGroups; currentUse
 
     return (
         <div className="flex flex-col gap-4">
-            {groups.disputes.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--danger)]">Incidencias / Disputas</h2>
-                    {groups.disputes.map((msg) =>
-                        msg.content !== '' ? (
-                            <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />
-                        ) : (
-                            <TransactionStatusCard key={msg.transaction_id} message={msg} />
-                        )
-                    )}
-                </div>
-            )}
-
-            {groups.pending.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--warning)]">Pendientes</h2>
-                    {groups.pending.map((msg) => (
-                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
-                    ))}
-                </div>
-            )}
-
-            {groups.awaitingPayment.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--success)]">Pendiente de pago</h2>
-                    {groups.awaitingPayment.map((msg) => (
-                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
-                    ))}
-                </div>
-            )}
-
-            {groups.rejected.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--danger)]">Rechazados</h2>
-                    {groups.rejected.map((msg) => (
-                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
-                    ))}
-                </div>
-            )}
-
-            {groups.activeNoMsg.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Sin mensajes</h2>
-                    {groups.activeNoMsg.map((msg) => (
-                        <TransactionStatusCard key={msg.transaction_id} message={msg} />
-                    ))}
-                </div>
-            )}
-
-            {groups.activeWithMsg.length > 0 && (
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Conversaciones</h2>
-                    {groups.activeWithMsg.map((msg) => (
-                        <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />
-                    ))}
-                </div>
-            )}
+            {chats.map((msg) => {
+                const isActive = ACTIVE_STATUSES.includes(msg.status ?? '');
+                const hasContent = msg.content !== '';
+                if (hasContent && (isActive || msg.status === 'pending_review')) {
+                    return <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />;
+                }
+                return <TransactionStatusCard key={msg.transaction_id} message={msg} />;
+            })}
         </div>
     );
 }
@@ -313,11 +194,10 @@ export default function ChatsPage() {
     const ownerChats = useMemo(() => chats.filter((c) => c.owner_id === user?.id), [chats, user]);
     const borrowerChats = useMemo(() => chats.filter((c) => c.borrower_id === user?.id), [chats, user]);
     const adminDisputes = useMemo(() => chats.filter((c) => c.status === 'pending_review'), [chats]);
-    
-    // Si es admin, mostramos solo incidencias
+
     const isAdmin = user?.role === 'admin';
     const scopedChats = isAdmin ? adminDisputes : (activeTab === 'owner' ? ownerChats : borrowerChats);
-    const groupedChats = useMemo(() => classifyChats(scopedChats), [scopedChats]);
+    const sortedChats = useMemo(() => [...scopedChats].sort(sortByDateDesc), [scopedChats]);
 
     if (!user) return null;
 
@@ -382,10 +262,7 @@ export default function ChatsPage() {
             )}
 
             {!loading && !error && chats.length > 0 && (
-                <ChatSection
-                    groups={groupedChats}
-                    currentUserID={user.id}
-                />
+                <ChatList chats={sortedChats} currentUserID={user.id} />
             )}
         </div>
     );

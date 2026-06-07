@@ -103,11 +103,11 @@ describe('ChatsPage', () => {
         });
     });
 
-    it('muestra la sección "Sin mensajes" para chats sin contenido', async () => {
+    it('muestra el estado de transacción para chats sin contenido', async () => {
         vi.mocked(messagesApi.getActiveChats).mockResolvedValue(mockChats);
         renderPage();
         await waitFor(() => {
-            expect(screen.getByText('Sin mensajes')).toBeInTheDocument();
+            expect(screen.getByText('Inicia la conversación para concretar la entrega')).toBeInTheDocument();
         });
     });
 });

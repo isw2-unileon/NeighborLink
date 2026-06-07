@@ -134,6 +134,11 @@ export default function ChatDetailPage() {
         };
     }, [transactionId]);
 
+    useEffect(() => {
+        if (!transactionId) return;
+        messagesApi.markAsRead(transactionId).catch(() => {});
+    }, [transactionId]);
+
     if (!user) return null;
 
     const isOwner = listing?.owner_id === user.id;
