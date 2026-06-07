@@ -69,6 +69,17 @@ func (f *fakeRepository) FindActiveByParticipant(_ context.Context, _ string) ([
 	return f.messages, nil
 }
 
+func (f *fakeRepository) MarkAsRead(_ context.Context, _, _ string) error {
+	return f.err
+}
+
+func (f *fakeRepository) CountUnread(_ context.Context, _ string) (int, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	return 0, nil
+}
+
 type fakeTxReader struct {
 	summary         *messages.TransactionSummary
 	err             error

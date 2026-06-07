@@ -19,6 +19,10 @@ func (s *service) AddPoints(ctx context.Context, userID string, points int) erro
 	return s.repo.AddPoints(ctx, userID, points)
 }
 
+func (s *service) DeductPoints(ctx context.Context, userID string, points int) (bool, error) {
+	return s.repo.DeductPoints(ctx, userID, points)
+}
+
 func (s *service) RedeemPoints(ctx context.Context, userID string, pointsToRedeem int) (*Redemption, error) {
 	balance, err := s.repo.GetPoints(ctx, userID)
 	if err != nil {

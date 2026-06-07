@@ -54,13 +54,14 @@ func (r *postgresRepository) FindByID(ctx context.Context, id string) (*Transact
 			COALESCE(stripe_payment_intent_id, '') AS stripe_payment_intent_id,
 			COALESCE(payment_method_id, '')        AS payment_method_id,
 			total_charged_cents, start_date, end_date, agreed_at, handover_at, return_at,
-			dispute_refund_points
+			dispute_refund_points,
+			COALESCE(payment_method, 'card')       AS payment_method
 		FROM transactions
 		WHERE id = $1
 	`, id).Scan(&t.ID, &t.ListingID, &t.BorrowerID, &t.Status,
 		&t.StripePaymentIntentID, &t.PaymentMethodID,
 		&t.TotalChargedCents, &t.StartDate, &t.EndDate, &t.AgreedAt, &t.HandoverAt, &t.ReturnAt,
-		&t.DisputeRefundPoints)
+		&t.DisputeRefundPoints, &t.PaymentMethod)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -188,12 +189,28 @@ func (r *postgresRepository) UpdatePaymentIntent(ctx context.Context, id string,
 		SET stripe_payment_intent_id = $1,
 		    payment_method_id        = $2,
 		    total_charged_cents      = $3,
+		    payment_method           = 'card',
 		    status                   = 'agreed',
 		    agreed_at                = NOW()
 		WHERE id = $4
 	`, paymentIntentID, paymentMethodID, totalChargedCents, id)
 	if err != nil {
 		return fmt.Errorf("transactions: update payment intent failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) SetAgreedWithPoints(ctx context.Context, id string, totalChargedCents int64) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE transactions
+		SET total_charged_cents = $1,
+		    payment_method      = 'points',
+		    status              = 'agreed',
+		    agreed_at           = NOW()
+		WHERE id = $2
+	`, totalChargedCents, id)
+	if err != nil {
+		return fmt.Errorf("transactions: set agreed with points failed: %w", err)
 	}
 	return nil
 }

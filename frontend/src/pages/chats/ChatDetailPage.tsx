@@ -60,7 +60,7 @@ function getStatusBadge(status?: TransactionStatus): StatusBadge | null {
 
 export default function ChatDetailPage() {
     const { id: transactionId } = useParams<{ id: string }>();
-    const { user } = useAuth();
+    const { user, updateUser } = useAuth();
     const navigate = useNavigate();
 
     const [messages, setMessages] = useState<Message[]>([]);
@@ -132,6 +132,11 @@ export default function ChatDetailPage() {
             controller.abort();
             clearInterval(interval);
         };
+    }, [transactionId]);
+
+    useEffect(() => {
+        if (!transactionId) return;
+        messagesApi.markAsRead(transactionId).catch(() => {});
     }, [transactionId]);
 
     if (!user) return null;
@@ -307,8 +312,12 @@ export default function ChatDetailPage() {
                     depositAmount={listing.deposit_amount}
                     startDate={transaction.start_date ?? ''}
                     endDate={transaction.end_date ?? ''}
+                    userPoints={user?.points ?? 0}
                     onClose={() => setShowPayment(false)}
                     onSuccess={handlePaymentSuccess}
+                    onPointsDeducted={(cents) => {
+                        if (user) updateUser({ ...user, points: user.points - cents });
+                    }}
                 />
             )}
 

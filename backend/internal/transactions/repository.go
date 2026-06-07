@@ -19,6 +19,10 @@ type Repository interface {
 	// charged amount on the transaction and sets its status to agreed.
 	UpdatePaymentIntent(ctx context.Context, id string, paymentIntentID string, paymentMethodID string, totalChargedCents int64) error
 
+	// SetAgreedWithPoints sets the transaction to agreed status after a points payment,
+	// recording the total cost without creating a Stripe PaymentIntent.
+	SetAgreedWithPoints(ctx context.Context, id string, totalChargedCents int64) error
+
 	// UpdateStatus updates only the status field and the corresponding timestamp.
 	// validStatuses: handed_over (sets handover_at), returned (sets return_at), cancelled.
 	UpdateStatus(ctx context.Context, id string, status string) error

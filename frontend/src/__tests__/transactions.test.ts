@@ -62,7 +62,7 @@ describe('transactionsApi.getById', () => {
 });
 
 describe('transactionsApi.pay', () => {
-    it('envía PUT con el importe correcto', async () => {
+    it('envía PUT con el importe correcto (pago con tarjeta)', async () => {
         fetchMock.mockResolvedValueOnce({
             ok: true,
             status: 200,
@@ -77,7 +77,30 @@ describe('transactionsApi.pay', () => {
                 method: 'PUT',
                 body: JSON.stringify({
                     deposit_amount_cents: 5000,
-                    payment_method_id: 'pm_123'
+                    payment_method_id: 'pm_123',
+                    payment_method: 'card',
+                }),
+            })
+        );
+    });
+
+    it('envía payment_method=points cuando se paga con puntos', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({ client_secret: '' }),
+        });
+
+        await transactionsApi.pay('tx-1', 5000, null, 'points');
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            expect.stringContaining('/transactions/tx-1/pay'),
+            expect.objectContaining({
+                method: 'PUT',
+                body: JSON.stringify({
+                    deposit_amount_cents: 5000,
+                    payment_method_id: null,
+                    payment_method: 'points',
                 }),
             })
         );
@@ -90,7 +113,7 @@ describe('transactionsApi.pay', () => {
             json: async () => ({ client_secret: 'pi_secret_abc' }),
         });
 
-        const result = await transactionsApi.pay('tx-1', 5000, 'pm_123');
+        const result = await transactionsApi.pay('tx-1', 5000, 'pm_123', 'card');
 
         expect(result.clientSecret).toBe('pi_secret_abc');
     });
@@ -101,6 +124,6 @@ describe('transactionsApi.pay', () => {
             json: async () => ({ error: 'transaction not in awaiting_payment state' }),
         });
 
-        await expect(transactionsApi.pay('tx-1', 5000, 'pm_123')).rejects.toThrow('awaiting_payment');
+        await expect(transactionsApi.pay('tx-1', 5000, 'pm_123', 'card')).rejects.toThrow('awaiting_payment');
     });
 });
