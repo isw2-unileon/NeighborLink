@@ -61,6 +61,7 @@ export interface Message {
     listing_photo?: string;
     borrower_id?: string;
     owner_id?: string;
+    has_unread?: boolean;
 }
 
 export interface Notification {

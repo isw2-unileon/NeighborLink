@@ -56,8 +56,11 @@ function ChatCard({ message, currentUserID }: { message: Message; currentUserID:
     return (
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
-            className="flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="relative flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
         >
+            {message.has_unread && (
+                <span className="absolute top-3 right-3 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
+            )}
             {message.listing_photo ? (
                 <img
                     src={message.listing_photo}

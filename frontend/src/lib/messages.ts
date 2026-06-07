@@ -21,4 +21,10 @@ export const messagesApi = {
 
     getActiveChats: (signal?: AbortSignal) =>
         api.get<MessagesResponse>('/chats', { signal }).then(r => r.data),
+
+    markAsRead: (transactionId: string) =>
+        api.post(`/transactions/${transactionId}/messages/read`).then(() => {}),
+
+    getUnreadCount: (signal?: AbortSignal) =>
+        api.get<{ count: number }>('/chats/unread-count', { signal }).then(r => r.data.count),
 };
