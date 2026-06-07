@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usersApi } from '../lib/users';
 import { listingsApi } from '../lib/listings';
@@ -308,8 +308,11 @@ function MyReservations({ userID }: { userID: string }) {
 export default function ProfilePage() {
     const { user, token, updateUser, logout } = useAuth();
     const navigate = useNavigate();
-
+    const location = useLocation();
     const [tab, setTab] = useState<'listings' | 'reservations' | 'wallet'>('listings');
+    useEffect(() => {
+        setTab(location.state?.tab ?? 'listings');
+    }, [location.key]);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -406,7 +409,10 @@ export default function ProfilePage() {
                 {(['listings', 'reservations', 'wallet'] as const).map(t => (
                     <button
                         key={t}
-                        onClick={() => setTab(t)}
+                        onClick={() => {
+                            setTab(t);
+                            window.history.replaceState({}, '');
+                        }}
                         className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${tab === t
                             ? 'bg-[var(--accent-2)] text-white'
                             : 'bg-white text-[var(--muted)] hover:text-[var(--text)]'

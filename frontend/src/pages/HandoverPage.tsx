@@ -37,7 +37,7 @@ export default function HandoverPage() {
                 deposit_amount_cents: depositAmountCents,
             });
             setSuccess(true);
-            setTimeout(() => navigate('/profile'), 1500);
+            setTimeout(() => navigate('/profile', { state: { tab: 'listings' } }), 1500);
         } catch {
             setError('Código incorrecto o error al confirmar. Inténtalo de nuevo.');
         } finally {
@@ -64,7 +64,7 @@ export default function HandoverPage() {
                 </div>
             )}
             <div className="glass-panel rounded-3xl p-8">
-                <button onClick={() => navigate('/profile')}
+                <button onClick={() => navigate('/profile', { state: { tab: 'listings' } })}
                     className="text-sm text-[var(--muted)] hover:text-[var(--text)] mb-6 block">
                     ← Volver
                 </button>

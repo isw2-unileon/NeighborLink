@@ -44,8 +44,8 @@ export default function ReturnPage() {
                 deposit_amount_cents: depositAmountCents,
             });
             setSuccess(true);
-            usersApi.getMe().then(me => updateUser(me)).catch(() => {});
-            setTimeout(() => navigate('/profile'), 1500);
+            usersApi.getMe().then(me => updateUser(me)).catch(() => { });
+            setTimeout(() => navigate('/profile', { state: { tab: 'listings' } }), 1500);
         } catch {
             setError('Código incorrecto o error al confirmar. Inténtalo de nuevo.');
         } finally {
@@ -91,7 +91,7 @@ export default function ReturnPage() {
                 </div>
             )}
             <div className="glass-panel rounded-3xl p-8">
-                <button onClick={() => navigate('/profile')}
+                <button onClick={() => navigate('/profile', { state: { tab: 'listings' } })}
                     className="text-sm text-[var(--muted)] hover:text-[var(--text)] mb-6 block">
                     ← Volver
                 </button>
