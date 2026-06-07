@@ -163,15 +163,23 @@ func (h *Handler) createMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": created})
 }
 
-// markChatAsRead records that the authenticated user has read all messages in a transaction's chat.
-func (h *Handler) markChatAsRead(c *gin.Context) {
+func (h *Handler) requireUserID(c *gin.Context) (string, bool) {
 	userID, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return "", false
+	}
+	return userID.(string), true
+}
+
+// markChatAsRead records that the authenticated user has read all messages in a transaction's chat.
+func (h *Handler) markChatAsRead(c *gin.Context) {
+	userID, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	transactionID := c.Param("id")
-	if err := h.repo.MarkAsRead(c.Request.Context(), userID.(string), transactionID); err != nil {
+	if err := h.repo.MarkAsRead(c.Request.Context(), userID, transactionID); err != nil {
 		slog.Error("failed to mark chat as read", "transaction_id", transactionID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
@@ -181,12 +189,11 @@ func (h *Handler) markChatAsRead(c *gin.Context) {
 
 // unreadChatsCount returns the number of chats with unread messages for the authenticated user.
 func (h *Handler) unreadChatsCount(c *gin.Context) {
-	userID, ok := c.Get("userID")
+	userID, ok := h.requireUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	count, err := h.repo.CountUnread(c.Request.Context(), userID.(string))
+	count, err := h.repo.CountUnread(c.Request.Context(), userID)
 	if err != nil {
 		slog.Error("failed to count unread chats", "user_id", userID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -198,13 +205,12 @@ func (h *Handler) unreadChatsCount(c *gin.Context) {
 // listActiveChats returns the latest message per active transaction
 // where the authenticated user is a participant.
 func (h *Handler) listActiveChats(c *gin.Context) {
-	userID, ok := c.Get("userID")
+	userID, ok := h.requireUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	messages, err := h.repo.FindActiveByParticipant(c.Request.Context(), userID.(string))
+	messages, err := h.repo.FindActiveByParticipant(c.Request.Context(), userID)
 	if err != nil {
 		slog.Error("failed to list active chats", "user_id", userID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
