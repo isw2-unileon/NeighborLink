@@ -37,7 +37,6 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
     });
 
     const days = range ? Math.round((range.to.getTime() - range.from.getTime()) / 86400000) : 0;
-    const total = depositAmount;
 
     function handleRangeSelect(r: DayPickerRange | undefined) {
         if (!r?.from || !r?.to) {

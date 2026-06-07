@@ -14,19 +14,12 @@ interface Props {
 export default function PaymentModal({
     transactionId,
     depositAmount,
-    startDate,
-    endDate,
     onClose,
     onSuccess
 }: Props) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const paymentFormRef = useRef<PaymentFormHandle>(null);
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffMs = end.getTime() - start.getTime();
-    const days = Math.max(1, Math.round(diffMs / 86400000)) || 1; // Default to 1 day if invalid
     const depositCents = Math.round(Number(depositAmount) * 100) || 0;
     const totalEuros = (depositCents + 200) / 100;
 
