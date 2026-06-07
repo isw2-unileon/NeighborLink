@@ -99,7 +99,7 @@ func TestConfirmPayment_ChargesDepositPlusPlatformFee(t *testing.T) {
 	lsvc := &fakeListingSvc{}
 	svc := transactions.NewService(repo, fs, lsvc, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-	_, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
+	_, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new", "card")
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(700), fs.capturedAmount) // 500 deposit + 200 platform fee
@@ -115,7 +115,7 @@ func TestConfirmPayment_FailsIfNotAwaitingPayment(t *testing.T) {
 	}
 	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-	cs, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
+	cs, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new", "card")
 
 	assert.Error(t, err)
 	assert.Empty(t, cs)
@@ -130,7 +130,7 @@ func TestConfirmPayment_ReturnsClientSecret(t *testing.T) {
 	fs := &fakeStripe{clientSecret: "pi_secret_xyz_secret"}
 	svc := transactions.NewService(repo, fs, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-	cs, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new")
+	cs, err := svc.ConfirmPayment(context.Background(), "tx-1", 500, "pm_new", "card")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "pi_secret_xyz_secret", cs)

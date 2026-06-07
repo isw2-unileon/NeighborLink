@@ -66,6 +66,17 @@ func (f *fakeRepository) UpdateRedemptionStatus(_ context.Context, _, _ string) 
 	return nil
 }
 
+func (f *fakeRepository) DeductPoints(_ context.Context, _ string, amount int) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	if f.points < amount {
+		return false, nil
+	}
+	f.points -= amount
+	return true, nil
+}
+
 // fakeStripe implements wallet.StripePayouter for tests.
 type fakeStripe struct{ fail bool }
 

@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,13 +20,13 @@ type adminChecker interface {
 type Handler struct {
 	repo      Repository
 	service   *Service
-	walletSvc pointsAdder
+	walletSvc pointsWallet
 	notifSvc  notificationCreator
 	adminSvc  adminChecker
 }
 
-// NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
-func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
+// NewHandler creates a new Handler injecting the Repository, Service, and a pointsWallet.
+func NewHandler(repo Repository, service *Service, walletSvc pointsWallet, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
 	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc, adminSvc: adminSvc}
 }
 
@@ -291,16 +292,24 @@ func (h *Handler) payTransaction(c *gin.Context) {
 
 	var body struct {
 		DepositAmountCents int64  `json:"deposit_amount_cents"`
-		PaymentMethodID    string `json:"payment_method_id" binding:"required"`
+		PaymentMethodID    string `json:"payment_method_id"`
+		PaymentMethod      string `json:"payment_method"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Error("failed to parse pay transaction body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if body.PaymentMethod == "" {
+		body.PaymentMethod = "card"
+	}
 
-	clientSecret, err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID)
+	clientSecret, err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID, body.PaymentMethod)
 	if err != nil {
+		if errors.Is(err, ErrInsufficientPoints) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+			return
+		}
 		h.handleServiceError(c, "pay", id, err)
 		return
 	}

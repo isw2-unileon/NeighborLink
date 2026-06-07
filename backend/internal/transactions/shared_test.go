@@ -12,7 +12,10 @@ import (
 // --- Shared Mocks ---
 
 type noopPointsAdder struct{}
-func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error { return nil }
+func (noopPointsAdder) AddPoints(_ context.Context, _ string, _ int) error   { return nil }
+func (noopPointsAdder) DeductPoints(_ context.Context, _ string, _ int) (bool, error) {
+	return true, nil
+}
 
 type noopNotificationCreator struct{}
 func (noopNotificationCreator) Create(_ context.Context, _ string, _ string, _ map[string]any) error { return nil }
