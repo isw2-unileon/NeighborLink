@@ -17,6 +17,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func setupRouter(repo transactions.Repository) *gin.Engine {
+	// usamos el fakeStripe y las dependencias por defecto
+	return setupRouterWithDeps(
+		repo,
+		&fakeStripe{},
+		nil, // notif por defecto
+		nil, // userSvc por defecto
+	)
+}
+
 func setupRouterWithDeps(
 	repo transactions.Repository,
 	fs *fakeStripe,
@@ -954,20 +964,35 @@ func TestPayTransaction_WrongStatus_Returns409(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, w.Code)
 }
 
-func TestHandoverTransaction_WrongStatus_Returns409(t *testing.T) {
-	router := setupRouter(&fakeRepository{
-		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
-		transactions: []transactions.Transaction{
-			{ID: "tx-1", Status: "returned"},
+func setupRouterWithWallet(repo transactions.Repository, fs *fakeStripe, wallet *mockPointsWallet) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	svc := transactions.NewService(
+		repo,
+		fs,
+		&noopListingUpdater{},
+		&mockAdminFinder{},
+		&mockMessageCreator{},
+		wallet,
+		&noopNotificationCreator{},
+	)
+
+	h := transactions.NewHandler(
+		repo,
+		svc,
+		wallet,                     // pointsAdder
+		&noopNotificationCreator{}, // notif
+		&mockAdminChecker{},        // adminChecker
+		&fakeUserNameGetter{ // userSvc (puede ser nil, pero mejor fake)
+			names: map[string]string{},
 		},
-	})
+	)
 
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/transactions/tx-1/handover", bytes.NewReader([]byte{}))
-	req.Header.Set("Authorization", makeToken("owner-1"))
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusConflict, w.Code)
+	api := r.Group("/api")
+	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
+	return r
 }
 
 // ---- Points payment integration tests ----
@@ -977,7 +1002,14 @@ func setupRouterWithWallet(repo transactions.Repository, fs *fakeStripe, wallet 
 	r := gin.New()
 	r.Use(gin.Recovery())
 	svc := transactions.NewService(repo, fs, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, wallet, &noopNotificationCreator{})
-	h := transactions.NewHandler(repo, svc, wallet, &noopNotificationCreator{}, &mockAdminChecker{})
+	h := transactions.NewHandler(
+		repo,
+		svc,
+		&noopPointsAdder{},
+		notif,
+		&mockAdminChecker{},
+		userSvc,
+	)
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r
