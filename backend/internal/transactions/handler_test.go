@@ -770,10 +770,12 @@ func TestConfirmReturn_InvalidCode_Returns422(t *testing.T) {
 
 func TestConfirmReturn_ValidCode_Returns200(t *testing.T) {
 	handoverAt := time.Now().Add(-24 * time.Hour)
+	startDate := handoverAt
+	endDate := time.Now()
 	router := setupRouter(&fakeRepository{
 		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
 		transactions: []transactions.Transaction{
-			{ID: "tx-1", Status: "handed_over", HandoverAt: &handoverAt},
+			{ID: "tx-1", Status: "handed_over", HandoverAt: &handoverAt, StartDate: &startDate, EndDate: &endDate},
 		},
 	})
 
@@ -848,10 +850,12 @@ func TestHandoverTransaction_Success(t *testing.T) {
 
 func TestReturnTransaction_Success(t *testing.T) {
 	handoverAt := time.Now().Add(-24 * time.Hour)
+	startDate := handoverAt
+	endDate := time.Now()
 	router := setupRouter(&fakeRepository{
 		ownerByTransactionID: map[string]string{"tx-1": "owner-1"},
 		transactions: []transactions.Transaction{
-			{ID: "tx-1", Status: "handed_over", StripePaymentIntentID: "", ListingID: "lst-1", HandoverAt: &handoverAt},
+			{ID: "tx-1", Status: "handed_over", StripePaymentIntentID: "", ListingID: "lst-1", HandoverAt: &handoverAt, StartDate: &startDate, EndDate: &endDate},
 		},
 	})
 

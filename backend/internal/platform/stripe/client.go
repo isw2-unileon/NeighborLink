@@ -30,26 +30,22 @@ func NewClient(secretKey string) *Client {
 // paymentMethodID is the Stripe payment method ID (pm_...) provided by the borrower.
 // Returns the PaymentIntent ID (pi_...) and client_secret needed by the frontend for 3DS.
 func (c *Client) AuthorizeDeposit(amountCents int64, currency string, paymentMethodID string) (piID string, clientSecret string, err error) {
-	params := &stripe.PaymentIntentParams{
-		Amount:        stripe.Int64(amountCents),
-		Currency:      stripe.String(currency),
-		PaymentMethod: stripe.String(paymentMethodID),
-		CaptureMethod: stripe.String(string(stripe.PaymentIntentCaptureMethodManual)),
-		Confirm:       stripe.Bool(true),
-		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
-			Enabled:        stripe.Bool(true),
-			AllowRedirects: stripe.String("never"),
-		},
-	}
+    params := &stripe.PaymentIntentParams{
+        Amount:             stripe.Int64(amountCents),
+        Currency:           stripe.String(currency),
+        PaymentMethod:      stripe.String(paymentMethodID),
+        CaptureMethod:      stripe.String(string(stripe.PaymentIntentCaptureMethodManual)),
+        Confirm:            stripe.Bool(true),
+        PaymentMethodTypes: []*string{stripe.String("card")},
+    }
 
-	pi, err := paymentintent.New(params)
-	if err != nil {
-		return "", "", fmt.Errorf("stripe: failed to authorize deposit: %w", err)
-	}
+    pi, err := paymentintent.New(params)
+    if err != nil {
+        return "", "", fmt.Errorf("stripe: failed to authorize deposit: %w", err)
+    }
 
-	return pi.ID, pi.ClientSecret, nil
+    return pi.ID, pi.ClientSecret, nil
 }
-
 // CaptureDeposit captures a previously authorized PaymentIntent in full.
 // Call this when the handover QR is scanned successfully.
 // paymentIntentID is the pi_... value stored in the transactions table.

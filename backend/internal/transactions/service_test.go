@@ -185,7 +185,9 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run("", func(t *testing.T) {
-			handoverAt := time.Now().UTC().AddDate(0, 0, -tc.days)
+			startDate := time.Now().UTC().AddDate(0, 0, -tc.days)
+			handoverAt := startDate // handover ocurrió cuando empezó el préstamo
+			endDate := time.Now().UTC()
 			repo := &fakeRepository{
 				transactions: []transactions.Transaction{
 					{
@@ -194,6 +196,8 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 						StripePaymentIntentID: "pi_fake",
 						ListingID:             "lst-1",
 						HandoverAt:            &handoverAt,
+						StartDate:             &startDate,
+						EndDate:               &endDate,
 					},
 				},
 			}
@@ -213,10 +217,10 @@ func TestReturn_VariableRefundByDays(t *testing.T) {
 }
 
 func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
-	// deposit is 10000; total charged would be 10200 (deposit + €2 fee).
-	// Only the deposit (not the fee) should be passed to ReleaseDeposit.
 	deposit := int64(10000)
-	handoverAt := time.Now().UTC().AddDate(0, 0, -1)
+	startDate := time.Now().UTC().AddDate(0, 0, -1)
+	handoverAt := startDate
+	endDate := time.Now().UTC()
 	repo := &fakeRepository{
 		transactions: []transactions.Transaction{
 			{
@@ -225,6 +229,8 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 				StripePaymentIntentID: "pi_fake",
 				ListingID:             "lst-1",
 				HandoverAt:            &handoverAt,
+				StartDate:             &startDate,
+				EndDate:               &endDate,
 			},
 		},
 	}
@@ -235,7 +241,6 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 	_, err := svc.Return(context.Background(), "tx-1", deposit)
 
 	assert.NoError(t, err)
-	// refundAmount must be strictly less than the deposit (fee not refunded, and lender keeps a share)
 	assert.Less(t, fs.releasedAmount, deposit)
 	assert.Equal(t, "lst-1", lsvc.updatedListingID)
 	assert.Equal(t, "available", lsvc.updatedStatus)
@@ -243,7 +248,9 @@ func TestReturn_PlatformFeeNotRefunded(t *testing.T) {
 
 func TestReturn_DaysClamped(t *testing.T) {
 	t.Run("same-day return clamps to 1", func(t *testing.T) {
-		handoverAt := time.Now().UTC() // same day
+		startDate := time.Now().UTC()
+		handoverAt := startDate
+		endDate := time.Now().UTC()
 		repo := &fakeRepository{
 			transactions: []transactions.Transaction{
 				{
@@ -252,6 +259,8 @@ func TestReturn_DaysClamped(t *testing.T) {
 					StripePaymentIntentID: "pi_fake",
 					ListingID:             "lst-1",
 					HandoverAt:            &handoverAt,
+					StartDate:             &startDate,
+					EndDate:               &endDate,
 				},
 			},
 		}
@@ -268,7 +277,9 @@ func TestReturn_DaysClamped(t *testing.T) {
 	})
 
 	t.Run("over-7-day return clamps to 7", func(t *testing.T) {
-		handoverAt := time.Now().UTC().AddDate(0, 0, -10)
+		startDate := time.Now().UTC().AddDate(0, 0, -10)
+		handoverAt := startDate
+		endDate := time.Now().UTC()
 		repo := &fakeRepository{
 			transactions: []transactions.Transaction{
 				{
@@ -277,6 +288,8 @@ func TestReturn_DaysClamped(t *testing.T) {
 					StripePaymentIntentID: "pi_fake",
 					ListingID:             "lst-1",
 					HandoverAt:            &handoverAt,
+					StartDate:             &startDate,
+					EndDate:               &endDate,
 				},
 			},
 		}

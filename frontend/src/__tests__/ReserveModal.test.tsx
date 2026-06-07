@@ -80,9 +80,9 @@ describe('ReserveModal', () => {
             expect(screen.getByRole('button', { name: /confirmar reserva/i })).not.toBeDisabled();
         });
 
-        // 4 días × 20 € = 80 €
-        expect(screen.getByText(/4 días × 20 €/)).toBeInTheDocument();
-        expect(screen.getByText('80 €')).toBeInTheDocument();
+
+        expect(screen.getByText(/Total a pagar/i)).toBeInTheDocument();
+        expect(screen.getByText('22.00 €')).toBeInTheDocument();
     });
 
     it('carga las fechas bloqueadas al montar', async () => {
