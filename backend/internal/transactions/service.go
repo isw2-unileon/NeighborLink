@@ -201,7 +201,15 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 		return nil, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
 	}
 
-	daysBorrowed := calcDaysBorrowed(*t.HandoverAt, time.Now())
+	effectiveStart := *t.StartDate
+	if t.HandoverAt != nil && t.HandoverAt.After(effectiveStart) {
+		effectiveStart = *t.HandoverAt
+	}
+	effectiveEnd := *t.EndDate
+	if now := time.Now(); now.After(effectiveEnd) {
+		effectiveEnd = now
+	}
+	daysBorrowed := calcDaysBorrowed(effectiveStart, effectiveEnd)
 	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
 
 	if t.PaymentMethod != "points" {

@@ -37,7 +37,6 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
     });
 
     const days = range ? Math.round((range.to.getTime() - range.from.getTime()) / 86400000) : 0;
-    const total = days * depositAmount;
 
     function handleRangeSelect(r: DayPickerRange | undefined) {
         if (!r?.from || !r?.to) {
@@ -55,7 +54,7 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
 
     async function handleConfirm() {
         if (!range) return;
-        
+
         // Función auxiliar para obtener YYYY-MM-DD en hora local
         const formatDateLocal = (date: Date) => {
             const year = date.getFullYear();
@@ -107,14 +106,31 @@ export default function ReserveModal({ listingId, depositAmount, onClose, onSucc
                     numberOfMonths={1}
                 />
 
-                {days > 0 && (
-                    <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-[var(--muted)]">{days} días × {depositAmount} €</span>
-                            <span className="font-semibold">{total} €</span>
+                {days > 0 && (() => {
+                    const refundPct = Math.max(89, 96 - days);
+                    const refundAmount = ((depositAmount * refundPct) / 100).toFixed(2);
+                    return (
+                        <div className="mt-4 p-3 bg-[var(--surface-strong)] rounded-2xl text-sm flex flex-col gap-2">
+                            <div className="flex justify-between">
+                                <span className="text-[var(--muted)]">Fianza</span>
+                                <span className="font-semibold">{depositAmount} €</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-[var(--muted)]">
+                                <span>Gastos de gestión</span>
+                                <span>2.00 €</span>
+                            </div>
+                            <div className="h-px bg-[var(--border)]" />
+                            <div className="flex justify-between font-semibold">
+                                <span>Total a pagar ({days} días)</span>
+                                <span>{(depositAmount + 2).toFixed(2)} €</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-green-600">
+                                <span>Devolución estimada ({refundPct}%)</span>
+                                <span>+{refundAmount} €</span>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
 
                 <button
                     onClick={handleConfirm}

@@ -29,12 +29,7 @@ export default function PaymentModal({
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const paymentFormRef = useRef<PaymentFormHandle>(null);
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffMs = end.getTime() - start.getTime();
-    const days = Math.max(1, Math.round(diffMs / 86400000)) || 1;
-    const depositCents = Math.round(days * Number(depositAmount) * 100) || 0;
+    const depositCents = Math.round(Number(depositAmount) * 100) || 0;
     const totalCents = depositCents + 200;
     const totalEuros = totalCents / 100;
     const canPayWithPoints = userPoints >= totalCents;
