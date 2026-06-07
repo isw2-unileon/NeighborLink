@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import ReturnPage from '../pages/ReturnPage'
+import { AuthProvider } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
 const mockNavigate = vi.fn()
@@ -20,13 +21,21 @@ vi.mock('../lib/api', () => ({
     }
 }))
 
+vi.mock('../lib/users', () => ({
+    usersApi: {
+        getMe: vi.fn().mockResolvedValue({ id: 'u-1', points: 100 }),
+    }
+}))
+
 function renderPage() {
     return render(
-        <MemoryRouter initialEntries={['/listings/abc/return']}>
-            <Routes>
-                <Route path="/listings/:id/return" element={<ReturnPage />} />
-            </Routes>
-        </MemoryRouter>
+        <AuthProvider>
+            <MemoryRouter initialEntries={['/listings/abc/return']}>
+                <Routes>
+                    <Route path="/listings/:id/return" element={<ReturnPage />} />
+                </Routes>
+            </MemoryRouter>
+        </AuthProvider>
     )
 }
 
