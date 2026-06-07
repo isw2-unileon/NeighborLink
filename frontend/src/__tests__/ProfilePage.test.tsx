@@ -51,6 +51,7 @@ beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(listingsLib.listingsApi, 'getByOwner').mockResolvedValue([])
     vi.spyOn(walletLib.walletApi, 'getPointsHistory').mockResolvedValue([])
+    vi.spyOn(usersLib.usersApi, 'getMe').mockResolvedValue({ ...fakeUser, points: 0 })
     vi.spyOn(walletLib.walletApi, 'redeemPoints').mockResolvedValue({
         id: 'r1', user_id: 'user-1', points_redeemed: 1000,
         amount_euros: 10, status: 'pending', created_at: new Date().toISOString(),
@@ -229,6 +230,6 @@ describe('ProfilePage — Cartera tab', () => {
         const confirmBtn = await screen.findByRole('button', { name: /Confirmar canje/i })
         fireEvent.click(confirmBtn)
         expect(await screen.findByText(/Solicitud de cobro enviada/)).toBeInTheDocument()
-        expect(mockUpdateUser).toHaveBeenCalledWith(expect.objectContaining({ points: 0 }))
+        await waitFor(() => expect(mockUpdateUser).toHaveBeenCalledWith(expect.objectContaining({ points: 0 })))
     })
 })
