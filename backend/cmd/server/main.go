@@ -22,7 +22,6 @@ import (
 	stripeplatform "github.com/isw2-unileon/neighborlink/backend/internal/platform/stripe"
 	reviewsModule "github.com/isw2-unileon/neighborlink/backend/internal/reviews"
 	transactionsModule "github.com/isw2-unileon/neighborlink/backend/internal/transactions"
-	"github.com/isw2-unileon/neighborlink/backend/internal/users"
 	usersModule "github.com/isw2-unileon/neighborlink/backend/internal/users"
 	walletModule "github.com/isw2-unileon/neighborlink/backend/internal/wallet"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -209,7 +208,7 @@ func (a *adminCheckAdapter) IsAdmin(ctx context.Context, userID string) (bool, e
 }
 
 type userNameAdapter struct {
-	repo users.Repository
+	repo usersModule.Repository
 }
 
 func (a *userNameAdapter) GetUserNameByID(ctx context.Context, userID string) (string, error) {
