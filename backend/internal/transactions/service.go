@@ -2,9 +2,13 @@ package transactions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
+
+// ErrInsufficientPoints is returned when the borrower does not have enough points to pay.
+var ErrInsufficientPoints = errors.New("insufficient points to cover the deposit")
 
 type stripeDepositor interface {
 	AuthorizeDeposit(amountCents int64, currency, paymentMethodID string) (piID string, clientSecret string, err error)
@@ -24,8 +28,9 @@ type messageCreator interface {
 	CreateSystemMessage(ctx context.Context, transactionID, content string) error
 }
 
-type pointsAdder interface {
+type pointsWallet interface {
 	AddPoints(ctx context.Context, userID string, points int) error
+	DeductPoints(ctx context.Context, userID string, points int) (bool, error)
 }
 
 type notificationCreator interface {
@@ -39,12 +44,12 @@ type Service struct {
 	listingSvc listingStatusUpdater
 	adminRepo  adminFinder
 	msgRepo    messageCreator
-	walletSvc  pointsAdder
+	walletSvc  pointsWallet
 	notifSvc   notificationCreator
 }
 
 // NewService creates a new Service instance with the required dependencies.
-func NewService(repo Repository, stripe stripeDepositor, listingSvc listingStatusUpdater, adminRepo adminFinder, msgRepo messageCreator, walletSvc pointsAdder, notifSvc notificationCreator) *Service {
+func NewService(repo Repository, stripe stripeDepositor, listingSvc listingStatusUpdater, adminRepo adminFinder, msgRepo messageCreator, walletSvc pointsWallet, notifSvc notificationCreator) *Service {
 	return &Service{repo: repo, stripe: stripe, listingSvc: listingSvc, adminRepo: adminRepo, msgRepo: msgRepo, walletSvc: walletSvc, notifSvc: notifSvc}
 }
 
@@ -61,9 +66,9 @@ func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error
 	return s.repo.UpdateStatus(ctx, transactionID, "awaiting_payment")
 }
 
-// ConfirmPayment autoriza el depósito en Stripe y mueve la transacción a agreed.
-// Solo puede llamarlo el borrower cuando status = awaiting_payment.
-func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64, paymentMethodID string) (string, error) {
+// ConfirmPayment authorises the deposit and moves the transaction to agreed.
+// paymentMethod must be "card" or "points". Only the borrower can call this when status = awaiting_payment.
+func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depositAmountCents int64, paymentMethodID string, paymentMethod string) (string, error) {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
 		return "", fmt.Errorf("service: find transaction: %w", err)
@@ -73,11 +78,28 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 	}
 
 	totalCents := depositAmountCents + PlatformFeeCents
+
+	if paymentMethod == "points" {
+		ok, err := s.walletSvc.DeductPoints(ctx, t.BorrowerID, int(totalCents))
+		if err != nil {
+			return "", fmt.Errorf("service: deduct points: %w", err)
+		}
+		if !ok {
+			return "", ErrInsufficientPoints
+		}
+		if err := s.repo.SetAgreedWithPoints(ctx, transactionID, totalCents); err != nil {
+			return "", fmt.Errorf("service: set agreed with points: %w", err)
+		}
+		if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "pending_handover"); err != nil {
+			return "", fmt.Errorf("service: update listing status: %w", err)
+		}
+		return "", nil
+	}
+
 	actualPaymentMethodID := paymentMethodID
 	if actualPaymentMethodID == "" {
 		actualPaymentMethodID = t.PaymentMethodID
 	}
-
 	if actualPaymentMethodID == "" {
 		return "", fmt.Errorf("service: payment method ID is required")
 	}
@@ -86,11 +108,9 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 	if err != nil {
 		return "", fmt.Errorf("service: authorize deposit: %w", err)
 	}
-
 	if err := s.repo.UpdatePaymentIntent(ctx, transactionID, stripePIID, actualPaymentMethodID, totalCents); err != nil {
 		return "", fmt.Errorf("service: update payment intent: %w", err)
 	}
-
 	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "pending_handover"); err != nil {
 		return "", fmt.Errorf("service: update listing status: %w", err)
 	}
@@ -145,7 +165,7 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 		return fmt.Errorf("service: transaction %s must be in agreed status to hand over", transactionID)
 	}
 
-	if !isDevPaymentIntent(t.StripePaymentIntentID) {
+	if t.PaymentMethod != "points" && !isDevPaymentIntent(t.StripePaymentIntentID) {
 		if err := s.stripe.CaptureDeposit(t.StripePaymentIntentID); err != nil {
 			return fmt.Errorf("service: capture deposit: %w", err)
 		}
@@ -161,18 +181,25 @@ func (s *Service) Handover(ctx context.Context, transactionID string) error {
 	return nil
 }
 
+// ReturnResult holds the outcome of a Return call so the handler can apply post-return actions.
+type ReturnResult struct {
+	DaysBorrowed      int
+	RefundAmountCents int64
+	PaymentMethod     string
+	BorrowerID        string
+}
+
 // Return refunds a variable percentage of the deposit to the borrower based on days borrowed,
 // marks the transaction as returned, and updates the listing status back to available.
-// Returns the number of days borrowed so the caller can compute the lender's points.
-func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) (int, error) {
+// Returns a ReturnResult so the caller can apply wallet credits or Stripe release.
+func (s *Service) Return(ctx context.Context, transactionID string, depositAmountCents int64) (*ReturnResult, error) {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
-		return 0, fmt.Errorf("service: find transaction: %w", err)
+		return nil, fmt.Errorf("service: find transaction: %w", err)
 	}
 	if t == nil || t.Status != "handed_over" {
-		return 0, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
+		return nil, fmt.Errorf("service: transaction %s must be in handed_over status to return", transactionID)
 	}
-
 	effectiveStart := *t.StartDate
 	if t.HandoverAt != nil && t.HandoverAt.After(effectiveStart) {
 		effectiveStart = *t.HandoverAt
@@ -184,25 +211,31 @@ func (s *Service) Return(ctx context.Context, transactionID string, depositAmoun
 	daysBorrowed := calcDaysBorrowed(effectiveStart, effectiveEnd)
 	refundAmountCents := depositAmountCents * int64(96-daysBorrowed) / 100
 
-	// Stripe requires at least 1 cent for refunds.
-	if refundAmountCents < 1 {
-		refundAmountCents = 1
-	}
-
-	if !isDevPaymentIntent(t.StripePaymentIntentID) {
-		if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {
-			return 0, fmt.Errorf("service: release deposit: %w", err)
+	if t.PaymentMethod != "points" {
+		// Stripe requires at least 1 cent for refunds.
+		if refundAmountCents < 1 {
+			refundAmountCents = 1
+		}
+		if !isDevPaymentIntent(t.StripePaymentIntentID) {
+			if err := s.stripe.ReleaseDeposit(t.StripePaymentIntentID, refundAmountCents); err != nil {
+				return nil, fmt.Errorf("service: release deposit: %w", err)
+			}
 		}
 	}
 
 	if err := s.repo.UpdateStatus(ctx, transactionID, "returned"); err != nil {
-		return 0, fmt.Errorf("service: update status: %w", err)
+		return nil, fmt.Errorf("service: update status: %w", err)
 	}
 
 	if err := s.listingSvc.UpdateStatus(ctx, t.ListingID, "available"); err != nil {
-		return 0, fmt.Errorf("service: update listing status: %w", err)
+		return nil, fmt.Errorf("service: update listing status: %w", err)
 	}
-	return daysBorrowed, nil
+	return &ReturnResult{
+		DaysBorrowed:      daysBorrowed,
+		RefundAmountCents: refundAmountCents,
+		PaymentMethod:     t.PaymentMethod,
+		BorrowerID:        t.BorrowerID,
+	}, nil
 }
 
 // ReportIssue transitions a transaction to pending_review and opens a chat with an admin.

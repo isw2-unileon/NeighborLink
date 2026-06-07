@@ -33,6 +33,16 @@ func (r *postgresRepository) AddPoints(ctx context.Context, userID string, delta
 	return nil
 }
 
+func (r *postgresRepository) DeductPoints(ctx context.Context, userID string, amount int) (bool, error) {
+	res, err := r.pool.Exec(ctx,
+		`UPDATE users SET points = points - $1 WHERE id = $2 AND points >= $1`,
+		amount, userID)
+	if err != nil {
+		return false, fmt.Errorf("wallet: deduct points failed: %w", err)
+	}
+	return res.RowsAffected() > 0, nil
+}
+
 func (r *postgresRepository) CreateRedemption(ctx context.Context, userID string, points int) (*Redemption, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,13 +20,13 @@ type adminChecker interface {
 type Handler struct {
 	repo      Repository
 	service   *Service
-	walletSvc pointsAdder
+	walletSvc pointsWallet
 	notifSvc  notificationCreator
 	adminSvc  adminChecker
 }
 
-// NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
-func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
+// NewHandler creates a new Handler injecting the Repository, Service, and a pointsWallet.
+func NewHandler(repo Repository, service *Service, walletSvc pointsWallet, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
 	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc, adminSvc: adminSvc}
 }
 
@@ -291,16 +292,24 @@ func (h *Handler) payTransaction(c *gin.Context) {
 
 	var body struct {
 		DepositAmountCents int64  `json:"deposit_amount_cents"`
-		PaymentMethodID    string `json:"payment_method_id" binding:"required"`
+		PaymentMethodID    string `json:"payment_method_id"`
+		PaymentMethod      string `json:"payment_method"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		slog.Error("failed to parse pay transaction body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if body.PaymentMethod == "" {
+		body.PaymentMethod = "card"
+	}
 
-	clientSecret, err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID)
+	clientSecret, err := h.service.ConfirmPayment(c.Request.Context(), id, body.DepositAmountCents, body.PaymentMethodID, body.PaymentMethod)
 	if err != nil {
+		if errors.Is(err, ErrInsufficientPoints) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+			return
+		}
 		h.handleServiceError(c, "pay", id, err)
 		return
 	}
@@ -361,16 +370,22 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 		return
 	}
 
-	daysBorrowed, err := h.service.Return(c.Request.Context(), id, depositAmountCents)
+	result, err := h.service.Return(c.Request.Context(), id, depositAmountCents)
 	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
 
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(depositAmountCents * int64(daysBorrowed+4) / 100)
+	pointsEarned := int(depositAmountCents * int64(result.DaysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
+	}
+
+	if result.PaymentMethod == "points" {
+		if err := h.walletSvc.AddPoints(c.Request.Context(), result.BorrowerID, int(result.RefundAmountCents)); err != nil {
+			slog.Error("failed to refund points to borrower after return", "transaction_id", id, "error", err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
@@ -600,15 +615,20 @@ func (h *Handler) confirmReturn(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid return code"})
 		return
 	}
-	daysBorrowed, err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents)
+	result, err := h.service.Return(c.Request.Context(), id, body.DepositAmountCents)
 	if err != nil {
 		h.handleServiceError(c, "return", id, err)
 		return
 	}
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(body.DepositAmountCents * int64(daysBorrowed+4) / 100)
+	pointsEarned := int(body.DepositAmountCents * int64(result.DaysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
+	}
+	if result.PaymentMethod == "points" {
+		if err := h.walletSvc.AddPoints(c.Request.Context(), result.BorrowerID, int(result.RefundAmountCents)); err != nil {
+			slog.Error("failed to refund points to borrower after return", "transaction_id", id, "error", err)
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }

@@ -44,6 +44,9 @@ type PointsHistoryEntry struct {
 type Repository interface {
 	GetPoints(ctx context.Context, userID string) (int, error)
 	AddPoints(ctx context.Context, userID string, delta int) error
+	// DeductPoints atomically removes points only if the balance is sufficient.
+	// Returns true if deducted, false (no error) if balance was insufficient.
+	DeductPoints(ctx context.Context, userID string, amount int) (bool, error)
 	CreateRedemption(ctx context.Context, userID string, points int) (*Redemption, error)
 	GetPointsHistory(ctx context.Context, userID string) ([]PointsHistoryEntry, error)
 	GetStripeConnectAccountID(ctx context.Context, userID string) (string, error)
@@ -53,6 +56,9 @@ type Repository interface {
 // Service is the business-logic contract for the wallet package.
 type Service interface {
 	AddPoints(ctx context.Context, userID string, points int) error
+	// DeductPoints atomically removes points only if balance is sufficient.
+	// Returns true if deducted, false (no error) if insufficient.
+	DeductPoints(ctx context.Context, userID string, points int) (bool, error)
 	RedeemPoints(ctx context.Context, userID string, pointsToRedeem int) (*Redemption, error)
 	GetPointsHistory(ctx context.Context, userID string) ([]PointsHistoryEntry, error)
 }

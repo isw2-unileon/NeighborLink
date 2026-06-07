@@ -38,6 +38,7 @@ export interface Transaction {
     status: TransactionStatus;
     stripe_payment_intent_id?: string;
     payment_method_id?: string;
+    payment_method?: 'card' | 'points';
     total_charged_cents: number;
     start_date: string | null;
     end_date: string | null;

@@ -18,6 +18,7 @@ type Transaction struct {
 	StripePaymentIntentID string     `json:"stripe_payment_intent_id,omitempty"`
 	PaymentMethodID       string     `json:"payment_method_id,omitempty"`
 	TotalChargedCents     int64      `json:"total_charged_cents,omitempty"`
+	PaymentMethod         string     `json:"payment_method,omitempty"`
 	StartDate             *time.Time `json:"start_date"`
 	EndDate               *time.Time `json:"end_date"`
 	AgreedAt              *time.Time `json:"agreed_at"`
