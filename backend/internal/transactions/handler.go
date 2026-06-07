@@ -377,7 +377,7 @@ func (h *Handler) returnTransaction(c *gin.Context) {
 	}
 
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(depositAmountCents * int64(result.DaysBorrowed+4) / 100)
+	pointsEarned := int((depositAmountCents - PlatformFeeCents) * int64(result.DaysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
 	}
@@ -621,7 +621,7 @@ func (h *Handler) confirmReturn(c *gin.Context) {
 		return
 	}
 	ownerID := c.MustGet("userID").(string)
-	pointsEarned := int(body.DepositAmountCents * int64(result.DaysBorrowed+4) / 100)
+	pointsEarned := int((body.DepositAmountCents - PlatformFeeCents) * int64(result.DaysBorrowed+4) / 100)
 	if err := h.walletSvc.AddPoints(c.Request.Context(), ownerID, pointsEarned); err != nil {
 		slog.Error("failed to award points after return", "transaction_id", id, "error", err)
 	}
