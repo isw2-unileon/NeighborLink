@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
     CreditCard,
     Clock,
@@ -14,6 +14,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi } from '../../lib/messages';
 import type { Message } from '../../types';
+
+
 
 type Tab = 'owner' | 'borrower';
 
@@ -57,6 +59,7 @@ function ChatCard({ message, currentUserID }: { message: Message; currentUserID:
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
             className="relative flex items-center gap-4 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+            state={{ fromTab: message.owner_id === currentUserID ? 'owner' : 'borrower' }}
         >
             {message.has_unread && (
                 <span className="absolute top-3 right-3 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
@@ -90,7 +93,7 @@ function ChatCard({ message, currentUserID }: { message: Message; currentUserID:
     );
 }
 
-function TransactionStatusCard({ message }: { message: Message }) {
+function TransactionStatusCard({ message, currentUserID }: { message: Message; currentUserID: string }) {
     const meta = STATUS_META[message.status as keyof typeof STATUS_META] ?? STATUS_META.default;
     const Icon = meta.Icon;
 
@@ -98,6 +101,7 @@ function TransactionStatusCard({ message }: { message: Message }) {
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
             className="relative flex items-center gap-4 rounded-3xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-4 transition hover:shadow-md"
+            state={{ fromTab: message.owner_id === currentUserID ? 'owner' : 'borrower' }}
         >
             {message.has_unread && (
                 <span className="absolute top-3 right-3 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
@@ -149,7 +153,7 @@ function ChatListSkeleton({ count = 4 }: { count?: number }) {
     );
 }
 
-function ChatList({ chats, currentUserID }: { chats: Message[]; currentUserID: string }) {
+function ChatList({ chats, currentUserID }: { chats: Message[]; currentUserID: string; }) {
     if (chats.length === 0) {
         return (
             <div className="text-center py-16 text-[var(--muted)]">
@@ -167,7 +171,7 @@ function ChatList({ chats, currentUserID }: { chats: Message[]; currentUserID: s
                 if (hasContent && (isActive || msg.status === 'pending_review')) {
                     return <ChatCard key={msg.id} message={msg} currentUserID={currentUserID} />;
                 }
-                return <TransactionStatusCard key={msg.transaction_id} message={msg} />;
+                return <TransactionStatusCard key={msg.transaction_id} message={msg} currentUserID={currentUserID} />;
             })}
         </div>
     );
@@ -178,7 +182,8 @@ export default function ChatsPage() {
     const [chats, setChats] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<Tab>('owner');
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState<Tab>((location.state?.tab as Tab) ?? 'owner');
 
     useEffect(() => {
         let isActive = true;
