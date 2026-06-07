@@ -2,6 +2,7 @@ package transactions_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -16,19 +17,84 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setupRouterWithStripe(repo transactions.Repository, fs *fakeStripe) *gin.Engine {
+func setupRouterWithDeps(
+	repo transactions.Repository,
+	fs *fakeStripe,
+	notif *recordingNotificationCreator,
+	userSvc *fakeUserNameGetter,
+) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	svc := transactions.NewService(repo, fs, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
-	h := transactions.NewHandler(repo, svc, &noopPointsAdder{}, &noopNotificationCreator{}, &mockAdminChecker{})
+
+	if notif == nil {
+		notif = &recordingNotificationCreator{}
+	}
+	if userSvc == nil {
+		userSvc = &fakeUserNameGetter{names: map[string]string{}}
+	}
+
+	svc := transactions.NewService(
+		repo,
+		fs,
+		&noopListingUpdater{},
+		&mockAdminFinder{},
+		&mockMessageCreator{},
+		&noopPointsAdder{},
+		notif,
+	)
+
+	h := transactions.NewHandler(
+		repo,
+		svc,
+		&noopPointsAdder{},
+		notif,
+		&mockAdminChecker{},
+		userSvc,
+	)
+
 	api := r.Group("/api")
 	h.RegisterRoutes(api, middleware.RequireAuth(testJWTSecret))
 	return r
 }
 
-func setupRouter(repo transactions.Repository) *gin.Engine {
-	return setupRouterWithStripe(repo, nil)
+type recordedNotification struct {
+	UserID string
+	Type   string
+	Data   map[string]any
+}
+
+type recordingNotificationCreator struct {
+	calls []recordedNotification
+	err   error
+}
+
+func (r *recordingNotificationCreator) Create(_ context.Context, userID string, typ string, data map[string]any) error {
+	cp := map[string]any{}
+	for k, v := range data {
+		cp[k] = v
+	}
+	r.calls = append(r.calls, recordedNotification{
+		UserID: userID,
+		Type:   typ,
+		Data:   cp,
+	})
+	return r.err
+}
+
+type fakeUserNameGetter struct {
+	names map[string]string
+	err   error
+}
+
+func (f *fakeUserNameGetter) GetUserNameByID(_ context.Context, userID string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	if f.names == nil {
+		return "", nil
+	}
+	return f.names[userID], nil
 }
 
 func TestListTransactions(t *testing.T) {

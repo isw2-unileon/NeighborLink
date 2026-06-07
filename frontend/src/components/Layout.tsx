@@ -13,6 +13,10 @@ function formatNotificationText(notification: Notification): string {
             return `El prestador ha aceptado la solicitud sobre "${String(notification.payload.listing_title ?? 'tu objeto')}"`;
         case 'transaction_rejected':
             return `El prestador ha rechazado la solicitud sobre "${String(notification.payload.listing_title ?? 'tu objeto')}"`;
+        case 'transaction_terms_accepted':
+            return `Se han aceptado los términos, recuerda que "${String(notification.payload.listing_title ?? 'el objeto')}" de "
+            ${String(notification.payload.owner_name ?? 'prestador')}" pasa a "${String(notification.payload.borrower_name ?? 'solicitante')}
+            " desde ${String(notification.payload.start_date ?? 'la fecha de inicio')} hasta ${String(notification.payload.end_date ?? 'la fecha de fin')}`;
         case 'chat_opened':
             return `Se ha abierto un chat para reservar tu objeto: ${String(notification.payload.listing_title ?? 'tu listing')}`;
         case 'points_refunded':

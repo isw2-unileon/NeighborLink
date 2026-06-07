@@ -15,6 +15,10 @@ type adminChecker interface {
 	IsAdmin(ctx context.Context, userID string) (bool, error)
 }
 
+type userNameGetter interface {
+	GetUserNameByID(ctx context.Context, userID string) (string, error)
+}
+
 // Handler holds the HTTP handlers for the transactions module.
 type Handler struct {
 	repo      Repository
@@ -22,11 +26,26 @@ type Handler struct {
 	walletSvc pointsAdder
 	notifSvc  notificationCreator
 	adminSvc  adminChecker
+	userSvc   userNameGetter
 }
 
 // NewHandler creates a new Handler injecting the Repository, Service, and a pointsAdder.
-func NewHandler(repo Repository, service *Service, walletSvc pointsAdder, notifSvc notificationCreator, adminSvc adminChecker) *Handler {
-	return &Handler{repo: repo, service: service, walletSvc: walletSvc, notifSvc: notifSvc, adminSvc: adminSvc}
+func NewHandler(
+	repo Repository,
+	service *Service,
+	walletSvc pointsAdder,
+	notifSvc notificationCreator,
+	adminSvc adminChecker,
+	userSvc userNameGetter,
+) *Handler {
+	return &Handler{
+		repo:      repo,
+		service:   service,
+		walletSvc: walletSvc,
+		notifSvc:  notifSvc,
+		adminSvc:  adminSvc,
+		userSvc:   userSvc,
+	}
 }
 
 // RegisterRoutes attaches the transactions routes to a Gin router group.
@@ -303,6 +322,72 @@ func (h *Handler) payTransaction(c *gin.Context) {
 	if err != nil {
 		h.handleServiceError(c, "pay", id, err)
 		return
+	}
+
+	t, err := h.repo.FindByID(c.Request.Context(), id)
+	if err != nil || t == nil {
+		slog.Error("failed to fetch transaction after payment", "id", id, "error", err)
+		c.JSON(http.StatusOK, gin.H{"client_secret": clientSecret})
+		return
+	}
+
+	if h.notifSvc != nil {
+		ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(c.Request.Context(), t.ListingID)
+		if notifErr != nil {
+			slog.Error("failed to fetch listing owner/title for payment notification", "listing_id", t.ListingID, "error", notifErr)
+			listingTitle = "el objeto"
+			ownerID = ""
+		}
+
+		startDate := ""
+		endDate := ""
+		if t.StartDate != nil {
+			startDate = t.StartDate.Format("2006-01-02")
+		}
+		if t.EndDate != nil {
+			endDate = t.EndDate.Format("2006-01-02")
+		}
+
+		borrowerName := "solicitante"
+		if h.userSvc != nil {
+			name, err := h.userSvc.GetUserNameByID(c.Request.Context(), t.BorrowerID)
+			if err != nil {
+				slog.Error("failed to fetch borrower name", "borrower_id", t.BorrowerID, "error", err)
+			} else if name != "" {
+				borrowerName = name
+			}
+		}
+
+		ownerName := "prestador"
+		if h.userSvc != nil && ownerID != "" {
+			name, err := h.userSvc.GetUserNameByID(c.Request.Context(), ownerID)
+			if err != nil {
+				slog.Error("failed to fetch owner name", "owner_id", ownerID, "error", err)
+			} else if name != "" {
+				ownerName = name
+			}
+		}
+
+		data := map[string]any{
+			"transaction_id": t.ID,
+			"listing_id":     t.ListingID,
+			"listing_title":  listingTitle,
+			"borrower_name":  borrowerName,
+			"owner_name":     ownerName,
+			"start_date":     startDate,
+			"end_date":       endDate,
+		}
+
+		recipients := []string{t.BorrowerID}
+		if ownerID != "" && ownerID != t.BorrowerID {
+			recipients = append(recipients, ownerID)
+		}
+
+		for _, recipientID := range recipients {
+			if err := h.notifSvc.Create(c.Request.Context(), recipientID, "transaction_terms_accepted", data); err != nil {
+				slog.Error("failed to create payment notification", "transaction_id", t.ID, "recipient_id", recipientID, "error", err)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"client_secret": clientSecret})
