@@ -97,8 +97,11 @@ function TransactionStatusCard({ message }: { message: Message }) {
     return (
         <Link
             to={`/transactions/${message.transaction_id}/chat`}
-            className="flex items-center gap-4 rounded-3xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-4 transition hover:shadow-md"
+            className="relative flex items-center gap-4 rounded-3xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-4 transition hover:shadow-md"
         >
+            {message.has_unread && (
+                <span className="absolute top-3 right-3 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
+            )}
             {message.listing_photo ? (
                 <img
                     src={message.listing_photo}
@@ -178,17 +181,29 @@ export default function ChatsPage() {
     const [activeTab, setActiveTab] = useState<Tab>('owner');
 
     useEffect(() => {
-        const controller = new AbortController();
+        let isActive = true;
 
-        messagesApi.getActiveChats(controller.signal)
-            .then(setChats)
-            .catch((err) => {
+        const fetchChats = async () => {
+            try {
+                const data = await messagesApi.getActiveChats();
+                if (!isActive) return;
+                setChats(data);
+            } catch (err) {
+                if (!isActive) return;
                 if (err instanceof Error && err.name === 'AbortError') return;
                 setError('No se pudieron cargar los chats');
-            })
-            .finally(() => setLoading(false));
+            } finally {
+                if (isActive) setLoading(false);
+            }
+        };
 
-        return () => controller.abort();
+        fetchChats();
+        const interval = setInterval(fetchChats, 3000);
+
+        return () => {
+            isActive = false;
+            clearInterval(interval);
+        };
     }, []);
 
     const ownerChats = useMemo(() => chats.filter((c) => c.owner_id === user?.id), [chats, user]);
