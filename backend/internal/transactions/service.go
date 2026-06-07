@@ -76,6 +76,13 @@ func (s *Service) decideRequest(
 		return fmt.Errorf("service: %s: %w", logMsg, err)
 	}
 
+	switch notifType {
+	case "transaction_accepted":
+		t.Status = "awaiting_payment"
+	case "transaction_rejected":
+		t.Status = "cancelled"
+	}
+
 	if s.notifSvc != nil {
 		_, listingTitle, _, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
 		if err != nil {

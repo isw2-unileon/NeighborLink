@@ -112,12 +112,24 @@ func (f *fakeRepository) FindByID(_ context.Context, id string) (*transactions.T
 	return nil, nil
 }
 
-func (f *fakeRepository) AcceptRequest(_ context.Context, _ string) error {
-	return nil
+func (r *fakeRepository) AcceptRequest(_ context.Context, id string) error {
+	for i := range r.transactions {
+		if r.transactions[i].ID == id {
+			r.transactions[i].Status = "awaiting_payment"
+			return nil
+		}
+	}
+	return fmt.Errorf("transaction %s not found", id)
 }
 
-func (f *fakeRepository) RejectRequest(_ context.Context, _ string) error {
-	return nil
+func (r *fakeRepository) RejectRequest(_ context.Context, id string) error {
+	for i := range r.transactions {
+		if r.transactions[i].ID == id {
+			r.transactions[i].Status = "cancelled"
+			return nil
+		}
+	}
+	return fmt.Errorf("transaction %s not found", id)
 }
 
 func (f *fakeRepository) FindByListing(_ context.Context, listingID string) ([]transactions.Transaction, error) {
