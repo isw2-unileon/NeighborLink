@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -55,10 +56,28 @@ func (s *Service) AcceptRequest(ctx context.Context, transactionID string) error
 	if err != nil {
 		return fmt.Errorf("service: find transaction: %w", err)
 	}
-	if t == nil || t.Status != "pending" {
-		return fmt.Errorf("service: transaction %s must be in pending status to accept", transactionID)
+	if t == nil {
+		return fmt.Errorf("service: transaction %s not found", transactionID)
 	}
-	return s.repo.UpdateStatus(ctx, transactionID, "awaiting_payment")
+
+	if err := s.repo.AcceptRequest(ctx, transactionID); err != nil {
+		return fmt.Errorf("service: accept transaction: %w", err)
+	}
+
+	if s.notifSvc != nil {
+		_, listingTitle, _, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
+		if err != nil {
+			return fmt.Errorf("service: get listing info: %w", err)
+		}
+
+		if err := s.notifSvc.Create(ctx, t.BorrowerID, "transaction_accepted", map[string]any{
+			"listing_title": listingTitle,
+		}); err != nil {
+			slog.Error("failed to create accepted notification", "transaction_id", transactionID, "error", err)
+		}
+	}
+
+	return nil
 }
 
 // ConfirmPayment autoriza el depósito en Stripe y mueve la transacción a agreed.
@@ -99,18 +118,32 @@ func (s *Service) ConfirmPayment(ctx context.Context, transactionID string, depo
 }
 
 // Reject cancels a pending transaction and updates its status to cancelled.
-func (s *Service) Reject(ctx context.Context, transactionID string) error {
+func (s *Service) RejectRequest(ctx context.Context, transactionID string) error {
 	t, err := s.repo.FindByID(ctx, transactionID)
 	if err != nil {
 		return fmt.Errorf("service: find transaction: %w", err)
 	}
-	if t == nil || t.Status != "pending" {
-		return fmt.Errorf("service: transaction %s must be in pending status to reject", transactionID)
+	if t == nil {
+		return fmt.Errorf("service: transaction %s not found", transactionID)
 	}
 
-	if err := s.repo.UpdateStatus(ctx, transactionID, "cancelled"); err != nil {
-		return fmt.Errorf("service: update status: %w", err)
+	if err := s.repo.RejectRequest(ctx, transactionID); err != nil {
+		return fmt.Errorf("service: reject transaction: %w", err)
 	}
+
+	if s.notifSvc != nil {
+		_, listingTitle, _, err := s.repo.FindListingInfoForRefund(ctx, t.ListingID)
+		if err != nil {
+			return fmt.Errorf("service: get listing info: %w", err)
+		}
+
+		if err := s.notifSvc.Create(ctx, t.BorrowerID, "transaction_rejected", map[string]any{
+			"listing_title": listingTitle,
+		}); err != nil {
+			slog.Error("failed to create rejected notification", "transaction_id", transactionID, "error", err)
+		}
+	}
+
 	return nil
 }
 

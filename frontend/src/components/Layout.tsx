@@ -10,9 +10,9 @@ function formatNotificationText(notification: Notification): string {
         case 'listing_created':
             return `Se ha creado tu anuncio: ${String(notification.payload.listing_title ?? 'listing')}`;
         case 'transaction_accepted':
-            return `Han aceptado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
+            return `El prestador ha aceptado la solicitud sobre "${String(notification.payload.listing_title ?? 'tu objeto')}"`;
         case 'transaction_rejected':
-            return `Han rechazado una solicitud de ${String(notification.payload.listing_title ?? 'un listing')}`;
+            return `El prestador ha rechazado la solicitud sobre "${String(notification.payload.listing_title ?? 'tu objeto')}"`;
         case 'chat_opened':
             return `Se ha abierto un chat para reservar tu objeto: ${String(notification.payload.listing_title ?? 'tu listing')}`;
         case 'points_refunded':

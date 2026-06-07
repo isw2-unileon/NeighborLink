@@ -125,6 +125,7 @@ func registerModules(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, cfg c
 		messageRepo,
 		adapters.NewTxReaderAdapter(transactionRepo),
 		&adminCheckAdapter{repo: userRepo},
+		notificationsSvc,
 	).RegisterRoutes(api, authMiddleware)
 
 	// Reviews
@@ -204,4 +205,3 @@ func (a *adminCheckAdapter) IsAdmin(ctx context.Context, userID string) (bool, e
 	}
 	return u.Role == "admin", nil
 }
-

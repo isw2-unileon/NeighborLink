@@ -328,7 +328,7 @@ func (h *Handler) rejectTransaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Reject(c.Request.Context(), id); err != nil {
+	if err := h.service.RejectRequest(c.Request.Context(), id); err != nil {
 		h.handleServiceError(c, "reject", id, err)
 		return
 	}
@@ -476,21 +476,109 @@ func (h *Handler) checkDateOverlap(ctx context.Context, listingID string, start,
 
 func (h *Handler) notifyOwnerOfChat(listingID, borrowerID string) {
 	if h.notifSvc == nil {
+		slog.Warn("notification service is nil", "listing_id", listingID, "type", "chat_opened")
 		return
 	}
+
 	go func() {
-		ownerID, listingTitle, notifErr := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
-		if notifErr != nil {
-			slog.Error("failed to fetch listing owner for notification", "listing_id", listingID, "error", notifErr)
+		ownerID, listingTitle, err := h.repo.FindListingOwnerAndTitle(context.Background(), listingID)
+		if err != nil {
+			slog.Error(
+				"failed to fetch listing owner for notification",
+				"listing_id", listingID,
+				"borrower_id", borrowerID,
+				"type", "chat_opened",
+				"error", err,
+			)
 			return
 		}
-		_ = h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
+
+		if err := h.notifSvc.Create(context.Background(), ownerID, "chat_opened", map[string]any{
 			"listing_title": listingTitle,
 			"borrower_id":   borrowerID,
-		})
+		}); err != nil {
+			slog.Error(
+				"failed to create notification",
+				"listing_id", listingID,
+				"owner_id", ownerID,
+				"borrower_id", borrowerID,
+				"type", "chat_opened",
+				"error", err,
+			)
+			return
+		}
+
+		slog.Info(
+			"notification created",
+			"listing_id", listingID,
+			"user_id", ownerID,
+			"type", "chat_opened",
+		)
 	}()
 }
 
+func (h *Handler) notifyBorrowerOfDecision(transactionID, notifType string) {
+	if h.notifSvc == nil {
+		slog.Warn("notification service is nil", "transaction_id", transactionID, "type", notifType)
+		return
+	}
+
+	go func() {
+		t, err := h.repo.FindByID(context.Background(), transactionID)
+		if err != nil {
+			slog.Error(
+				"failed to fetch transaction for notification",
+				"transaction_id", transactionID,
+				"type", notifType,
+				"error", err,
+			)
+			return
+		}
+		if t == nil {
+			slog.Error(
+				"transaction not found for notification",
+				"transaction_id", transactionID,
+				"type", notifType,
+			)
+			return
+		}
+
+		_, listingTitle, err := h.repo.FindListingOwnerAndTitle(context.Background(), t.ListingID)
+		if err != nil {
+			slog.Error(
+				"failed to fetch listing title for notification",
+				"transaction_id", transactionID,
+				"listing_id", t.ListingID,
+				"borrower_id", t.BorrowerID,
+				"type", notifType,
+				"error", err,
+			)
+			return
+		}
+
+		if err := h.notifSvc.Create(context.Background(), t.BorrowerID, notifType, map[string]any{
+			"listing_title": listingTitle,
+		}); err != nil {
+			slog.Error(
+				"failed to create notification",
+				"transaction_id", transactionID,
+				"listing_id", t.ListingID,
+				"user_id", t.BorrowerID,
+				"type", notifType,
+				"error", err,
+			)
+			return
+		}
+
+		slog.Info(
+			"notification created",
+			"transaction_id", transactionID,
+			"listing_id", t.ListingID,
+			"user_id", t.BorrowerID,
+			"type", notifType,
+		)
+	}()
+}
 
 func (h *Handler) validateReserveDates(c *gin.Context, input ReserveInput) (start, end time.Time, ok bool) {
 	var err error

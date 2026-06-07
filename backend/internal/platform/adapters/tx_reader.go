@@ -17,6 +17,11 @@ func NewTxReaderAdapter(repo transactions.Repository) messages.TransactionReader
 	return &TxReaderAdapter{repo: repo}
 }
 
+// FindListingOwnerAndTitle retrieves the owner ID and title of a listing by its ID using the underlying transactions.Repository. It returns an error if the retrieval operation fails.
+func (a *TxReaderAdapter) FindListingOwnerAndTitle(ctx context.Context, listingID string) (string, string, error) {
+	return a.repo.FindListingOwnerAndTitle(ctx, listingID)
+}
+
 // FindByID retrieves a transaction by its ID using the underlying transactions.Repository and converts it to a messages.TransactionSummary. It returns nil if the transaction is not found.
 func (a *TxReaderAdapter) FindByID(ctx context.Context, id string) (*messages.TransactionSummary, error) {
 	tx, err := a.repo.FindByID(ctx, id)
