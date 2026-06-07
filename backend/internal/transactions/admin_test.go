@@ -2,6 +2,7 @@ package transactions_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,15 +13,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type noopUserNameGetter struct{}
+
+func (noopUserNameGetter) GetUserNameByID(_ context.Context, _ string) (string, error) {
+	return "Usuario", nil
+}
+
 func TestAdminRestrictions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("admin cannot reserve listing", func(t *testing.T) {
 		repo := &fakeRepository{}
 		adminChecker := &mockAdminChecker{Admins: map[string]bool{"admin-1": true}}
-		
+
 		svc := transactions.NewService(repo, nil, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
-		h := transactions.NewHandler(repo, svc, &noopPointsAdder{}, &noopNotificationCreator{}, adminChecker)
+		h := transactions.NewHandler(
+			repo,
+			svc,
+			&noopPointsAdder{},
+			&noopNotificationCreator{},
+			adminChecker,
+			&noopUserNameGetter{},
+		)
 
 		r := gin.New()
 		h.RegisterRoutes(r.Group("/api"), fakeAuthMiddleware("admin-1"))
@@ -30,7 +44,7 @@ func TestAdminRestrictions(t *testing.T) {
 			"end_date":   "2026-06-12",
 		}
 		jsonBody, _ := json.Marshal(body)
-		
+
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", "/api/listings/listing-1/reserve", bytes.NewBuffer(jsonBody))
 		r.ServeHTTP(w, req)
@@ -46,9 +60,16 @@ func TestAdminRestrictions(t *testing.T) {
 			},
 		}
 		adminChecker := &mockAdminChecker{Admins: map[string]bool{"user-1": false}}
-		
+
 		svc := transactions.NewService(repo, nil, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
-		h := transactions.NewHandler(repo, svc, &noopPointsAdder{}, &noopNotificationCreator{}, adminChecker)
+		h := transactions.NewHandler(
+			repo,
+			svc,
+			&noopPointsAdder{},
+			&noopNotificationCreator{},
+			adminChecker,
+			&noopUserNameGetter{},
+		)
 
 		r := gin.New()
 		h.RegisterRoutes(r.Group("/api"), fakeAuthMiddleware("user-1"))
@@ -67,9 +88,16 @@ func TestAdminRestrictions(t *testing.T) {
 			},
 		}
 		adminChecker := &mockAdminChecker{Admins: map[string]bool{"admin-1": true}}
-		
+
 		svc := transactions.NewService(repo, nil, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
-		h := transactions.NewHandler(repo, svc, &noopPointsAdder{}, &noopNotificationCreator{}, adminChecker)
+		h := transactions.NewHandler(
+			repo,
+			svc,
+			&noopPointsAdder{},
+			&noopNotificationCreator{},
+			adminChecker,
+			&noopUserNameGetter{},
+		)
 
 		r := gin.New()
 		h.RegisterRoutes(r.Group("/api"), fakeAuthMiddleware("admin-1"))
@@ -88,9 +116,16 @@ func TestAdminRestrictions(t *testing.T) {
 			},
 		}
 		adminChecker := &mockAdminChecker{Admins: map[string]bool{"admin-1": true}}
-		
+
 		svc := transactions.NewService(repo, nil, &noopListingUpdater{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
-		h := transactions.NewHandler(repo, svc, &noopPointsAdder{}, &noopNotificationCreator{}, adminChecker)
+		h := transactions.NewHandler(
+			repo,
+			svc,
+			&noopPointsAdder{},
+			&noopNotificationCreator{},
+			adminChecker,
+			&noopUserNameGetter{},
+		)
 
 		r := gin.New()
 		h.RegisterRoutes(r.Group("/api"), fakeAuthMiddleware("admin-1"))

@@ -146,7 +146,7 @@ func TestReject_SetsCancelledStatus(t *testing.T) {
 	}
 	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-	err := svc.Reject(context.Background(), "tx-1")
+	err := svc.RejectRequest(context.Background(), "tx-1")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "cancelled", repo.transactions[0].Status)
@@ -160,7 +160,7 @@ func TestReject_FailsIfNotPending(t *testing.T) {
 	}
 	svc := transactions.NewService(repo, &fakeStripe{}, &fakeListingSvc{}, &mockAdminFinder{}, &mockMessageCreator{}, &noopPointsAdder{}, &noopNotificationCreator{})
 
-	err := svc.Reject(context.Background(), "tx-1")
+	err := svc.RejectRequest(context.Background(), "tx-1")
 
 	assert.Error(t, err)
 }

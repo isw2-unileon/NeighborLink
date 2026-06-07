@@ -89,8 +89,6 @@ func (f *fakeTransactionLister) FindByListing(_ context.Context, _ string) ([]tr
 
 // --- Helpers ---
 
-
-
 func fakeAuthMiddleware(userID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("userID", userID)

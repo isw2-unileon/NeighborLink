@@ -15,4 +15,5 @@ type TransactionSummary struct {
 type TransactionReader interface {
 	FindByID(ctx context.Context, id string) (*TransactionSummary, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
+	FindListingOwnerAndTitle(ctx context.Context, listingID string) (string, string, error)
 }
