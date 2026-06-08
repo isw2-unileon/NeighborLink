@@ -111,7 +111,7 @@ func (r *postgresRepository) GetPointsHistory(ctx context.Context, userID string
             SELECT t.id as transaction_id, l.title as listing_title, t.return_at as completed_at,
                    FLOOR(
                      (t.total_charged_cents - 200) *
-                     (GREATEST(1, LEAST(7, (t.return_at::date - t.handover_at::date))) + 4)
+                     (GREATEST(1, LEAST(7, (GREATEST(t.end_date::date, t.return_at::date) - GREATEST(t.start_date::date, t.handover_at::date)))) + 4)
                      / 100.0
                    ) AS points_earned
             FROM transactions t
